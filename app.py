@@ -998,6 +998,7 @@ if uploaded_file is not None:
             st.session_state.front_cols_ordered = []
             st.session_state.back_cols_ordered = []
             st.session_state.col_styles = {}
+            st.session_state.api_config = {}
             st.success("Tabulka úspěšně načtena do paměti!")
         except Exception as e:
             st.error(f"Nepodařilo se načíst soubor: {e}")
@@ -1013,187 +1014,471 @@ if st.session_state.df is not None:
     # --- KROK 2: OBOHACENÍ DATA (API ENHANCERS S TÉMATICKÝM VÝBĚREM) ---
     st.markdown("---")
     
-    # Inicializace výchozích konfigurací pro zamezení NameError
-    inat_col = columns[0] if columns else ""
-    inat_max_photos = 4
-    inat_desc_type = "Vědecký anglický (popis, habitat, listy...)"
-    gbif_col = columns[0] if columns else ""
-    uniprot_col = columns[0] if columns else ""
-    icd10_col = columns[0] if columns else ""
-    trans_col = columns[0] if columns else ""
-    trans_src = "Angličtina"
-    trans_tgt = "Čeština"
-    tts_col = columns[0] if columns else ""
-    tts_lang = "Angličtina"
-    dict_col = columns[0] if columns else ""
-    chem_col = columns[0] if columns else ""
-    onthisday_col = columns[0] if columns else ""
-    wiki_img_col = columns[0] if columns else ""
-    wiki_max_photos = 3
-    wiki_gen_col = columns[0] if columns else ""
-    wiki_gen_lang = "Čeština (cs)"
-    country_col = columns[0] if columns else ""
-    
-    enable_inat = False
-    enable_gbif = False
-    enable_uniprot = False
-    enable_icd10 = False
-    enable_trans = False
-    enable_tts = False
-    enable_dict = False
-    enable_wiki_img = False
-    enable_wiki_gen = False
-    enable_chem = False
-    enable_onthisday = False
-    enable_country = False
+    # Inicializace persistentního konfigurátoru v session_state (aby přežil přepínání záložek)
+    if "api_config" not in st.session_state or not st.session_state.api_config:
+        st.session_state.api_config = {
+            "selected_api_topic": "🌿 Biologie",
+            "enable_inat": False,
+            "inat_col": columns[0] if columns else "",
+            "inat_max": 4,
+            "inat_desc": "Vědecký anglický (popis, habitat, listy...)",
+            "enable_gbif": False,
+            "gbif_col": columns[0] if columns else "",
+            "enable_uniprot": False,
+            "uniprot_col": columns[0] if columns else "",
+            "enable_icd10": False,
+            "icd_col": columns[0] if columns else "",
+            "enable_trans": False,
+            "trans_col": columns[0] if columns else "",
+            "trans_src": "Angličtina",
+            "trans_tgt": "Čeština",
+            "enable_tts": False,
+            "tts_col": columns[0] if columns else "",
+            "tts_lang": "Angličtina",
+            "enable_dict": False,
+            "dict_col": columns[0] if columns else "",
+            "enable_country": False,
+            "country_col": columns[0] if columns else "",
+            "enable_chem": False,
+            "chem_col": columns[0] if columns else "",
+            "enable_onthisday": False,
+            "otd_col": columns[0] if columns else "",
+            "enable_wiki_img": False,
+            "wiki_col": columns[0] if columns else "",
+            "wiki_max": 3,
+            "enable_wiki_gen": False,
+            "wiki_gen_col": columns[0] if columns else "",
+            "wiki_gen_lang": "Čeština (cs)"
+        }
 
-    st.markdown("### 🛠️ Obohatit tabulku o nová data (API moduly)")
-    st.write("Vyberte hlavní zaměření/téma studia a nakonfigurujte příslušné moduly.")
-    
-    tab_bio, tab_med, tab_lang, tab_geo, tab_chem, tab_hist, tab_gen, tab_all = st.tabs([
-        "🌿 Biologie & Mikrobiologie",
-        "🩺 Medicína & Anatomie",
-        "🗣️ Jazykové vzdělávání",
-        "🌍 Zeměpis & Státy",
-        "🧪 Chemie",
-        "🏛️ Historie & Společenské vědy",
-        "🔍 Obecné vyhledávání & Obrázky",
-        "🛠️ Zobrazit všechny moduly (pokročilé)"
-    ])
-    
+    # Zajištění validních sloupců (pokud by se změnil DataFrame bez kompletního promazání)
+    cfg = st.session_state.api_config
+    col_keys = ["inat_col", "gbif_col", "uniprot_col", "icd_col", "trans_col", "tts_col", 
+                "dict_col", "country_col", "chem_col", "otd_col", "wiki_col", "wiki_gen_col"]
+    for col_key in col_keys:
+        if col_key not in cfg or cfg[col_key] not in columns:
+            cfg[col_key] = columns[0] if columns else ""
+
     languages = {
         "Angličtina": "en", "Čeština": "cs", "Němčina": "de", 
         "Španělština": "es", "Francouzština": "fr", "Italština": "it", "Ruština": "ru"
     }
+
+
+    # Horizontální radio jako taby – přežije rerun
+    st.markdown("""
+    <style>
+    div[role="radiogroup"] > label { 
+        display: inline-flex; margin-right: 4px;
+        padding: 8px 16px; border-radius: 8px 8px 0 0;
+        background: rgba(128, 128, 128, 0.15); 
+        border: 1px solid rgba(128, 128, 128, 0.3);
+        border-bottom: none; cursor: pointer; font-weight: 500;
+        color: inherit !important;
+    }
+    div[role="radiogroup"] > label p {
+        color: inherit !important;
+        margin: 0 !important;
+        font-weight: inherit !important;
+    }
+    div[role="radiogroup"] > label:hover {
+        background: rgba(128, 128, 128, 0.25);
+    }
+    div[role="radiogroup"] > label:has(input:checked) {
+        background: #1D4ED8 !important; 
+        border-color: #1D4ED8 !important;
+        color: white !important; 
+        font-weight: 700;
+    }
+    div[role="radiogroup"] > label:has(input:checked) p {
+        color: white !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    topics = ["🌿 Biologie", "🩺 Medicína", "🗣️ Jazyky", "🌍 Zeměpis", "🧪 Chemie", "🏛️ Historie", "🔍 Obecné"]
+    curr_topic = cfg.get("selected_api_topic", "🌿 Biologie")
+    try:
+        topic_idx = topics.index(curr_topic)
+    except ValueError:
+        topic_idx = 0
+
+    selected_topic = st.radio(
+        "Téma modulu:",
+        topics,
+        index=topic_idx,
+        horizontal=True,
+        key="selected_api_topic_widget",
+        label_visibility="collapsed"
+    )
+    cfg["selected_api_topic"] = selected_topic
     
-    with tab_bio:
-        st.markdown("### 🌿 Moduly pro biologii a mikrobiologii")
+    st.markdown("<hr style='margin:0 0 12px 0'>", unsafe_allow_html=True)
+
+    if selected_topic == "🌿 Biologie":
+        st.markdown("#### 🌿 Moduly pro biologii a mikrobiologii")
         col_b1, col_b2 = st.columns(2)
         with col_b1:
-            enable_inat = st.checkbox("Aktivovat iNaturalist (Botanika & Zoologie)", value=False)
-            inat_col = st.selectbox("Sloupec s latinským názvem druhu", options=columns, key="inat_col")
-            inat_max_photos = st.slider("Max fotek z iNat na řádek", 1, 5, 4, key="inat_max")
-            inat_desc_type = st.selectbox(
-                "Typ popisů", 
-                ["Vědecký anglický (popis, habitat, listy...)", "Stručný český (Wikipedie)"],
-                key="inat_desc"
+            cfg["enable_inat"] = st.checkbox(
+                "Aktivovat iNaturalist (Botanika & Zoologie)", 
+                value=cfg.get("enable_inat", False),
+                key="w_enable_inat"
             )
+            
+            inat_col_val = cfg.get("inat_col", columns[0])
+            try:
+                inat_col_idx = columns.index(inat_col_val)
+            except ValueError:
+                inat_col_idx = 0
+            cfg["inat_col"] = st.selectbox(
+                "Sloupec s latinským názvem druhu", 
+                options=columns, 
+                index=inat_col_idx,
+                key="w_inat_col"
+            )
+            
+            cfg["inat_max"] = st.slider(
+                "Max fotek z iNat na řádek", 
+                1, 5, 
+                value=cfg.get("inat_max", 4),
+                key="w_inat_max"
+            )
+            
+            desc_options = ["Vědecký anglický (popis, habitat, listy...)", "Stručný český (Wikipedie)"]
+            inat_desc_val = cfg.get("inat_desc", desc_options[0])
+            try:
+                inat_desc_idx = desc_options.index(inat_desc_val)
+            except ValueError:
+                inat_desc_idx = 0
+            cfg["inat_desc"] = st.selectbox(
+                "Typ popisů", 
+                options=desc_options, 
+                index=inat_desc_idx,
+                key="w_inat_desc"
+            )
+            
         with col_b2:
-            enable_gbif = st.checkbox("Aktivovat GBIF Taxonomii (kmen, třída, čeleď...)", value=False)
-            gbif_col = st.selectbox("Sloupec s latinským názvem k zařazení", options=columns, key="gbif_col")
+            cfg["enable_gbif"] = st.checkbox(
+                "Aktivovat GBIF Taxonomii (kmen, třída, čeleď...)", 
+                value=cfg.get("enable_gbif", False),
+                key="w_enable_gbif"
+            )
             
-            enable_uniprot = st.checkbox("Aktivovat UniProt (Funkce proteinů & genů)", value=False)
-            uniprot_col = st.selectbox("Sloupec s názvem genu (např. TP53)", options=columns, key="uniprot_col")
+            gbif_col_val = cfg.get("gbif_col", columns[0])
+            try:
+                gbif_col_idx = columns.index(gbif_col_val)
+            except ValueError:
+                gbif_col_idx = 0
+            cfg["gbif_col"] = st.selectbox(
+                "Sloupec s latinským názvem k zařazení", 
+                options=columns, 
+                index=gbif_col_idx,
+                key="w_gbif_col"
+            )
             
-    with tab_med:
-        st.markdown("### 🩺 Moduly pro medicínu a klinické obory")
-        enable_icd10 = st.checkbox("Aktivovat MKN-10 (Mezinárodní klasifikace nemocí / ICD-10)", value=False)
-        icd10_col = st.selectbox("Sloupec s názvem diagnózy nebo kódem", options=columns, key="icd_col")
+            cfg["enable_uniprot"] = st.checkbox(
+                "Aktivovat UniProt (Funkce proteinů & genů)", 
+                value=cfg.get("enable_uniprot", False),
+                key="w_enable_uniprot"
+            )
+            
+            uniprot_col_val = cfg.get("uniprot_col", columns[0])
+            try:
+                uniprot_col_idx = columns.index(uniprot_col_val)
+            except ValueError:
+                uniprot_col_idx = 0
+            cfg["uniprot_col"] = st.selectbox(
+                "Sloupec s názvem genu (např. TP53)", 
+                options=columns, 
+                index=uniprot_col_idx,
+                key="w_uniprot_col"
+            )
+
+    elif selected_topic == "🩺 Medicína":
+        st.markdown("#### 🩺 Moduly pro medicínu a klinické obory")
+        cfg["enable_icd10"] = st.checkbox(
+            "Aktivovat MKN-10 (Mezinárodní klasifikace nemocí / ICD-10)", 
+            value=cfg.get("enable_icd10", False),
+            key="w_enable_icd10"
+        )
         
-    with tab_lang:
-        st.markdown("### 🗣️ Moduly pro cizí jazyky a slovní zásobu")
+        icd_col_val = cfg.get("icd_col", columns[0])
+        try:
+            icd_col_idx = columns.index(icd_col_val)
+        except ValueError:
+            icd_col_idx = 0
+        cfg["icd_col"] = st.selectbox(
+            "Sloupec s názvem diagnózy nebo kódem", 
+            options=columns, 
+            index=icd_col_idx,
+            key="w_icd_col"
+        )
+
+    elif selected_topic == "🗣️ Jazyky":
+        st.markdown("#### 🗣️ Moduly pro cizí jazyky a slovní zásobu")
         col_l1, col_l2 = st.columns(2)
         with col_l1:
-            enable_trans = st.checkbox("Aktivovat překladač", value=False)
-            trans_col = st.selectbox("Sloupec s textem k překladu", options=columns, key="trans_col")
-            trans_src = st.selectbox("Zdrojový jazyk", options=list(languages.keys()), index=0)
-            trans_tgt = st.selectbox("Cílový jazyk", options=list(languages.keys()), index=1)
+            cfg["enable_trans"] = st.checkbox(
+                "Aktivovat překladač", 
+                value=cfg.get("enable_trans", False),
+                key="w_enable_trans"
+            )
+            
+            trans_col_val = cfg.get("trans_col", columns[0])
+            try:
+                trans_col_idx = columns.index(trans_col_val)
+            except ValueError:
+                trans_col_idx = 0
+            cfg["trans_col"] = st.selectbox(
+                "Sloupec s textem k překladu", 
+                options=columns, 
+                index=trans_col_idx,
+                key="w_trans_col"
+            )
+            
+            lang_keys = list(languages.keys())
+            trans_src_val = cfg.get("trans_src", "Angličtina")
+            try:
+                trans_src_idx = lang_keys.index(trans_src_val)
+            except ValueError:
+                trans_src_idx = 0
+            cfg["trans_src"] = st.selectbox(
+                "Zdrojový jazyk", 
+                options=lang_keys, 
+                index=trans_src_idx,
+                key="w_trans_src"
+            )
+            
+            trans_tgt_val = cfg.get("trans_tgt", "Čeština")
+            try:
+                trans_tgt_idx = lang_keys.index(trans_tgt_val)
+            except ValueError:
+                trans_tgt_idx = 1 if len(lang_keys) > 1 else 0
+            cfg["trans_tgt"] = st.selectbox(
+                "Cílový jazyk", 
+                options=lang_keys, 
+                index=trans_tgt_idx,
+                key="w_trans_tgt"
+            )
+            
         with col_l2:
-            enable_tts = st.checkbox("Aktivovat hlasovou výslovnost (Google TTS)", value=False)
-            tts_col = st.selectbox("Sloupec s textem k namluvení", options=columns, key="tts_col")
-            tts_lang = st.selectbox("Jazyk výslovnosti", options=list(languages.keys()), index=0, key="tts_lang")
+            cfg["enable_tts"] = st.checkbox(
+                "Aktivovat hlasovou výslovnost (Google TTS)", 
+                value=cfg.get("enable_tts", False),
+                key="w_enable_tts"
+            )
             
-            enable_dict = st.checkbox("Aktivovat anglický výkladový slovník (včetně příkladové věty)", value=False)
-            dict_col = st.selectbox("Sloupec s anglickým slovem k definici", options=columns, key="dict_col")
+            tts_col_val = cfg.get("tts_col", columns[0])
+            try:
+                tts_col_idx = columns.index(tts_col_val)
+            except ValueError:
+                tts_col_idx = 0
+            cfg["tts_col"] = st.selectbox(
+                "Sloupec s textem k namluvení", 
+                options=columns, 
+                index=tts_col_idx,
+                key="w_tts_col"
+            )
             
-    with tab_geo:
-        st.markdown("### 🌍 Moduly pro zeměpis a státy")
-        enable_country = st.checkbox("Aktivovat modul států (hlavní město, region, měna, vlajka...)", value=False)
-        country_col = st.selectbox("Sloupec s názvem státu (česky nebo anglicky)", options=columns, key="country_col")
+            tts_lang_val = cfg.get("tts_lang", "Angličtina")
+            try:
+                tts_lang_idx = lang_keys.index(tts_lang_val)
+            except ValueError:
+                tts_lang_idx = 0
+            cfg["tts_lang"] = st.selectbox(
+                "Jazyk výslovnosti", 
+                options=lang_keys, 
+                index=tts_lang_idx,
+                key="w_tts_lang"
+            )
+            
+            cfg["enable_dict"] = st.checkbox(
+                "Aktivovat anglický výkladový slovník", 
+                value=cfg.get("enable_dict", False),
+                key="w_enable_dict"
+            )
+            
+            dict_col_val = cfg.get("dict_col", columns[0])
+            try:
+                dict_col_idx = columns.index(dict_col_val)
+            except ValueError:
+                dict_col_idx = 0
+            cfg["dict_col"] = st.selectbox(
+                "Sloupec s anglickým slovem k definici", 
+                options=columns, 
+                index=dict_col_idx,
+                key="w_dict_col"
+            )
+
+    elif selected_topic == "🌍 Zeměpis":
+        st.markdown("#### 🌍 Moduly pro zeměpis a státy")
+        cfg["enable_country"] = st.checkbox(
+            "Aktivovat modul států (hlavní město, region, měna, vlajka...)", 
+            value=cfg.get("enable_country", False),
+            key="w_enable_country"
+        )
         
-    with tab_chem:
-        st.markdown("### 🧪 Moduly pro chemii")
-        enable_chem = st.checkbox("Aktivovat PubChem (molekuly, hmotnost, IUPAC)", value=False)
-        chem_col = st.selectbox("Sloupec s názvem sloučeniny (anglicky)", options=columns, key="chem_col")
+        country_col_val = cfg.get("country_col", columns[0])
+        try:
+            country_col_idx = columns.index(country_col_val)
+        except ValueError:
+            country_col_idx = 0
+        cfg["country_col"] = st.selectbox(
+            "Sloupec s názvem státu (česky nebo anglicky)", 
+            options=columns, 
+            index=country_col_idx,
+            key="w_country_col"
+        )
+
+    elif selected_topic == "🧪 Chemie":
+        st.markdown("#### 🧪 Moduly pro chemii")
+        cfg["enable_chem"] = st.checkbox(
+            "Aktivovat PubChem (molekuly, hmotnost, IUPAC)", 
+            value=cfg.get("enable_chem", False),
+            key="w_enable_chem"
+        )
         
-    with tab_hist:
-        st.markdown("### 🏛️ Moduly pro historii a společenské vědy")
-        enable_onthisday = st.checkbox("Aktivovat kalendárium 'Tento den v historii'", value=False)
-        onthisday_col = st.selectbox("Sloupec s datem (např. 26.6., June 26, 06/26)", options=columns, key="otd_col")
+        chem_col_val = cfg.get("chem_col", columns[0])
+        try:
+            chem_col_idx = columns.index(chem_col_val)
+        except ValueError:
+            chem_col_idx = 0
+        cfg["chem_col"] = st.selectbox(
+            "Sloupec s názvem sloučeniny (anglicky)", 
+            options=columns, 
+            index=chem_col_idx,
+            key="w_chem_col"
+        )
+
+    elif selected_topic == "🏛️ Historie":
+        st.markdown("#### 🏛️ Moduly pro historii a společenské vědy")
+        cfg["enable_onthisday"] = st.checkbox(
+            "Aktivovat kalendárium 'Tento den v historii'", 
+            value=cfg.get("enable_onthisday", False),
+            key="w_enable_onthisday"
+        )
         
-    with tab_gen:
-        st.markdown("### 🔍 Obecné a encyklopedické vyhledávání")
+        otd_col_val = cfg.get("otd_col", columns[0])
+        try:
+            otd_col_idx = columns.index(otd_col_val)
+        except ValueError:
+            otd_col_idx = 0
+        cfg["otd_col"] = st.selectbox(
+            "Sloupec s datem (např. 26.6., June 26, 06/26)", 
+            options=columns, 
+            index=otd_col_idx,
+            key="w_otd_col"
+        )
+
+    elif selected_topic == "🔍 Obecné":
+        st.markdown("#### 🔍 Obecné a encyklopedické vyhledávání")
         col_g1, col_g2 = st.columns(2)
         with col_g1:
-            enable_wiki_img = st.checkbox("Aktivovat Wikimedia Commons vyhledávač obrázků", value=False)
-            wiki_img_col = st.selectbox("Sloupec s vyhledávaným slovem pro obrázek", options=columns, key="wiki_col")
-            wiki_max_photos = st.slider("Max fotek na řádek", 1, 5, 3, key="wiki_max")
+            cfg["enable_wiki_img"] = st.checkbox(
+                "Aktivovat Wikimedia Commons vyhledávač obrázků", 
+                value=cfg.get("enable_wiki_img", False),
+                key="w_enable_wiki_img"
+            )
+            
+            wiki_col_val = cfg.get("wiki_col", columns[0])
+            try:
+                wiki_col_idx = columns.index(wiki_col_val)
+            except ValueError:
+                wiki_col_idx = 0
+            cfg["wiki_col"] = st.selectbox(
+                "Sloupec s vyhledávaným slovem pro obrázek", 
+                options=columns, 
+                index=wiki_col_idx,
+                key="w_wiki_col"
+            )
+            
+            cfg["wiki_max"] = st.slider(
+                "Max fotek na řádek", 
+                1, 5, 
+                value=cfg.get("wiki_max", 3),
+                key="w_wiki_max"
+            )
+            
         with col_g2:
-            enable_wiki_gen = st.checkbox("Aktivovat obecné vyhledávání na Wikipedii", value=False)
-            wiki_gen_col = st.selectbox("Sloupec s tématem pro Wikipedii", options=columns, key="wiki_gen_col")
-            wiki_gen_lang = st.selectbox("Jazyk Wikipedie pro vyhledání", options=["Čeština (cs)", "Angličtina (en)"], index=0, key="wiki_gen_lang")
+            cfg["enable_wiki_gen"] = st.checkbox(
+                "Aktivovat obecné vyhledávání na Wikipedii", 
+                value=cfg.get("enable_wiki_gen", False),
+                key="w_enable_wiki_gen"
+            )
             
-    with tab_all:
-        st.markdown("### 🛠️ Všechny dostupné API moduly")
-        
-        with st.expander("🌿 Biologie & Mikrobiologie", expanded=True):
-            col_b1, col_b2 = st.columns(2)
-            with col_b1:
-                enable_inat = st.checkbox("Aktivovat iNaturalist", value=False, key="all_inat")
-                inat_col = st.selectbox("Sloupec s názvem druhu", options=columns, key="all_inat_col")
-                inat_max_photos = st.slider("Max fotek", 1, 5, 4, key="all_inat_max")
-                inat_desc_type = st.selectbox("Typ popisů", ["Vědecký anglický (popis, habitat, listy...)", "Stručný český (Wikipedie)"], key="all_inat_desc")
-            with col_b2:
-                enable_gbif = st.checkbox("Aktivovat GBIF Taxonomii", value=False, key="all_gbif")
-                gbif_col = st.selectbox("Sloupec k zařazení", options=columns, key="all_gbif_col")
-                enable_uniprot = st.checkbox("Aktivovat UniProt", value=False, key="all_uniprot")
-                uniprot_col = st.selectbox("Sloupec s názvem genu", options=columns, key="all_uniprot_col")
-                
-        with st.expander("🩺 Medicína & Anatomie", expanded=True):
-            enable_icd10 = st.checkbox("Aktivovat MKN-10", value=False, key="all_icd")
-            icd10_col = st.selectbox("Sloupec s názvem diagnózy", options=columns, key="all_icd_col")
+            wiki_gen_col_val = cfg.get("wiki_gen_col", columns[0])
+            try:
+                wiki_gen_col_idx = columns.index(wiki_gen_col_val)
+            except ValueError:
+                wiki_gen_col_idx = 0
+            cfg["wiki_gen_col"] = st.selectbox(
+                "Sloupec s tématem pro Wikipedii", 
+                options=columns, 
+                index=wiki_gen_col_idx,
+                key="w_wiki_gen_col"
+            )
             
-        with st.expander("🗣️ Jazykové vzdělávání", expanded=True):
-            col_l1, col_l2 = st.columns(2)
-            with col_l1:
-                enable_trans = st.checkbox("Aktivovat překladač", value=False, key="all_trans")
-                trans_col = st.selectbox("Sloupec k překladu", options=columns, key="all_trans_col")
-                trans_src = st.selectbox("Zdrojový jazyk", options=list(languages.keys()), index=0, key="all_trans_src")
-                trans_tgt = st.selectbox("Cílový jazyk", options=list(languages.keys()), index=1, key="all_trans_tgt")
-            with col_l2:
-                enable_tts = st.checkbox("Aktivovat hlasovou výslovnost (TTS)", value=False, key="all_tts")
-                tts_col = st.selectbox("Sloupec k namluvení", options=columns, key="all_tts_col")
-                tts_lang = st.selectbox("Jazyk výslovnosti", options=list(languages.keys()), index=0, key="all_tts_lang")
-                enable_dict = st.checkbox("Aktivovat výkladový slovník (včetně příkladové věty)", value=False, key="all_dict")
-                dict_col = st.selectbox("Sloupec s anglickým slovem", options=columns, key="all_dict_col")
-                
-        with st.expander("🌍 Zeměpis & Státy", expanded=True):
-            enable_country = st.checkbox("Aktivovat modul států", value=False, key="all_country")
-            country_col = st.selectbox("Sloupec s názvem státu", options=columns, key="all_country_col")
-            
-        with st.expander("🧪 Chemie", expanded=True):
-            enable_chem = st.checkbox("Aktivovat PubChem", value=False, key="all_chem")
-            chem_col = st.selectbox("Sloupec s názvem sloučeniny", options=columns, key="all_chem_col")
-            
-        with st.expander("🏛️ Historie", expanded=True):
-            enable_onthisday = st.checkbox("Aktivovat kalendárium 'Tento den'", value=False, key="all_otd")
-            onthisday_col = st.selectbox("Sloupec s datem", options=columns, key="all_otd_col")
-            
-        with st.expander("🔍 Obecné vyhledávání", expanded=True):
-            col_g1, col_g2 = st.columns(2)
-            with col_g1:
-                enable_wiki_img = st.checkbox("Aktivovat Wikimedia Commons", value=False, key="all_wiki_img")
-                wiki_img_col = st.selectbox("Sloupec pro obrázek", options=columns, key="all_wiki_img_col")
-                wiki_max_photos = st.slider("Max fotek", 1, 5, 3, key="all_wiki_max")
-            with col_g2:
-                enable_wiki_gen = st.checkbox("Aktivovat obecnou Wikipedii", value=False, key="all_wiki_gen")
-                wiki_gen_col = st.selectbox("Sloupec s tématem", options=columns, key="all_wiki_gen_col")
-                wiki_gen_lang = st.selectbox("Jazyk Wikipedie", options=["Čeština (cs)", "Angličtina (en)"], index=0, key="all_wiki_gen_lang")
-    
+            wiki_gen_lang_options = ["Čeština (cs)", "Angličtina (en)"]
+            wiki_gen_lang_val = cfg.get("wiki_gen_lang", wiki_gen_lang_options[0])
+            try:
+                wiki_gen_lang_idx = wiki_gen_lang_options.index(wiki_gen_lang_val)
+            except ValueError:
+                wiki_gen_lang_idx = 0
+            cfg["wiki_gen_lang"] = st.selectbox(
+                "Jazyk Wikipedie pro vyhledání", 
+                options=wiki_gen_lang_options, 
+                index=wiki_gen_lang_idx,
+                key="w_wiki_gen_lang"
+            )
+
+    # Přehled aktivních modulů
+    active = [k.replace("enable_","") for k in ["enable_inat","enable_gbif","enable_uniprot","enable_icd10",
+              "enable_trans","enable_tts","enable_dict","enable_country","enable_chem",
+              "enable_onthisday","enable_wiki_img","enable_wiki_gen"] if cfg.get(k, False)]
+    if active:
+        st.info(f"✅ Aktivní moduly: **{', '.join(active)}**")
+
+
     st.markdown("---")
     
     # Spuštění obohacení
     if st.button("⚡ Spustit obohacení dat (API)"):
+        # Načíst aktuální hodnoty ze session_state (přežijí přepnutí tabu)
+        cfg = st.session_state.api_config
+        enable_inat = cfg.get("enable_inat", False)
+        enable_gbif = cfg.get("enable_gbif", False)
+        enable_uniprot = cfg.get("enable_uniprot", False)
+        enable_icd10 = cfg.get("enable_icd10", False)
+        enable_trans = cfg.get("enable_trans", False)
+        enable_tts = cfg.get("enable_tts", False)
+        enable_dict = cfg.get("enable_dict", False)
+        enable_wiki_img = cfg.get("enable_wiki_img", False)
+        enable_wiki_gen = cfg.get("enable_wiki_gen", False)
+        enable_chem = cfg.get("enable_chem", False)
+        enable_onthisday = cfg.get("enable_onthisday", False)
+        enable_country = cfg.get("enable_country", False)
+        trans_src = cfg.get("trans_src", "Angličtina")
+        trans_tgt = cfg.get("trans_tgt", "Čeština")
+        
+        inat_col = cfg.get("inat_col", columns[0] if columns else "")
+        inat_max_photos = cfg.get("inat_max", 4)
+        inat_desc_type = cfg.get("inat_desc", "Vědecký anglický (popis, habitat, listy...)")
+        gbif_col = cfg.get("gbif_col", columns[0] if columns else "")
+        uniprot_col = cfg.get("uniprot_col", columns[0] if columns else "")
+        icd10_col = cfg.get("icd_col", columns[0] if columns else "")
+        trans_col = cfg.get("trans_col", columns[0] if columns else "")
+        tts_col = cfg.get("tts_col", columns[0] if columns else "")
+        tts_lang = cfg.get("tts_lang", "Angličtina")
+        dict_col = cfg.get("dict_col", columns[0] if columns else "")
+        chem_col = cfg.get("chem_col", columns[0] if columns else "")
+        onthisday_col = cfg.get("otd_col", columns[0] if columns else "")
+        wiki_img_col = cfg.get("wiki_col", columns[0] if columns else "")
+        wiki_max_photos = cfg.get("wiki_max", 3)
+        wiki_gen_col = cfg.get("wiki_gen_col", columns[0] if columns else "")
+        wiki_gen_lang = cfg.get("wiki_gen_lang", "Čeština (cs)")
+        country_col = cfg.get("country_col", columns[0] if columns else "")
+
+
         progress_bar = st.progress(0.0)
         status = st.empty()
         
