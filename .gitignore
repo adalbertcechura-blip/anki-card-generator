@@ -1,0 +1,18 @@
+# Virtuální prostředí (zbytečné a velké pro cloud)
+venv/
+.venv/
+env/
+
+# Python mezipaměť
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Výstupní soubory
+*.apkg
+nenalezene_polozky.csv
+
+# Systémové soubory
+.DS_Store
+Thumbs.db
