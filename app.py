@@ -257,6 +257,39 @@ def clean_html(text):
     text = re.sub(r'</?(?!b|i|u|em|strong|p|br|div|span)[a-zA-Z0-9]+[^>]*>', '', text)
     return text.strip()
 
+def get_value_css(col):
+    """Vrátí inline CSS styl pro hodnotu sloupce na základě nastavení."""
+    styles = []
+    if 'col_styles' in st.session_state and col in st.session_state.col_styles:
+        style = st.session_state.col_styles[col]
+        if style.get("bold"):
+            styles.append("font-weight: bold")
+        if style.get("italic"):
+            styles.append("font-style: italic")
+        size = style.get("size")
+        if size == "Malé (12px)":
+            styles.append("font-size: 12px")
+        elif size == "Střední (16px)":
+            styles.append("font-size: 16px")
+        elif size == "Velké (20px)":
+            styles.append("font-size: 20px")
+        elif size == "Obrovské (24px)":
+            styles.append("font-size: 24px")
+    return "; ".join(styles)
+
+def sync_ordered_cols(selected_cols, state_key):
+    """Synchronizuje vybrané sloupce s uspořádaným seznamem v session_state."""
+    if state_key not in st.session_state:
+        st.session_state[state_key] = []
+    current_ordered = st.session_state[state_key]
+    # Ponechat pouze ty, které jsou stále vybrané
+    new_ordered = [c for c in current_ordered if c in selected_cols]
+    # Přidat ty, které jsou vybrané, ale ještě nejsou v seznamu
+    for c in selected_cols:
+        if c not in new_ordered:
+            new_ordered.append(c)
+    st.session_state[state_key] = new_ordered
+
 # --- DATUM PARSER PRO ON THIS DAY ---
 
 def parse_date(date_str):
@@ -874,8 +907,7 @@ countries_db = load_countries_db()
 st.set_page_config(
     page_title="Univerzální Anki Generátor",
     page_icon="⚡",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
 st.markdown("""
@@ -928,12 +960,26 @@ if 'notes_count' not in st.session_state:
     st.session_state.notes_count = 0
 if 'media_count' not in st.session_state:
     st.session_state.media_count = 0
+if 'front_cols_ordered' not in st.session_state:
+    st.session_state.front_cols_ordered = []
+if 'back_cols_ordered' not in st.session_state:
+    st.session_state.back_cols_ordered = []
+if 'col_styles' not in st.session_state:
+    st.session_state.col_styles = {}
 
 # --- NAHRÁNÍ SOUBORU ---
-uploaded_file = st.file_uploader("Nahrajte tabulku (Excel .xlsx nebo CSV)", type=["csv", "xlsx"])
+col_file1, col_file2 = st.columns([4, 1])
+with col_file1:
+    uploaded_file = st.file_uploader("Nahrajte tabulku (Excel .xlsx nebo CSV)", type=["csv", "xlsx"])
+
+reload_clicked = False
+with col_file2:
+    if uploaded_file is not None:
+        st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True) # zarovnání spaceru
+        reload_clicked = st.button("🔄 Znovu načíst čistý soubor")
 
 if uploaded_file is not None:
-    if st.session_state.df is None or st.sidebar.button("🔄 Znovu načíst čistý soubor"):
+    if st.session_state.df is None or reload_clicked:
         try:
             if uploaded_file.name.endswith('.csv'):
                 df = pd.read_csv(uploaded_file)
@@ -949,6 +995,9 @@ if uploaded_file is not None:
             st.session_state.unfound_csv_data = None
             st.session_state.notes_count = 0
             st.session_state.media_count = 0
+            st.session_state.front_cols_ordered = []
+            st.session_state.back_cols_ordered = []
+            st.session_state.col_styles = {}
             st.success("Tabulka úspěšně načtena do paměti!")
         except Exception as e:
             st.error(f"Nepodařilo se načíst soubor: {e}")
@@ -992,357 +1041,350 @@ if st.session_state.df is not None:
     enable_trans = False
     enable_tts = False
     enable_dict = False
-    enable_chem = False
-    enable_onthisday = False
     enable_wiki_img = False
     enable_wiki_gen = False
+    enable_chem = False
+    enable_onthisday = False
     enable_country = False
 
-    with st.expander("🛠️ Obohatit tabulku o nová data (API moduly)", expanded=True):
-        st.write("Vyberte hlavní zaměření/téma studia a následně nakonfigurujte rozšiřující moduly.")
-        
-        study_theme = st.selectbox(
-            "🎯 Vyberte téma studia:",
-            [
-                "— Vyberte téma studia —",
-                "🌿 Biologie & Mikrobiologie",
-                "🩺 Medicína & Anatomie",
-                "🗣️ Jazykové vzdělávání",
-                "🌍 Zeměpis & Státy",
-                "🧪 Chemie",
-                "🏛️ Historie & Společenské vědy",
-                "🔍 Obecné vyhledávání & Obrázky",
-                "🛠️ Zobrazit všechny moduly (pokročilé)"
-            ]
-        )
-        
-        languages = {
-            "Angličtina": "en", "Čeština": "cs", "Němčina": "de", 
-            "Španělština": "es", "Francouzština": "fr", "Italština": "it", "Ruština": "ru"
-        }
-        
-        if study_theme == "— Vyberte téma studia —":
-            st.info("Zvolte téma studia z nabídky výše pro zobrazení a konfiguraci modulů.")
+    st.markdown("### 🛠️ Obohatit tabulku o nová data (API moduly)")
+    st.write("Vyberte hlavní zaměření/téma studia a nakonfigurujte příslušné moduly.")
+    
+    tab_bio, tab_med, tab_lang, tab_geo, tab_chem, tab_hist, tab_gen, tab_all = st.tabs([
+        "🌿 Biologie & Mikrobiologie",
+        "🩺 Medicína & Anatomie",
+        "🗣️ Jazykové vzdělávání",
+        "🌍 Zeměpis & Státy",
+        "🧪 Chemie",
+        "🏛️ Historie & Společenské vědy",
+        "🔍 Obecné vyhledávání & Obrázky",
+        "🛠️ Zobrazit všechny moduly (pokročilé)"
+    ])
+    
+    languages = {
+        "Angličtina": "en", "Čeština": "cs", "Němčina": "de", 
+        "Španělština": "es", "Francouzština": "fr", "Italština": "it", "Ruština": "ru"
+    }
+    
+    with tab_bio:
+        st.markdown("### 🌿 Moduly pro biologii a mikrobiologii")
+        col_b1, col_b2 = st.columns(2)
+        with col_b1:
+            enable_inat = st.checkbox("Aktivovat iNaturalist (Botanika & Zoologie)", value=False)
+            inat_col = st.selectbox("Sloupec s latinským názvem druhu", options=columns, key="inat_col")
+            inat_max_photos = st.slider("Max fotek z iNat na řádek", 1, 5, 4, key="inat_max")
+            inat_desc_type = st.selectbox(
+                "Typ popisů", 
+                ["Vědecký anglický (popis, habitat, listy...)", "Stručný český (Wikipedie)"],
+                key="inat_desc"
+            )
+        with col_b2:
+            enable_gbif = st.checkbox("Aktivovat GBIF Taxonomii (kmen, třída, čeleď...)", value=False)
+            gbif_col = st.selectbox("Sloupec s latinským názvem k zařazení", options=columns, key="gbif_col")
             
-        elif study_theme == "🌿 Biologie & Mikrobiologie":
-            st.markdown("### 🌿 Moduly pro biologii a mikrobiologii")
+            enable_uniprot = st.checkbox("Aktivovat UniProt (Funkce proteinů & genů)", value=False)
+            uniprot_col = st.selectbox("Sloupec s názvem genu (např. TP53)", options=columns, key="uniprot_col")
+            
+    with tab_med:
+        st.markdown("### 🩺 Moduly pro medicínu a klinické obory")
+        enable_icd10 = st.checkbox("Aktivovat MKN-10 (Mezinárodní klasifikace nemocí / ICD-10)", value=False)
+        icd10_col = st.selectbox("Sloupec s názvem diagnózy nebo kódem", options=columns, key="icd_col")
+        
+    with tab_lang:
+        st.markdown("### 🗣️ Moduly pro cizí jazyky a slovní zásobu")
+        col_l1, col_l2 = st.columns(2)
+        with col_l1:
+            enable_trans = st.checkbox("Aktivovat překladač", value=False)
+            trans_col = st.selectbox("Sloupec s textem k překladu", options=columns, key="trans_col")
+            trans_src = st.selectbox("Zdrojový jazyk", options=list(languages.keys()), index=0)
+            trans_tgt = st.selectbox("Cílový jazyk", options=list(languages.keys()), index=1)
+        with col_l2:
+            enable_tts = st.checkbox("Aktivovat hlasovou výslovnost (Google TTS)", value=False)
+            tts_col = st.selectbox("Sloupec s textem k namluvení", options=columns, key="tts_col")
+            tts_lang = st.selectbox("Jazyk výslovnosti", options=list(languages.keys()), index=0, key="tts_lang")
+            
+            enable_dict = st.checkbox("Aktivovat anglický výkladový slovník (včetně příkladové věty)", value=False)
+            dict_col = st.selectbox("Sloupec s anglickým slovem k definici", options=columns, key="dict_col")
+            
+    with tab_geo:
+        st.markdown("### 🌍 Moduly pro zeměpis a státy")
+        enable_country = st.checkbox("Aktivovat modul států (hlavní město, region, měna, vlajka...)", value=False)
+        country_col = st.selectbox("Sloupec s názvem státu (česky nebo anglicky)", options=columns, key="country_col")
+        
+    with tab_chem:
+        st.markdown("### 🧪 Moduly pro chemii")
+        enable_chem = st.checkbox("Aktivovat PubChem (molekuly, hmotnost, IUPAC)", value=False)
+        chem_col = st.selectbox("Sloupec s názvem sloučeniny (anglicky)", options=columns, key="chem_col")
+        
+    with tab_hist:
+        st.markdown("### 🏛️ Moduly pro historii a společenské vědy")
+        enable_onthisday = st.checkbox("Aktivovat kalendárium 'Tento den v historii'", value=False)
+        onthisday_col = st.selectbox("Sloupec s datem (např. 26.6., June 26, 06/26)", options=columns, key="otd_col")
+        
+    with tab_gen:
+        st.markdown("### 🔍 Obecné a encyklopedické vyhledávání")
+        col_g1, col_g2 = st.columns(2)
+        with col_g1:
+            enable_wiki_img = st.checkbox("Aktivovat Wikimedia Commons vyhledávač obrázků", value=False)
+            wiki_img_col = st.selectbox("Sloupec s vyhledávaným slovem pro obrázek", options=columns, key="wiki_col")
+            wiki_max_photos = st.slider("Max fotek na řádek", 1, 5, 3, key="wiki_max")
+        with col_g2:
+            enable_wiki_gen = st.checkbox("Aktivovat obecné vyhledávání na Wikipedii", value=False)
+            wiki_gen_col = st.selectbox("Sloupec s tématem pro Wikipedii", options=columns, key="wiki_gen_col")
+            wiki_gen_lang = st.selectbox("Jazyk Wikipedie pro vyhledání", options=["Čeština (cs)", "Angličtina (en)"], index=0, key="wiki_gen_lang")
+            
+    with tab_all:
+        st.markdown("### 🛠️ Všechny dostupné API moduly")
+        
+        with st.expander("🌿 Biologie & Mikrobiologie", expanded=True):
             col_b1, col_b2 = st.columns(2)
             with col_b1:
-                enable_inat = st.checkbox("Aktivovat iNaturalist (Botanika & Zoologie)", value=False)
-                inat_col = st.selectbox("Sloupec s latinským názvem druhu", options=columns, key="inat_col")
-                inat_max_photos = st.slider("Max fotek z iNat na řádek", 1, 5, 4, key="inat_max")
-                inat_desc_type = st.selectbox(
-                    "Typ popisů", 
-                    ["Vědecký anglický (popis, habitat, listy...)", "Stručný český (Wikipedie)"],
-                    key="inat_desc"
-                )
+                enable_inat = st.checkbox("Aktivovat iNaturalist", value=False, key="all_inat")
+                inat_col = st.selectbox("Sloupec s názvem druhu", options=columns, key="all_inat_col")
+                inat_max_photos = st.slider("Max fotek", 1, 5, 4, key="all_inat_max")
+                inat_desc_type = st.selectbox("Typ popisů", ["Vědecký anglický (popis, habitat, listy...)", "Stručný český (Wikipedie)"], key="all_inat_desc")
             with col_b2:
-                enable_gbif = st.checkbox("Aktivovat GBIF Taxonomii (kmen, třída, čeleď...)", value=False)
-                gbif_col = st.selectbox("Sloupec s latinským názvem k zařazení", options=columns, key="gbif_col")
+                enable_gbif = st.checkbox("Aktivovat GBIF Taxonomii", value=False, key="all_gbif")
+                gbif_col = st.selectbox("Sloupec k zařazení", options=columns, key="all_gbif_col")
+                enable_uniprot = st.checkbox("Aktivovat UniProt", value=False, key="all_uniprot")
+                uniprot_col = st.selectbox("Sloupec s názvem genu", options=columns, key="all_uniprot_col")
                 
-                enable_uniprot = st.checkbox("Aktivovat UniProt (Funkce proteinů & genů)", value=False)
-                uniprot_col = st.selectbox("Sloupec s názvem genu (např. TP53)", options=columns, key="uniprot_col")
-                
-        elif study_theme == "🩺 Medicína & Anatomie":
-            st.markdown("### 🩺 Moduly pro medicínu a klinické obory")
-            enable_icd10 = st.checkbox("Aktivovat MKN-10 (Mezinárodní klasifikace nemocí / ICD-10)", value=False)
-            icd10_col = st.selectbox("Sloupec s názvem diagnózy nebo kódem", options=columns, key="icd_col")
+        with st.expander("🩺 Medicína & Anatomie", expanded=True):
+            enable_icd10 = st.checkbox("Aktivovat MKN-10", value=False, key="all_icd")
+            icd10_col = st.selectbox("Sloupec s názvem diagnózy", options=columns, key="all_icd_col")
             
-        elif study_theme == "🗣️ Jazykové vzdělávání":
-            st.markdown("### 🗣️ Moduly pro cizí jazyky a slovní zásobu")
+        with st.expander("🗣️ Jazykové vzdělávání", expanded=True):
             col_l1, col_l2 = st.columns(2)
             with col_l1:
-                enable_trans = st.checkbox("Aktivovat překladač", value=False)
-                trans_col = st.selectbox("Sloupec s textem k překladu", options=columns, key="trans_col")
-                trans_src = st.selectbox("Zdrojový jazyk", options=list(languages.keys()), index=0)
-                trans_tgt = st.selectbox("Cílový jazyk", options=list(languages.keys()), index=1)
+                enable_trans = st.checkbox("Aktivovat překladač", value=False, key="all_trans")
+                trans_col = st.selectbox("Sloupec k překladu", options=columns, key="all_trans_col")
+                trans_src = st.selectbox("Zdrojový jazyk", options=list(languages.keys()), index=0, key="all_trans_src")
+                trans_tgt = st.selectbox("Cílový jazyk", options=list(languages.keys()), index=1, key="all_trans_tgt")
             with col_l2:
-                enable_tts = st.checkbox("Aktivovat hlasovou výslovnost (Google TTS)", value=False)
-                tts_col = st.selectbox("Sloupec s textem k namluvení", options=columns, key="tts_col")
-                tts_lang = st.selectbox("Jazyk výslovnosti", options=list(languages.keys()), index=0, key="tts_lang")
+                enable_tts = st.checkbox("Aktivovat hlasovou výslovnost (TTS)", value=False, key="all_tts")
+                tts_col = st.selectbox("Sloupec k namluvení", options=columns, key="all_tts_col")
+                tts_lang = st.selectbox("Jazyk výslovnosti", options=list(languages.keys()), index=0, key="all_tts_lang")
+                enable_dict = st.checkbox("Aktivovat výkladový slovník (včetně příkladové věty)", value=False, key="all_dict")
+                dict_col = st.selectbox("Sloupec s anglickým slovem", options=columns, key="all_dict_col")
                 
-                enable_dict = st.checkbox("Aktivovat anglický výkladový slovník (včetně příkladové věty)", value=False)
-                dict_col = st.selectbox("Sloupec s anglickým slovem k definici", options=columns, key="dict_col")
-                
-        elif study_theme == "🌍 Zeměpis & Státy":
-            st.markdown("### 🌍 Moduly pro zeměpis a státy")
-            enable_country = st.checkbox("Aktivovat modul států (hlavní město, region, měna, vlajka...)", value=False)
-            country_col = st.selectbox("Sloupec s názvem státu (česky nebo anglicky)", options=columns, key="country_col")
+        with st.expander("🌍 Zeměpis & Státy", expanded=True):
+            enable_country = st.checkbox("Aktivovat modul států", value=False, key="all_country")
+            country_col = st.selectbox("Sloupec s názvem státu", options=columns, key="all_country_col")
             
-        elif study_theme == "🧪 Chemie":
-            st.markdown("### 🧪 Moduly pro chemii")
-            enable_chem = st.checkbox("Aktivovat PubChem (molekuly, hmotnost, IUPAC)", value=False)
-            chem_col = st.selectbox("Sloupec s názvem sloučeniny (anglicky)", options=columns, key="chem_col")
+        with st.expander("🧪 Chemie", expanded=True):
+            enable_chem = st.checkbox("Aktivovat PubChem", value=False, key="all_chem")
+            chem_col = st.selectbox("Sloupec s názvem sloučeniny", options=columns, key="all_chem_col")
             
-        elif study_theme == "🏛️ Historie & Společenské vědy":
-            st.markdown("### 🏛️ Moduly pro historii a společenské vědy")
-            enable_onthisday = st.checkbox("Aktivovat kalendárium 'Tento den v historii'", value=False)
-            onthisday_col = st.selectbox("Sloupec s datem (např. 26.6., June 26, 06/26)", options=columns, key="otd_col")
+        with st.expander("🏛️ Historie", expanded=True):
+            enable_onthisday = st.checkbox("Aktivovat kalendárium 'Tento den'", value=False, key="all_otd")
+            onthisday_col = st.selectbox("Sloupec s datem", options=columns, key="all_otd_col")
             
-        elif study_theme == "🔍 Obecné vyhledávání & Obrázky":
-            st.markdown("### 🔍 Obecné a encyklopedické vyhledávání")
+        with st.expander("🔍 Obecné vyhledávání", expanded=True):
             col_g1, col_g2 = st.columns(2)
             with col_g1:
-                enable_wiki_img = st.checkbox("Aktivovat Wikimedia Commons vyhledávač obrázků", value=False)
-                wiki_img_col = st.selectbox("Sloupec s vyhledávaným slovem pro obrázek", options=columns, key="wiki_col")
-                wiki_max_photos = st.slider("Max fotek na řádek", 1, 5, 3, key="wiki_max")
+                enable_wiki_img = st.checkbox("Aktivovat Wikimedia Commons", value=False, key="all_wiki_img")
+                wiki_img_col = st.selectbox("Sloupec pro obrázek", options=columns, key="all_wiki_img_col")
+                wiki_max_photos = st.slider("Max fotek", 1, 5, 3, key="all_wiki_max")
             with col_g2:
-                enable_wiki_gen = st.checkbox("Aktivovat obecné vyhledávání na Wikipedii", value=False)
-                wiki_gen_col = st.selectbox("Sloupec s tématem pro Wikipedii", options=columns, key="wiki_gen_col")
-                wiki_gen_lang = st.selectbox("Jazyk Wikipedie pro vyhledání", options=["Čeština (cs)", "Angličtina (en)"], index=0, key="wiki_gen_lang")
-                
-        elif study_theme == "🛠️ Zobrazit všechny moduly (pokročilé)":
-            st.markdown("### 🛠️ Všechny dostupné API moduly")
+                enable_wiki_gen = st.checkbox("Aktivovat obecnou Wikipedii", value=False, key="all_wiki_gen")
+                wiki_gen_col = st.selectbox("Sloupec s tématem", options=columns, key="all_wiki_gen_col")
+                wiki_gen_lang = st.selectbox("Jazyk Wikipedie", options=["Čeština (cs)", "Angličtina (en)"], index=0, key="all_wiki_gen_lang")
+    
+    st.markdown("---")
+    
+    # Spuštění obohacení
+    if st.button("⚡ Spustit obohacení dat (API)"):
+        progress_bar = st.progress(0.0)
+        status = st.empty()
+        
+        new_df = df.copy()
+        
+        # Vytvoření nových sloupců v DataFrame
+        if enable_inat:
+            new_df["[iNat] Český název"] = ""
+            new_df["[iNat] Popis"] = ""
+            new_df["[iNat] Obrázky (URL)"] = ""
+        if enable_gbif:
+            new_df["[Taxonomie] Říše"] = ""
+            new_df["[Taxonomie] Kmen"] = ""
+            new_df["[Taxonomie] Třída"] = ""
+            new_df["[Taxonomie] Řád"] = ""
+            new_df["[Taxonomie] Čeleď"] = ""
+            new_df["[Taxonomie] Rod"] = ""
+        if enable_uniprot:
+            new_df["[UniProt] Protein"] = ""
+            new_df["[UniProt] Funkce"] = ""
+        if enable_icd10:
+            new_df["[MKN-10] Kód"] = ""
+            new_df["[MKN-10] Název diagnózy"] = ""
+        if enable_wiki_img:
+            new_df["[Wikimedia] Obrázky (URL)"] = ""
+        if enable_trans:
+            new_df[f"[Překlad] {trans_tgt}"] = ""
+        if enable_tts:
+            new_df["[TTS] Výslovnost (Audio)"] = ""
+        if enable_dict:
+            new_df["[Slovník] Výslovnost (Text)"] = ""
+            new_df["[Slovník] Definice"] = ""
+            new_df["[Slovník] Příkladová věta"] = ""
+        if enable_chem:
+            new_df["[Chemie] Molekula (URL)"] = ""
+            new_df["[Chemie] Systematický název"] = ""
+            new_df["[Chemie] Molekulová hmotnost"] = ""
+        if enable_onthisday:
+            new_df["[Historie] Události"] = ""
+        if enable_wiki_gen:
+            new_df["[Wikipedie] Název"] = ""
+            new_df["[Wikipedie] Shrnutí"] = ""
+            new_df["[Wikipedie] Náhled (URL)"] = ""
+        if enable_country:
+            new_df["[Zeměpis] Český název"] = ""
+            new_df["[Zeměpis] Hlavní město"] = ""
+            new_df["[Zeměpis] Region"] = ""
+            new_df["[Zeměpis] Jazyky"] = ""
+            new_df["[Zeměpis] Měna"] = ""
+            new_df["[Zeměpis] Rozloha"] = ""
+            new_df["[Zeměpis] Vlajka (URL)"] = ""
             
-            with st.expander("🌿 Biologie & Mikrobiologie", expanded=True):
-                col_b1, col_b2 = st.columns(2)
-                with col_b1:
-                    enable_inat = st.checkbox("Aktivovat iNaturalist", value=False, key="all_inat")
-                    inat_col = st.selectbox("Sloupec s názvem druhu", options=columns, key="all_inat_col")
-                    inat_max_photos = st.slider("Max fotek", 1, 5, 4, key="all_inat_max")
-                    inat_desc_type = st.selectbox("Typ popisů", ["Vědecký anglický (popis, habitat, listy...)", "Stručný český (Wikipedie)"], key="all_inat_desc")
-                with col_b2:
-                    enable_gbif = st.checkbox("Aktivovat GBIF Taxonomii", value=False, key="all_gbif")
-                    gbif_col = st.selectbox("Sloupec k zařazení", options=columns, key="all_gbif_col")
-                    enable_uniprot = st.checkbox("Aktivovat UniProt", value=False, key="all_uniprot")
-                    uniprot_col = st.selectbox("Sloupec s názvem genu", options=columns, key="all_uniprot_col")
-                    
-            with st.expander("🩺 Medicína & Anatomie", expanded=True):
-                enable_icd10 = st.checkbox("Aktivovat MKN-10", value=False, key="all_icd")
-                icd10_col = st.selectbox("Sloupec s názvem diagnózy", options=columns, key="all_icd_col")
-                
-            with st.expander("🗣️ Jazykové vzdělávání", expanded=True):
-                col_l1, col_l2 = st.columns(2)
-                with col_l1:
-                    enable_trans = st.checkbox("Aktivovat překladač", value=False, key="all_trans")
-                    trans_col = st.selectbox("Sloupec k překladu", options=columns, key="all_trans_col")
-                    trans_src = st.selectbox("Zdrojový jazyk", options=list(languages.keys()), index=0, key="all_trans_src")
-                    trans_tgt = st.selectbox("Cílový jazyk", options=list(languages.keys()), index=1, key="all_trans_tgt")
-                with col_l2:
-                    enable_tts = st.checkbox("Aktivovat hlasovou výslovnost (TTS)", value=False, key="all_tts")
-                    tts_col = st.selectbox("Sloupec k namluvení", options=columns, key="all_tts_col")
-                    tts_lang = st.selectbox("Jazyk výslovnosti", options=list(languages.keys()), index=0, key="all_tts_lang")
-                    enable_dict = st.checkbox("Aktivovat výkladový slovník (včetně příkladové věty)", value=False, key="all_dict")
-                    dict_col = st.selectbox("Sloupec s anglickým slovem", options=columns, key="all_dict_col")
-                    
-            with st.expander("🌍 Zeměpis & Státy", expanded=True):
-                enable_country = st.checkbox("Aktivovat modul států", value=False, key="all_country")
-                country_col = st.selectbox("Sloupec s názvem státu", options=columns, key="all_country_col")
-                
-            with st.expander("🧪 Chemie", expanded=True):
-                enable_chem = st.checkbox("Aktivovat PubChem", value=False, key="all_chem")
-                chem_col = st.selectbox("Sloupec s názvem sloučeniny", options=columns, key="all_chem_col")
-                
-            with st.expander("🏛️ Historie", expanded=True):
-                enable_onthisday = st.checkbox("Aktivovat kalendárium 'Tento den'", value=False, key="all_otd")
-                onthisday_col = st.selectbox("Sloupec s datem", options=columns, key="all_otd_col")
-                
-            with st.expander("🔍 Obecné vyhledávání", expanded=True):
-                col_g1, col_g2 = st.columns(2)
-                with col_g1:
-                    enable_wiki_img = st.checkbox("Aktivovat Wikimedia Commons", value=False, key="all_wiki_img")
-                    wiki_img_col = st.selectbox("Sloupec pro obrázek", options=columns, key="all_wiki_img_col")
-                    wiki_max_photos = st.slider("Max fotek", 1, 5, 3, key="all_wiki_max")
-                with col_g2:
-                    enable_wiki_gen = st.checkbox("Aktivovat obecnou Wikipedii", value=False, key="all_wiki_gen")
-                    wiki_gen_col = st.selectbox("Sloupec s tématem", options=columns, key="all_wiki_gen_col")
-                    wiki_gen_lang = st.selectbox("Jazyk Wikipedie", options=["Čeština (cs)", "Angličtina (en)"], index=0, key="all_wiki_gen_lang")
-
-        st.markdown("---")
-
-        # Spuštění obohacení
-        if st.button("⚡ Spustit obohacení dat (API)"):
-            progress_bar = st.progress(0.0)
-            status = st.empty()
+        unfound_list = []
+        total = len(df)
+        
+        for idx, row in df.iterrows():
+            progress_bar.progress((idx + 1) / total)
+            status.text(f"Obohacuji řádek {idx+1}/{total}...")
             
-            new_df = df.copy()
-            
-            # Vytvoření nových sloupců v DataFrame
+            # 1. iNaturalist
             if enable_inat:
-                new_df["[iNat] Český název"] = ""
-                new_df["[iNat] Popis"] = ""
-                new_df["[iNat] Obrázky (URL)"] = ""
+                raw_sp = str(row[inat_col]).strip()
+                sp = re.sub(r'\s*\(.*\)\s*', '', raw_sp).strip()
+                sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp).strip()
+                
+                is_sci = (inat_desc_type == "Vědecký anglický (popis, habitat, listy...)")
+                inat_data = fetch_inaturalist_data(sp_clean, inat_max_photos, scientific_desc=is_sci)
+                
+                if inat_data['source'] == 'Nenalezeno':
+                    unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'iNaturalist'})
+                
+                new_df.at[idx, "[iNat] Český název"] = inat_data['common_name']
+                new_df.at[idx, "[iNat] Popis"] = inat_data['description']
+                new_df.at[idx, "[iNat] Obrázky (URL)"] = ";".join(inat_data['photo_urls'])
+                
+            # 2. GBIF Taxonomie
             if enable_gbif:
-                new_df["[Taxonomie] Říše"] = ""
-                new_df["[Taxonomie] Kmen"] = ""
-                new_df["[Taxonomie] Třída"] = ""
-                new_df["[Taxonomie] Řád"] = ""
-                new_df["[Taxonomie] Čeleď"] = ""
-                new_df["[Taxonomie] Rod"] = ""
+                raw_sp = str(row[gbif_col]).strip()
+                sp = re.sub(r'\s*\(.*\)\s*', '', raw_sp).strip()
+                sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp).strip()
+                gbif_data = fetch_gbif_taxonomy(sp_clean)
+                if gbif_data['source'] == 'Nenalezeno':
+                    unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'GBIF Taxonomie'})
+                new_df.at[idx, "[Taxonomie] Říše"] = gbif_data['kingdom']
+                new_df.at[idx, "[Taxonomie] Kmen"] = gbif_data['phylum']
+                new_df.at[idx, "[Taxonomie] Třída"] = gbif_data['class']
+                new_df.at[idx, "[Taxonomie] Řád"] = gbif_data['order']
+                new_df.at[idx, "[Taxonomie] Čeleď"] = gbif_data['family']
+                new_df.at[idx, "[Taxonomie] Rod"] = gbif_data['genus']
+                
+            # 3. UniProt Proteiny
             if enable_uniprot:
-                new_df["[UniProt] Protein"] = ""
-                new_df["[UniProt] Funkce"] = ""
+                gene = str(row[uniprot_col]).strip()
+                uniprot_data = fetch_uniprot_data(gene)
+                if uniprot_data['source'] == 'Nenalezeno':
+                    unfound_list.append({'Řádek': idx + 1, 'Položka': gene, 'Modul': 'UniProt'})
+                new_df.at[idx, "[UniProt] Protein"] = uniprot_data['protein_name']
+                new_df.at[idx, "[UniProt] Funkce"] = uniprot_data['function']
+                
+            # 4. MKN-10 ICD-10
             if enable_icd10:
-                new_df["[MKN-10] Kód"] = ""
-                new_df["[MKN-10] Název diagnózy"] = ""
+                med_query = str(row[icd10_col]).strip()
+                icd_data = fetch_icd10_data(med_query)
+                if icd_data['source'] == 'Nenalezeno':
+                    unfound_list.append({'Řádek': idx + 1, 'Položka': med_query, 'Modul': 'MKN-10'})
+                new_df.at[idx, "[MKN-10] Kód"] = icd_data['code']
+                new_df.at[idx, "[MKN-10] Název diagnózy"] = icd_data['name']
+                
+            # 5. Wikimedia Commons
             if enable_wiki_img:
-                new_df["[Wikimedia] Obrázky (URL)"] = ""
+                kw = str(row[wiki_img_col]).strip()
+                wiki_urls = fetch_wikimedia_images(kw, wiki_max_photos)
+                if not wiki_urls:
+                    unfound_list.append({'Řádek': idx + 1, 'Položka': kw, 'Modul': 'Wikimedia Commons'})
+                new_df.at[idx, "[Wikimedia] Obrázky (URL)"] = ";".join(wiki_urls)
+                
+            # 6. Překlad
             if enable_trans:
-                new_df[f"[Překlad] {trans_tgt}"] = ""
+                txt = str(row[trans_col]).strip()
+                src_code = languages[trans_src]
+                tgt_code = languages[trans_tgt]
+                translated = translate_text(txt, src_code, tgt_code)
+                new_df.at[idx, f"[Překlad] {trans_tgt}"] = translated
+                
+            # 7. Google TTS
             if enable_tts:
-                new_df["[TTS] Výslovnost (Audio)"] = ""
+                txt = str(row[tts_col]).strip()
+                lang_code = languages[tts_lang]
+                if txt:
+                    new_df.at[idx, "[TTS] Výslovnost (Audio)"] = f"{txt};{lang_code}"
+                    
+            # 8. Dictionary API
             if enable_dict:
-                new_df["[Slovník] Výslovnost (Text)"] = ""
-                new_df["[Slovník] Definice"] = ""
-                new_df["[Slovník] Příkladová věta"] = ""
+                wd = str(row[dict_col]).strip()
+                dict_data = fetch_dictionary_data(wd)
+                if not dict_data['definition']:
+                    unfound_list.append({'Řádek': idx + 1, 'Položka': wd, 'Modul': 'Slovník'})
+                new_df.at[idx, "[Slovník] Výslovnost (Text)"] = dict_data['phonetic']
+                new_df.at[idx, "[Slovník] Definice"] = dict_data['definition']
+                new_df.at[idx, "[Slovník] Příkladová věta"] = dict_data['example']
+                
+            # 9. PubChem chemický modul
             if enable_chem:
-                new_df["[Chemie] Molekula (URL)"] = ""
-                new_df["[Chemie] Systematický název"] = ""
-                new_df["[Chemie] Molekulová hmotnost"] = ""
+                ch = str(row[chem_col]).strip()
+                chem_data = fetch_chemistry_data(ch)
+                if not chem_data['iupac']:
+                    unfound_list.append({'Řádek': idx + 1, 'Položka': ch, 'Modul': 'PubChem Chemie'})
+                new_df.at[idx, "[Chemie] Molekula (URL)"] = chem_data['img_url']
+                new_df.at[idx, "[Chemie] Systematický název"] = chem_data['iupac']
+                new_df.at[idx, "[Chemie] Molekulová hmotnost"] = chem_data['weight']
+                
+            # 10. Kalendárium On This Day
             if enable_onthisday:
-                new_df["[Historie] Události"] = ""
+                dt = str(row[onthisday_col]).strip()
+                otd_data = fetch_on_this_day_events(dt)
+                if otd_data['source'] == 'Nenalezeno':
+                    unfound_list.append({'Řádek': idx + 1, 'Položka': dt, 'Modul': 'Kalendárium'})
+                new_df.at[idx, "[Historie] Události"] = otd_data['events']
+                
+            # 11. Wikipedie obecná
             if enable_wiki_gen:
-                new_df["[Wikipedie] Název"] = ""
-                new_df["[Wikipedie] Shrnutí"] = ""
-                new_df["[Wikipedie] Náhled (URL)"] = ""
+                cpt = str(row[wiki_gen_col]).strip()
+                w_lang = "cs" if "Čeština" in wiki_gen_lang else "en"
+                wiki_gen_data = fetch_wikipedia_general(cpt, w_lang)
+                if wiki_gen_data['source'] == 'Nenalezeno':
+                    unfound_list.append({'Řádek': idx + 1, 'Položka': cpt, 'Modul': f'Wikipedie ({w_lang.upper()})'})
+                new_df.at[idx, "[Wikipedie] Název"] = wiki_gen_data['title']
+                new_df.at[idx, "[Wikipedie] Shrnutí"] = wiki_gen_data['summary']
+                new_df.at[idx, "[Wikipedie] Náhled (URL)"] = wiki_gen_data['img_url']
+                
+            # 12. Zeměpis & Státy
             if enable_country:
-                new_df["[Zeměpis] Český název"] = ""
-                new_df["[Zeměpis] Hlavní město"] = ""
-                new_df["[Zeměpis] Region"] = ""
-                new_df["[Zeměpis] Jazyky"] = ""
-                new_df["[Zeměpis] Měna"] = ""
-                new_df["[Zeměpis] Rozloha"] = ""
-                new_df["[Zeměpis] Vlajka (URL)"] = ""
+                c_name = str(row[country_col]).strip()
+                c_data = fetch_country_data(c_name, countries_db)
+                if c_data['source'] == 'Nenalezeno':
+                    unfound_list.append({'Řádek': idx + 1, 'Položka': c_name, 'Modul': 'Zeměpis'})
+                new_df.at[idx, "[Zeměpis] Český název"] = c_data['common_name']
+                new_df.at[idx, "[Zeměpis] Hlavní město"] = c_data['capital']
+                new_df.at[idx, "[Zeměpis] Region"] = f"{c_data['region']} ({c_data['subregion']})" if c_data['subregion'] else c_data['region']
+                new_df.at[idx, "[Zeměpis] Jazyky"] = c_data['languages']
+                new_df.at[idx, "[Zeměpis] Měna"] = c_data['currencies']
+                new_df.at[idx, "[Zeměpis] Rozloha"] = c_data['area']
+                new_df.at[idx, "[Zeměpis] Vlajka (URL)"] = c_data['flag_url']
                 
-            unfound_list = []
-            total = len(df)
+            time.sleep(0.4)
             
-            for idx, row in df.iterrows():
-                progress_bar.progress((idx + 1) / total)
-                status.text(f"Obohacuji řádek {idx+1}/{total}...")
-                
-                # 1. iNaturalist
-                if enable_inat:
-                    raw_sp = str(row[inat_col]).strip()
-                    sp = re.sub(r'\s*\(.*\)\s*', '', raw_sp).strip()
-                    sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp).strip()
-                    
-                    is_sci = (inat_desc_type == "Vědecký anglický (popis, habitat, listy...)")
-                    inat_data = fetch_inaturalist_data(sp_clean, inat_max_photos, scientific_desc=is_sci)
-                    
-                    if inat_data['source'] == 'Nenalezeno':
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'iNaturalist'})
-                    
-                    new_df.at[idx, "[iNat] Český název"] = inat_data['common_name']
-                    new_df.at[idx, "[iNat] Popis"] = inat_data['description']
-                    new_df.at[idx, "[iNat] Obrázky (URL)"] = ";".join(inat_data['photo_urls'])
-                    
-                # 2. GBIF Taxonomie
-                if enable_gbif:
-                    raw_sp = str(row[gbif_col]).strip()
-                    sp = re.sub(r'\s*\(.*\)\s*', '', raw_sp).strip()
-                    sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp).strip()
-                    gbif_data = fetch_gbif_taxonomy(sp_clean)
-                    if gbif_data['source'] == 'Nenalezeno':
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'GBIF Taxonomie'})
-                    new_df.at[idx, "[Taxonomie] Říše"] = gbif_data['kingdom']
-                    new_df.at[idx, "[Taxonomie] Kmen"] = gbif_data['phylum']
-                    new_df.at[idx, "[Taxonomie] Třída"] = gbif_data['class']
-                    new_df.at[idx, "[Taxonomie] Řád"] = gbif_data['order']
-                    new_df.at[idx, "[Taxonomie] Čeleď"] = gbif_data['family']
-                    new_df.at[idx, "[Taxonomie] Rod"] = gbif_data['genus']
-                    
-                # 3. UniProt Proteiny
-                if enable_uniprot:
-                    gene = str(row[uniprot_col]).strip()
-                    uniprot_data = fetch_uniprot_data(gene)
-                    if uniprot_data['source'] == 'Nenalezeno':
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': gene, 'Modul': 'UniProt'})
-                    new_df.at[idx, "[UniProt] Protein"] = uniprot_data['protein_name']
-                    new_df.at[idx, "[UniProt] Funkce"] = uniprot_data['function']
-                    
-                # 4. MKN-10 ICD-10
-                if enable_icd10:
-                    med_query = str(row[icd10_col]).strip()
-                    icd_data = fetch_icd10_data(med_query)
-                    if icd_data['source'] == 'Nenalezeno':
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': med_query, 'Modul': 'MKN-10'})
-                    new_df.at[idx, "[MKN-10] Kód"] = icd_data['code']
-                    new_df.at[idx, "[MKN-10] Název diagnózy"] = icd_data['name']
-                    
-                # 5. Wikimedia Commons
-                if enable_wiki_img:
-                    kw = str(row[wiki_img_col]).strip()
-                    wiki_urls = fetch_wikimedia_images(kw, wiki_max_photos)
-                    if not wiki_urls:
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': kw, 'Modul': 'Wikimedia Commons'})
-                    new_df.at[idx, "[Wikimedia] Obrázky (URL)"] = ";".join(wiki_urls)
-                    
-                # 6. Překlad
-                if enable_trans:
-                    txt = str(row[trans_col]).strip()
-                    src_code = languages[trans_src]
-                    tgt_code = languages[trans_tgt]
-                    translated = translate_text(txt, src_code, tgt_code)
-                    new_df.at[idx, f"[Překlad] {trans_tgt}"] = translated
-                    
-                # 7. Google TTS
-                if enable_tts:
-                    txt = str(row[tts_col]).strip()
-                    lang_code = languages[tts_lang]
-                    if txt:
-                        new_df.at[idx, "[TTS] Výslovnost (Audio)"] = f"{txt};{lang_code}"
-                        
-                # 8. Dictionary API
-                if enable_dict:
-                    wd = str(row[dict_col]).strip()
-                    dict_data = fetch_dictionary_data(wd)
-                    if not dict_data['definition']:
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': wd, 'Modul': 'Slovník'})
-                    new_df.at[idx, "[Slovník] Výslovnost (Text)"] = dict_data['phonetic']
-                    new_df.at[idx, "[Slovník] Definice"] = dict_data['definition']
-                    new_df.at[idx, "[Slovník] Příkladová věta"] = dict_data['example']
-                    
-                # 9. PubChem chemický modul
-                if enable_chem:
-                    ch = str(row[chem_col]).strip()
-                    chem_data = fetch_chemistry_data(ch)
-                    if not chem_data['iupac']:
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': ch, 'Modul': 'PubChem Chemie'})
-                    new_df.at[idx, "[Chemie] Molekula (URL)"] = chem_data['img_url']
-                    new_df.at[idx, "[Chemie] Systematický název"] = chem_data['iupac']
-                    new_df.at[idx, "[Chemie] Molekulová hmotnost"] = chem_data['weight']
-                    
-                # 10. Kalendárium On This Day
-                if enable_onthisday:
-                    dt = str(row[onthisday_col]).strip()
-                    otd_data = fetch_on_this_day_events(dt)
-                    if otd_data['source'] == 'Nenalezeno':
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': dt, 'Modul': 'Kalendárium'})
-                    new_df.at[idx, "[Historie] Události"] = otd_data['events']
-                    
-                # 11. Wikipedie obecná
-                if enable_wiki_gen:
-                    cpt = str(row[wiki_gen_col]).strip()
-                    w_lang = "cs" if "Čeština" in wiki_gen_lang else "en"
-                    wiki_gen_data = fetch_wikipedia_general(cpt, w_lang)
-                    if wiki_gen_data['source'] == 'Nenalezeno':
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': cpt, 'Modul': f'Wikipedie ({w_lang.upper()})'})
-                    new_df.at[idx, "[Wikipedie] Název"] = wiki_gen_data['title']
-                    new_df.at[idx, "[Wikipedie] Shrnutí"] = wiki_gen_data['summary']
-                    new_df.at[idx, "[Wikipedie] Náhled (URL)"] = wiki_gen_data['img_url']
-                    
-                # 12. Zeměpis & Státy
-                if enable_country:
-                    c_name = str(row[country_col]).strip()
-                    c_data = fetch_country_data(c_name, countries_db)
-                    if c_data['source'] == 'Nenalezeno':
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': c_name, 'Modul': 'Zeměpis'})
-                    new_df.at[idx, "[Zeměpis] Český název"] = c_data['common_name']
-                    new_df.at[idx, "[Zeměpis] Hlavní město"] = c_data['capital']
-                    new_df.at[idx, "[Zeměpis] Region"] = f"{c_data['region']} ({c_data['subregion']})" if c_data['subregion'] else c_data['region']
-                    new_df.at[idx, "[Zeměpis] Jazyky"] = c_data['languages']
-                    new_df.at[idx, "[Zeměpis] Měna"] = c_data['currencies']
-                    new_df.at[idx, "[Zeměpis] Rozloha"] = c_data['area']
-                    new_df.at[idx, "[Zeměpis] Vlajka (URL)"] = c_data['flag_url']
-                    
-                time.sleep(0.4)
-                
-            st.session_state.df = new_df
-            st.session_state.enhancements_applied = True
-            st.session_state.unfound_list = unfound_list
-            st.success("⚡ Obohocení dat úspěšně dokončeno! Tabulka byla rozšířena o nové sloupce.")
-            st.rerun()
+        st.session_state.df = new_df
+        st.session_state.enhancements_applied = True
+        st.session_state.unfound_list = unfound_list
+        st.success("⚡ Obohocení dat úspěšně dokončeno! Tabulka byla rozšířena o nové sloupce.")
+        st.rerun()
 
     # --- KROK 3: MAPOVÁNÍ KARET (FRONT / BACK DESIGNER) ---
     st.markdown("---")
@@ -1353,19 +1395,81 @@ if st.session_state.df is not None:
     with col_lay1:
         st.markdown("#### 1. Lícová strana (Front)")
         front_cols = st.multiselect(
-            "Vyberte sloupce, které se zobrazí na LÍCI karty (v tomto pořadí):",
+            "Vyberte sloupce, které se zobrazí na LÍCI karty:",
             options=columns,
-            default=[columns[0]] if columns else []
+            default=[columns[0]] if columns else [],
+            key="front_cols_multiselect"
         )
+        sync_ordered_cols(front_cols, "front_cols_ordered")
+        
+        st.markdown("##### ↕️ Uspořádání sloupců na líci:")
+        for i, col in enumerate(st.session_state.front_cols_ordered):
+            if col not in st.session_state.col_styles:
+                sample_val = ""
+                if st.session_state.df is not None and not st.session_state.df.empty and col in st.session_state.df.columns:
+                    sample_val = st.session_state.df[col].iloc[0]
+                is_img = is_image_col(col, sample_val)
+                st.session_state.col_styles[col] = {
+                    "bold": False,
+                    "italic": False,
+                    "size": "Výchozí",
+                    "custom_label": col,
+                    "show_label": not is_img
+                }
+            
+            c_name, c_up, c_down = st.columns([6, 1, 1])
+            with c_name:
+                st.write(f"**{col}**")
+            with c_up:
+                if st.button("▲", key=f"up_front_{col}_{i}"):
+                    if i > 0:
+                        st.session_state.front_cols_ordered[i], st.session_state.front_cols_ordered[i-1] = st.session_state.front_cols_ordered[i-1], st.session_state.front_cols_ordered[i]
+                        st.rerun()
+            with c_down:
+                if st.button("▼", key=f"down_front_{col}_{i}"):
+                    if i < len(st.session_state.front_cols_ordered) - 1:
+                        st.session_state.front_cols_ordered[i], st.session_state.front_cols_ordered[i+1] = st.session_state.front_cols_ordered[i+1], st.session_state.front_cols_ordered[i]
+                        st.rerun()
         
     with col_lay2:
         st.markdown("#### 2. Rubová strana (Back)")
         default_back = [c for c in columns if c not in front_cols]
         back_cols = st.multiselect(
-            "Vyberte sloupce, které se zobrazí na RUBU karty (v tomto pořadí):",
+            "Vyberte sloupce, které se zobrazí na RUBU karty:",
             options=columns,
-            default=default_back if default_back else columns
+            default=default_back if default_back else columns,
+            key="back_cols_multiselect"
         )
+        sync_ordered_cols(back_cols, "back_cols_ordered")
+        
+        st.markdown("##### ↕️ Uspořádání sloupců na rubu:")
+        for i, col in enumerate(st.session_state.back_cols_ordered):
+            if col not in st.session_state.col_styles:
+                sample_val = ""
+                if st.session_state.df is not None and not st.session_state.df.empty and col in st.session_state.df.columns:
+                    sample_val = st.session_state.df[col].iloc[0]
+                is_img = is_image_col(col, sample_val)
+                st.session_state.col_styles[col] = {
+                    "bold": False,
+                    "italic": False,
+                    "size": "Výchozí",
+                    "custom_label": col,
+                    "show_label": not is_img
+                }
+            
+            c_name, c_up, c_down = st.columns([6, 1, 1])
+            with c_name:
+                st.write(f"**{col}**")
+            with c_up:
+                if st.button("▲", key=f"up_back_{col}_{i}"):
+                    if i > 0:
+                        st.session_state.back_cols_ordered[i], st.session_state.back_cols_ordered[i-1] = st.session_state.back_cols_ordered[i-1], st.session_state.back_cols_ordered[i]
+                        st.rerun()
+            with c_down:
+                if st.button("▼", key=f"down_back_{col}_{i}"):
+                    if i < len(st.session_state.back_cols_ordered) - 1:
+                        st.session_state.back_cols_ordered[i], st.session_state.back_cols_ordered[i+1] = st.session_state.back_cols_ordered[i+1], st.session_state.back_cols_ordered[i]
+                        st.rerun()
         
     with col_lay3:
         st.markdown("#### 🎨 Barevný vzhled")
@@ -1379,8 +1483,45 @@ if st.session_state.df is not None:
             index=0
         )
         
+    # Stylování sloupců
+    all_selected_cols = list(dict.fromkeys(st.session_state.front_cols_ordered + st.session_state.back_cols_ordered))
+    if all_selected_cols:
+        st.markdown("#### ⚙️ Pokročilé nastavení zobrazení sloupců")
+        for col in all_selected_cols:
+            if col not in st.session_state.col_styles:
+                sample_val = ""
+                if st.session_state.df is not None and not st.session_state.df.empty and col in st.session_state.df.columns:
+                    sample_val = st.session_state.df[col].iloc[0]
+                is_img = is_image_col(col, sample_val)
+                st.session_state.col_styles[col] = {
+                    "bold": False,
+                    "italic": False,
+                    "size": "Výchozí",
+                    "custom_label": col,
+                    "show_label": not is_img
+                }
+            
+            style = st.session_state.col_styles[col]
+            with st.expander(f"Nastavení zobrazení sloupce: {col}"):
+                sc1, sc2, sc3 = st.columns(3)
+                with sc1:
+                    style["bold"] = st.checkbox("Tučné (Bold)", value=style["bold"], key=f"style_bold_{col}")
+                    style["italic"] = st.checkbox("Kurzíva (Italic)", value=style["italic"], key=f"style_italic_{col}")
+                with sc2:
+                    sizes = ["Výchozí", "Malé (12px)", "Střední (16px)", "Velké (20px)", "Obrovské (24px)"]
+                    current_idx = sizes.index(style["size"]) if style["size"] in sizes else 0
+                    style["size"] = st.selectbox(
+                        "Velikost písma:",
+                        sizes,
+                        index=current_idx,
+                        key=f"style_size_{col}"
+                    )
+                with sc3:
+                    style["show_label"] = st.checkbox("Zobrazit název sloupce", value=style["show_label"], key=f"style_show_lbl_{col}")
+                    style["custom_label"] = st.text_input("Vlastní název sloupce:", value=style["custom_label"], key=f"style_cust_lbl_{col}")
+        
     # Náhled karty
-    if front_cols or back_cols:
+    if st.session_state.front_cols_ordered or st.session_state.back_cols_ordered:
         st.markdown("#### 👁️ Vizuální náhled jedné kartičky (první řádek v tabulce)")
         preview_row = df.iloc[0]
         col_pre1, col_pre2 = st.columns(2)
@@ -1402,44 +1543,74 @@ if st.session_state.df is not None:
         with col_pre1:
             st.markdown("**LÍC (Front Side):**")
             st.markdown(f'<div style="background-color: {preview_bg}; border: 1px solid {preview_border}; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px {preview_shadow}; color: {preview_fg};">', unsafe_allow_html=True)
-            for c in front_cols:
+            for c in st.session_state.front_cols_ordered:
                 val = preview_row[c]
                 if pd.isna(val) or str(val).strip() == "":
                     continue
+                
+                # Načíst styly
+                show_label = True
+                label_text = c
+                if c in st.session_state.col_styles:
+                    show_label = st.session_state.col_styles[c].get("show_label", True)
+                    label_text = st.session_state.col_styles[c].get("custom_label", c)
+                
+                val_css = get_value_css(c)
+                val_style_attr = f' style="{val_css}; color: {preview_fg};"' if val_css else f' style="color: {preview_fg};"'
+                label_html = f'<span style="font-size: 10px; font-weight: bold; color: {preview_label}; text-transform: uppercase; border-bottom: 1px solid {preview_border}; display: block; margin-bottom: 4px; padding-bottom: 2px;">{label_text}</span>' if show_label else ''
+                
                 if is_image_col(c, val):
                     urls = [u.strip() for u in str(val).split(';') if u.strip()]
+                    if label_html:
+                        st.markdown(label_html, unsafe_allow_html=True)
                     for url in urls:
                         st.markdown(f'<div style="width: 100%; max-width: 450px; border-radius: 8px; overflow: hidden; border: 2px solid {preview_border}; margin: 10px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"><img src="{url}" style="width: 100%; height: auto; max-height: 250px; object-fit: cover; display: block;"></div>', unsafe_allow_html=True)
                 elif str(c).startswith("[TTS]"):
                     st.warning(f"🔊 Výslovnost (Audio): {str(val).split(';')[0]}")
-                elif str(c).startswith("[Historie]"):
-                    st.markdown(f'<span style="font-size: 10px; font-weight: bold; color: {preview_label}; text-transform: uppercase; border-bottom: 1px solid {preview_border}; display: block; margin-bottom: 4px; padding-bottom: 2px;">{c}</span>', unsafe_allow_html=True)
-                    st.markdown(f'<div style="color: {preview_fg};">{val}</div>', unsafe_allow_html=True)
                 else:
-                    st.markdown(f'<span style="font-size: 10px; font-weight: bold; color: {preview_label}; text-transform: uppercase; border-bottom: 1px solid {preview_border}; display: block; margin-bottom: 4px; padding-bottom: 2px;">{c}</span>', unsafe_allow_html=True)
-                    st.markdown(f'<div style="font-size: 15px; margin-bottom: 10px; color: {preview_fg};">{val}</div>', unsafe_allow_html=True)
+                    if label_html:
+                        st.markdown(label_html, unsafe_allow_html=True)
+                    val_str = str(val)
+                    if not re.search(r'<[a-zA-Z0-9/]+[^>]*>', val_str):
+                        val_str = val_str.replace('\n', '<br>')
+                    st.markdown(f'<div{val_style_attr}>{val_str}</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
             
         with col_pre2:
             st.markdown("**RUB (Back Side):**")
             st.markdown(f'<div style="background-color: {preview_bg}; border: 1px solid {preview_border}; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px {preview_shadow}; color: {preview_fg};">', unsafe_allow_html=True)
             st.markdown(f'<span style="color: {preview_label}; font-size: 11px;">[ Zde se zobrazí líc karty ]</span><hr style="margin: 12px 0; border: 0; border-top: 1px solid {preview_border};">', unsafe_allow_html=True)
-            for c in back_cols:
+            for c in st.session_state.back_cols_ordered:
                 val = preview_row[c]
                 if pd.isna(val) or str(val).strip() == "":
                     continue
+                
+                # Načíst styly
+                show_label = True
+                label_text = c
+                if c in st.session_state.col_styles:
+                    show_label = st.session_state.col_styles[c].get("show_label", True)
+                    label_text = st.session_state.col_styles[c].get("custom_label", c)
+                
+                val_css = get_value_css(c)
+                val_style_attr = f' style="{val_css}; color: {preview_fg};"' if val_css else f' style="color: {preview_fg};"'
+                label_html = f'<span style="font-size: 10px; font-weight: bold; color: {preview_label}; text-transform: uppercase; border-bottom: 1px solid {preview_border}; display: block; margin-bottom: 4px; padding-bottom: 2px;">{label_text}</span>' if show_label else ''
+                
                 if is_image_col(c, val):
                     urls = [u.strip() for u in str(val).split(';') if u.strip()]
+                    if label_html:
+                        st.markdown(label_html, unsafe_allow_html=True)
                     for url in urls:
                         st.markdown(f'<div style="width: 100%; max-width: 450px; border-radius: 8px; overflow: hidden; border: 2px solid {preview_border}; margin: 10px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"><img src="{url}" style="width: 100%; height: auto; max-height: 250px; object-fit: cover; display: block;"></div>', unsafe_allow_html=True)
                 elif str(c).startswith("[TTS]"):
                     st.warning(f"🔊 Výslovnost (Audio): {str(val).split(';')[0]}")
-                elif str(c).startswith("[Historie]"):
-                    st.markdown(f'<span style="font-size: 10px; font-weight: bold; color: {preview_label}; text-transform: uppercase; border-bottom: 1px solid {preview_border}; display: block; margin-bottom: 4px; padding-bottom: 2px;">{c}</span>', unsafe_allow_html=True)
-                    st.markdown(f'<div style="color: {preview_fg};">{val}</div>', unsafe_allow_html=True)
                 else:
-                    st.markdown(f'<span style="font-size: 10px; font-weight: bold; color: {preview_label}; text-transform: uppercase; border-bottom: 1px solid {preview_border}; display: block; margin-bottom: 4px; padding-bottom: 2px;">{c}</span>', unsafe_allow_html=True)
-                    st.markdown(f'<div style="font-size: 15px; margin-bottom: 10px; color: {preview_fg};">{val}</div>', unsafe_allow_html=True)
+                    if label_html:
+                        st.markdown(label_html, unsafe_allow_html=True)
+                    val_str = str(val)
+                    if not re.search(r'<[a-zA-Z0-9/]+[^>]*>', val_str):
+                        val_str = val_str.replace('\n', '<br>')
+                    st.markdown(f'<div{val_style_attr}>{val_str}</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
 
     # --- KROK 4: EXPORT DO ANKI BALÍČKU ---
@@ -1457,7 +1628,7 @@ if st.session_state.df is not None:
     
     if st.button("📦 Generovat Anki balíček (.apkg)"):
         clear_temp_on_finish = True
-        if not front_cols and not back_cols:
+        if not st.session_state.front_cols_ordered and not st.session_state.back_cols_ordered:
             st.error("Musíte vybrat alespoň jeden sloupec pro Líc nebo Rub kartičky!")
         else:
             temp_dir = tempfile.mkdtemp()
@@ -1484,6 +1655,17 @@ if st.session_state.df is not None:
                         if pd.isna(val) or str(val).strip() == "" or str(val).lower() == "nan":
                             continue
                             
+                        # Načíst nastavení stylů pro tento sloupec
+                        show_label = True
+                        label_text = col
+                        if 'col_styles' in st.session_state and col in st.session_state.col_styles:
+                            show_label = st.session_state.col_styles[col].get("show_label", True)
+                            label_text = st.session_state.col_styles[col].get("custom_label", col)
+                        
+                        val_css = get_value_css(col)
+                        val_style_attr = f' style="{val_css}"' if val_css else ''
+                        label_html = f'<span class="field-label">{label_text}</span>' if show_label else ''
+                        
                         # TTS hlasový modul
                         if str(col).startswith("[TTS]"):
                             parts = str(val).split(';')
@@ -1540,7 +1722,12 @@ if st.session_state.df is not None:
                                     f'</div>'
                                     for fn in local_filenames
                                 ])
-                                html_parts.append(f'<div class="photo-list">{img_tags}</div>')
+                                html_parts.append(
+                                    f'<div class="card-field field-{slugify(col)}">'
+                                    f'{label_html}'
+                                    f'<div class="photo-list">{img_tags}</div>'
+                                    f'</div>'
+                                )
                         
                         # Běžný textový sloupec (včetně HTML popisků z Wikipedie/Kalendária)
                         else:
@@ -1551,14 +1738,14 @@ if st.session_state.df is not None:
                                 
                             html_parts.append(
                                 f'<div class="card-field field-{slugify(col)}">'
-                                f'<span class="field-label">{col}</span>'
-                                f'<div class="field-value">{val_str}</div>'
+                                f'{label_html}'
+                                f'<div class="field-value"{val_style_attr}>{val_str}</div>'
                                 f'</div>'
                             )
                     return "".join(html_parts)
                 
-                front_html = compile_side_html(front_cols, idx, row)
-                back_html = compile_side_html(back_cols, idx, row)
+                front_html = compile_side_html(st.session_state.front_cols_ordered, idx, row)
+                back_html = compile_side_html(st.session_state.back_cols_ordered, idx, row)
                 
                 subdeck_val = ""
                 if subdeck_col_choice != "— Bez rozdělení —":
