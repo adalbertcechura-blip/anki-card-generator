@@ -2683,30 +2683,46 @@ if st.session_state.df is not None:
                                         st.session_state.api_errors.append(f"Druh: {raw_species}, Sloupec: {col}, URL: {url}, Chyba: {str(e)}")
                             continue
 
-                        # Obrázkový sloupec
+                        # Obrázkový sloupec (iNaturalist, Wikimedia, GBIF Zoologie, Vlajky...)
                         if is_image_col(col, val):
                             urls = [u.strip() for u in str(val).split(';') if u.strip()]
                             local_filenames = []
                             
+                            raw_sp_name = str(row_data[columns[0]]).strip() if len(columns) > 0 else f"druh_{row_idx}"
+                            clean_sp = slugify_species_name(raw_sp_name) if raw_sp_name else f"druh_{row_idx}"
+                            
                             for img_idx, url in enumerate(urls):
+                                if not url.startswith('http://') and not url.startswith('https://'):
+                                    continue
                                 try:
                                     ext = ".jpg"
                                     if ".png" in url.lower():
                                         ext = ".png"
                                     elif ".jpeg" in url.lower():
                                         ext = ".jpeg"
+                                    elif ".webp" in url.lower():
+                                        ext = ".webp"
                                         
-                                    safe_col = slugify(col)
-                                    safe_filename = f"media_{row_idx}_{safe_col}_{img_idx}{ext}"
+                                    safe_col = slugify(col)[:12]
+                                    url_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()[:6]
+                                    safe_filename = f"{clean_sp}_{safe_col}_{row_idx}_{img_idx}_{url_hash}{ext}"
                                     local_path = os.path.join(media_dir, safe_filename)
                                     
-                                    r_img = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
-                                    if r_img.status_code == 200:
+                                    r_img = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=12)
+                                    if r_img.status_code == 200 and len(r_img.content) > 0:
                                         with open(local_path, 'wb') as f:
                                             f.write(r_img.content)
-                                        local_filenames.append(safe_filename)
-                                except Exception:
-                                    pass
+                                        if check_image_quality(local_path):
+                                            local_filenames.append(safe_filename)
+                                            if local_path not in downloaded_media:
+                                                downloaded_media.append(local_path)
+                                        else:
+                                            if os.path.exists(local_path):
+                                                os.remove(local_path)
+                                except Exception as e:
+                                    if 'api_errors' not in st.session_state:
+                                        st.session_state.api_errors = []
+                                    st.session_state.api_errors.append(f"Druh: {raw_sp_name}, Sloupec: {col}, URL: {url}, Chyba: {str(e)}")
                             
                             if local_filenames:
                                 img_tags = "".join([
