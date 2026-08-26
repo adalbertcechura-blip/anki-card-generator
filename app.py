@@ -119,6 +119,15 @@ def get_anki_css(theme_name):
   height: 1px;
   margin: 14px 0;
 }
+
+audio {
+  width: 100%;
+  max-width: 420px;
+  height: 34px;
+  border-radius: 6px;
+  margin-top: 4px;
+  display: block;
+}
 """
 
     if theme_name == "Světlý režim (vždy světlé)" or theme_name == "Světlý režim":
@@ -2607,7 +2616,10 @@ if st.session_state.df is not None:
                                         html_parts.append(
                                             f'<div class="card-field field-{slugify(col)}">'
                                             f'{label_html}'
-                                            f'<div class="field-value">{type_label}: [sound:{safe_filename}]</div>'
+                                            f'<div class="field-value">'
+                                            f'<span style="font-weight: 600; font-size: 13px; display: block; margin-bottom: 2px;">{type_label}</span>'
+                                            f'<audio controls controlslist="nodownload" preload="none" src="{safe_filename}"></audio>'
+                                            f'</div>'
                                             f'</div>'
                                         )
                                 except Exception as e:
