@@ -1426,7 +1426,7 @@ if input_method == "Nahrát soubor (Excel, CSV, TXT)":
                     content = uploaded_file.read().decode('utf-8')
                     lines = content.splitlines()
                     species_list = [line.strip() for line in lines if line.strip()]
-                    df = pd.DataFrame(species_list, columns=["Vědecký název"])
+                    df = pd.DataFrame(species_list, columns=["Vědecké jméno"])
                 else:
                     df = pd.read_excel(uploaded_file)
                 st.session_state.df = df
@@ -1460,7 +1460,7 @@ else:
         lines = text_input_value.splitlines()
         species_list = [line.strip() for line in lines if line.strip()]
         if species_list:
-            df = pd.DataFrame(species_list, columns=["Vědecký název"])
+            df = pd.DataFrame(species_list, columns=["Vědecké jméno"])
             st.session_state.df = df
             st.session_state.enhancements_applied = False
             st.session_state.unfound_list = []
@@ -1489,10 +1489,10 @@ if st.session_state.df is not None:
     
     col_clean1, col_clean2 = st.columns([2, 3])
     with col_clean1:
-        clean_col_choice = st.selectbox("Sloupec s názvy k vyčištění:", options=columns, index=0, key="clean_col_choice")
+        clean_col_choice = st.selectbox("Sloupec se jmény k vyčištění:", options=columns, index=0, key="clean_col_choice")
     with col_clean2:
         st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-        if st.button("Vyčistit vědecké názvy (odstranit subsp., var., agg.)"):
+        if st.button("Vyčistit vědecká jména (odstranit subsp., var., agg.)"):
             def clean_botanical_name(name):
                 if not name or pd.isna(name):
                     return name
@@ -1501,7 +1501,7 @@ if st.session_state.df is not None:
                 return cleaned.strip()
             
             st.session_state.df[clean_col_choice] = st.session_state.df[clean_col_choice].apply(clean_botanical_name)
-            st.success("Názvy byly úspěšně vyčištěny.")
+            st.success("Jména byla úspěšně vyčištěna.")
             st.rerun()
     
     # --- KROK 2: OBOHACENÍ DAT ---
@@ -1641,7 +1641,7 @@ if st.session_state.df is not None:
                 except ValueError:
                     gbif_photo_col_idx = 0
                 cfg["gbif_photo_col"] = st.selectbox(
-                    "Sloupec s názvem druhu pro GBIF fotky", 
+                    "Sloupec se jménem druhu pro GBIF fotky", 
                     options=columns, 
                     index=gbif_photo_col_idx,
                     key="w_gbif_photo_col"
@@ -1659,7 +1659,7 @@ if st.session_state.df is not None:
                 except ValueError:
                     pladias_col_idx = 0
                 cfg["pladias_col"] = st.selectbox(
-                    "Sloupec s latinským názvem druhu pro Pladias",
+                    "Sloupec s vědeckým jménem druhu pro Pladias",
                     options=columns, 
                     index=pladias_col_idx,
                     key="w_pladias_col"
@@ -1679,7 +1679,7 @@ if st.session_state.df is not None:
                 except ValueError:
                     gbif_zoo_col_idx = 0
                 cfg["gbif_zoo_col"] = st.selectbox(
-                    "Sloupec s latinským názvem druhu pro zoologii",
+                    "Sloupec s vědeckým jménem druhu pro zoologii",
                     options=columns, 
                     index=gbif_zoo_col_idx,
                     key="w_gbif_zoo_col"
@@ -1704,8 +1704,8 @@ if st.session_state.df is not None:
                 except ValueError:
                     bird_col_idx = 0
                 cfg["bird_sounds_col"] = st.selectbox(
-                    "Sloupec s vědeckým názvem druhu (Xeno-canto)",
-                    options=columns,
+                    "Sloupec s vědeckým jménem druhu (Xeno-canto)",
+                    options=columns, 
                     index=bird_col_idx,
                     key="w_bird_sounds_col"
                 )
@@ -1738,7 +1738,7 @@ if st.session_state.df is not None:
         col_b1, col_b2 = st.columns(2)
         with col_b1:
             cfg["enable_inat"] = st.checkbox(
-                "Aktivovat iNaturalist (Český název & Obrázky)", 
+                "Aktivovat iNaturalist (České jméno & Obrázky)", 
                 value=cfg.get("enable_inat", False),
                 key="w_enable_inat"
             )
@@ -1749,7 +1749,7 @@ if st.session_state.df is not None:
                 except ValueError:
                     inat_col_idx = 0
                 cfg["inat_col"] = st.selectbox(
-                    "Sloupec s latinským názvem druhu (iNaturalist)", 
+                    "Sloupec s vědeckým jménem druhu (iNaturalist)", 
                     options=columns, 
                     index=inat_col_idx,
                     key="w_inat_col"
@@ -1774,7 +1774,7 @@ if st.session_state.df is not None:
                 except ValueError:
                     desc_col_idx = 0
                 cfg["desc_col"] = st.selectbox(
-                    "Sloupec s vědeckým názvem druhu pro popis", 
+                    "Sloupec s vědeckým jménem druhu pro popis", 
                     options=columns, 
                     index=desc_col_idx,
                     key="w_desc_col"
@@ -1794,7 +1794,7 @@ if st.session_state.df is not None:
                 except ValueError:
                     gbif_col_idx = 0
                 cfg["gbif_col"] = st.selectbox(
-                    "Sloupec s latinským názvem k zařazení", 
+                    "Sloupec s vědeckým jménem k zařazení", 
                     options=columns, 
                     index=gbif_col_idx,
                     key="w_gbif_col"
@@ -1838,8 +1838,8 @@ if st.session_state.df is not None:
                 except ValueError:
                     wiki_link_col_idx = 0
                 cfg["wiki_link_col"] = st.selectbox(
-                    "Sloupec s latinským názvem pro Wikipedii",
-                    options=columns,
+                    "Sloupec s vědeckým jménem pro Wikipedii",
+                    options=columns, 
                     index=wiki_link_col_idx,
                     key="w_wiki_link_col"
                 )
@@ -2022,7 +2022,7 @@ if st.session_state.df is not None:
         
         # Vytvoření nových sloupců v DataFrame
         if enable_inat:
-            new_df["[iNat] Český název"] = ""
+            new_df["[iNat] České jméno"] = ""
             new_df["[iNat] Obrázky (URL)"] = ""
         if enable_desc:
             new_df["[Popis] Botanický popis"] = ""
@@ -2083,7 +2083,7 @@ if st.session_state.df is not None:
                 if inat_data['source'] == 'Nenalezeno':
                     unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'iNaturalist'})
                 
-                new_df.at[idx, "[iNat] Český název"] = inat_data['common_name']
+                new_df.at[idx, "[iNat] České jméno"] = inat_data['common_name']
                 new_df.at[idx, "[iNat] Obrázky (URL)"] = ";".join(inat_data['photo_urls'])
                 
             # 1b. Vědecký popis druhu (rostliny i živočichové)
