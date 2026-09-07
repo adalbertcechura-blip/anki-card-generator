@@ -1225,11 +1225,17 @@ countries_db = load_countries_db()
 
 st.set_page_config(
     page_title="Generátor kartiček Anki",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
 
 st.markdown("""
 <style>
+    /* Skrytí sidebaru */
+    [data-testid="stSidebar"], [data-testid="collapsedControl"] {
+        display: none !important;
+    }
+    
     /* Globální tmavé biologické téma (přírodní tmavě zelené tóny, čistý moderní web) */
     html, body, [data-testid="stAppViewContainer"], .stApp {
         background-color: #0c140f !important;
@@ -1374,6 +1380,44 @@ st.markdown("""
 st.markdown('<div class="main-title">Generátor kartiček Anki</div>', unsafe_allow_html=True)
 st.markdown('<div class="subtitle">Nahrajte tabulku, obohaťte ji o data přes API a sestavte líc a rub kartiček.</div>', unsafe_allow_html=True)
 
+def _read_pdf_data(file_candidates):
+    for f in file_candidates:
+        if os.path.exists(f):
+            try:
+                with open(f, "rb") as fp:
+                    return fp.read()
+            except Exception:
+                pass
+    return None
+
+pdf_gen_data = _read_pdf_data(["O_generatoru.pdf", "O generátoru.pdf", "MANUAL_GENERATOR.pdf"])
+pdf_anki_data = _read_pdf_data(["O_Anki.pdf", "O Anki.pdf", "MANUAL_ANKI.pdf"])
+
+# Dvě tlačítka nahoře pro stažení návodů v PDF
+if pdf_gen_data or pdf_anki_data:
+    col_pdf1, col_pdf2 = st.columns(2)
+    with col_pdf1:
+        if pdf_gen_data:
+            st.download_button(
+                "Návod: Generátor kartiček (PDF)",
+                data=pdf_gen_data,
+                file_name="O_generatoru.pdf",
+                mime="application/pdf",
+                key="top_dl_gen_pdf",
+                use_container_width=True
+            )
+    with col_pdf2:
+        if pdf_anki_data:
+            st.download_button(
+                "Návod: Jak používat Anki (PDF)",
+                data=pdf_anki_data,
+                file_name="O_Anki.pdf",
+                mime="application/pdf",
+                key="top_dl_anki_pdf",
+                use_container_width=True
+            )
+    st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
+
 # Inicializace stavu
 if 'df' not in st.session_state:
     st.session_state.df = None
@@ -1492,7 +1536,7 @@ if st.session_state.df is not None:
         clean_col_choice = st.selectbox("Sloupec se jmény k vyčištění:", options=columns, index=0, key="clean_col_choice")
     with col_clean2:
         st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-        if st.button("Vyčistit vědecká jména (odstranit subsp., var., agg.)"):
+        if st.button("Převést na druhovou úroveň (odstranit subsp., var., agg.)"):
             def clean_botanical_name(name):
                 if not name or pd.isna(name):
                     return name
@@ -1501,7 +1545,7 @@ if st.session_state.df is not None:
                 return cleaned.strip()
             
             st.session_state.df[clean_col_choice] = st.session_state.df[clean_col_choice].apply(clean_botanical_name)
-            st.success("Jména byla úspěšně vyčištěna.")
+            st.success("Jména byla úspěšně převedena na druhovou úroveň.")
             st.rerun()
     
     # --- KROK 2: OBOHACENÍ DAT ---
@@ -1763,7 +1807,7 @@ if st.session_state.df is not None:
 
             st.markdown("---")
             cfg["enable_desc"] = st.checkbox(
-                "Aktivovat vědecký popis druhu (Wikipedie EN)", 
+                "Stáhnout popis druhu z Wikipedie", 
                 value=cfg.get("enable_desc", False),
                 key="w_enable_desc"
             )
@@ -1779,7 +1823,7 @@ if st.session_state.df is not None:
                     index=desc_col_idx,
                     key="w_desc_col"
                 )
-                st.caption("Stáhne anglický vědecký popis z Wikipedie – funguje pro rostliny i živočichy.")
+                st.caption("Stáhne anglický popis z Wikipedie – funguje pro rostliny i živočichy.")
                 
         with col_b2:
             cfg["enable_gbif"] = st.checkbox(
@@ -2025,7 +2069,7 @@ if st.session_state.df is not None:
             new_df["[iNat] České jméno"] = ""
             new_df["[iNat] Obrázky (URL)"] = ""
         if enable_desc:
-            new_df["[Popis] Botanický popis"] = ""
+            new_df["[Popis] Popis z Wikipedie"] = ""
         if enable_gbif:
             new_df["[Taxonomie] Říše"] = ""
             new_df["[Taxonomie] Kmen"] = ""
@@ -2086,7 +2130,7 @@ if st.session_state.df is not None:
                 new_df.at[idx, "[iNat] České jméno"] = inat_data['common_name']
                 new_df.at[idx, "[iNat] Obrázky (URL)"] = ";".join(inat_data['photo_urls'])
                 
-            # 1b. Vědecký popis druhu (rostliny i živočichové)
+            # 1b. Popis druhu z Wikipedie (rostliny i živočichové)
             if enable_desc:
                 raw_sp = str(row[desc_col]).strip()
                 sp = re.sub(r'\s*\(.*\)\s*', '', raw_sp).strip()
@@ -2095,9 +2139,9 @@ if st.session_state.df is not None:
                 desc_text = fetch_wiki_description(sp_clean)
                 
                 if not desc_text:
-                    unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'Vědecký popis (Wikipedie)'})
+                    unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'Popis z Wikipedie'})
                 
-                new_df.at[idx, "[Popis] Botanický popis"] = desc_text
+                new_df.at[idx, "[Popis] Popis z Wikipedie"] = desc_text
                 
             # 2. GBIF Taxonomie
             if enable_gbif:
@@ -2516,6 +2560,20 @@ if st.session_state.df is not None:
             index=0
         )
     
+    # Nastavení štítků (Tags)
+    enable_tagging = st.checkbox("Přidat štítky (tags) ke kartičkám podle hodnoty ve sloupci", value=False)
+    tag_col = ""
+    tag_match_val = ""
+    tag_name_input = ""
+    if enable_tagging:
+        col_t1, col_t2, col_t3 = st.columns(3)
+        with col_t1:
+            tag_col = st.selectbox("Sloupec pro přidělení štítku:", options=columns, index=0)
+        with col_t2:
+            tag_match_val = st.text_input("Hodnota ve sloupci pro označení (např. 1, u, ucitel):", value="1")
+        with col_t3:
+            tag_name_input = st.text_input("Název štítku v Anki (tag):", value="ucitele")
+    
     if st.button("Generovat balíček (.apkg)"):
         st.session_state.api_errors = []
         clear_temp_on_finish = True
@@ -2774,12 +2832,23 @@ if st.session_state.df is not None:
                     raw_val = row.get(subdeck_col_choice)
                     if pd.notna(raw_val) and str(raw_val).strip() != "":
                         subdeck_val = str(raw_val).strip()
+                
+                # Výpočet štítků (tags)
+                card_tags = []
+                if enable_tagging and tag_col and tag_name_input.strip():
+                    cell_raw = str(row.get(tag_col, "")).strip()
+                    match_targets = [m.strip().lower() for m in tag_match_val.split(",") if m.strip()]
+                    if (match_targets and cell_raw.lower() in match_targets) or (not match_targets and cell_raw != ""):
+                        clean_tag = re.sub(r'\s+', '_', tag_name_input.strip())
+                        if clean_tag:
+                            card_tags.append(clean_tag)
                         
                 processed_notes.append({
                     'front': front_html,
                     'back': back_html,
                     'guid_src': str(row[columns[0]]) if columns else str(idx),
-                    'subdeck_val': subdeck_val
+                    'subdeck_val': subdeck_val,
+                    'tags': card_tags
                 })
                 
             status.text("Zapisuji balíček Anki (.apkg)...")
@@ -2827,6 +2896,7 @@ if st.session_state.df is not None:
                         note_data['front'],
                         note_data['back']
                     ],
+                    tags=note_data.get('tags', []),
                     guid=genanki.guid_for(note_data['guid_src'] + "|" + model_hash + "|" + content_hash)
                 )
                 
