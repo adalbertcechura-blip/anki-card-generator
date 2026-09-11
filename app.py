@@ -11,6 +11,8 @@ import tempfile
 import genanki
 import time
 import json
+import concurrent.futures
+import gc
 
 # --- NAČTENÍ GLOBÁLNÍ KONFIGURACE (API klíče pro správce) ---
 def _load_global_config() -> dict:
@@ -1481,6 +1483,15 @@ def _read_pdf_data(file_candidates):
                 pass
     return None
 
+def _compat_width():
+    try:
+        ver = tuple(map(int, re.findall(r'\d+', st.__version__)[:2]))
+        if ver >= (1, 60):
+            return {"width": "stretch"}
+    except Exception:
+        pass
+    return {"use_container_width": True}
+
 pdf_gen_data = _read_pdf_data(["O_generatoru.pdf", "O generátoru.pdf", "MANUAL_GENERATOR.pdf"])
 pdf_anki_data = _read_pdf_data(["O_Anki.pdf", "O Anki.pdf", "MANUAL_ANKI.pdf"])
 
@@ -1495,7 +1506,7 @@ if pdf_gen_data or pdf_anki_data:
                 file_name="O_generatoru.pdf",
                 mime="application/pdf",
                 key="top_dl_gen_pdf",
-                use_container_width=True
+                **_compat_width()
             )
     with col_pdf2:
         if pdf_anki_data:
@@ -1505,7 +1516,7 @@ if pdf_gen_data or pdf_anki_data:
                 file_name="O_Anki.pdf",
                 mime="application/pdf",
                 key="top_dl_anki_pdf",
-                use_container_width=True
+                **_compat_width()
             )
     st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
 
@@ -1619,7 +1630,7 @@ if st.session_state.df is not None:
     columns = list(df.columns)
     
     st.markdown("### Náhled tabulky")
-    st.dataframe(df.head(5), use_container_width=True)
+    st.dataframe(df.head(5), **_compat_width())
     st.caption(f"Celkem řádků: **{len(df)}** | Sloupců: **{len(columns)}**")
     
     col_clean1, col_clean2 = st.columns([2, 3])
@@ -2719,240 +2730,314 @@ if st.session_state.df is not None:
             progress_bar = st.progress(0.0)
             status = st.empty()
             
-            processed_notes = []
-            downloaded_media = []
+            # --- FÁZE 1: SBĚR VŠECH MÉDIÍ K PARALELNÍMU STAŽENÍ ---
+            status.text("Připravuji seznam médií ke stažení...")
+            media_tasks = {}
+            active_cols = list(dict.fromkeys(st.session_state.front_cols_ordered + st.session_state.back_cols_ordered))
             
+            for idx, row in df.iterrows():
+                for col in active_cols:
+                    val = row[col]
+                    if pd.isna(val) or str(val).strip() == "" or str(val).lower() == "nan":
+                        continue
+                        
+                    # TTS
+                    if str(col).startswith("[TTS]"):
+                        parts = str(val).split(';')
+                        if len(parts) >= 2:
+                            text_to_speak = parts[0].strip()
+                            lang_code = parts[1].strip()
+                            if text_to_speak and lang_code:
+                                safe_txt = slugify(text_to_speak)[:20]
+                                safe_filename = f"tts_{idx}_{safe_txt}_{lang_code}.mp3"
+                                tts_url = f"https://translate.google.com/translate_tts?ie=UTF-8&tl={lang_code}&client=tw-ob&q={urllib.parse.quote(text_to_speak)}"
+                                media_tasks[safe_filename] = (tts_url, 'audio')
+                                
+                    # Xeno-canto Hlasy ptáků
+                    elif col == "[Zvuky] Hlasy ptáků":
+                        entries = [e.strip() for e in str(val).split(';') if e.strip()]
+                        for s_idx, entry in enumerate(entries):
+                            if '|' in entry:
+                                sound_url, stype = entry.rsplit('|', 1)
+                            else:
+                                sound_url, stype = entry, "song"
+                            sound_url = sound_url.strip()
+                            if not sound_url.startswith('http'):
+                                continue
+                            raw_sp_name = str(row[columns[0]]) if len(columns) > 0 else f"druh_{idx}"
+                            safe_sp = slugify(raw_sp_name)[:20] or f"druh_{idx}"
+                            safe_filename = f"xc_{idx}_{s_idx}_{safe_sp}_{stype}.mp3"
+                            media_tasks[safe_filename] = (sound_url, 'audio')
+                            
+                    # Speciální GBIF orgánové sloupce
+                    elif col in ["[GBIF] Habitus", "[GBIF] Květ", "[GBIF] List", "[GBIF] Plod", "[GBIF] Herbář"] and is_image_col(col, val):
+                        urls = [u.strip() for u in str(val).split(';') if u.strip()]
+                        organ_map = {
+                            "[GBIF] Habitus": "habitus",
+                            "[GBIF] Květ": "kvet",
+                            "[GBIF] List": "list",
+                            "[GBIF] Plod": "plod",
+                            "[GBIF] Herbář": "herbar"
+                        }
+                        organ = organ_map.get(col, "foto")
+                        species_col = st.session_state.api_config.get("gbif_photo_col", columns[0])
+                        raw_species = str(row[species_col]).strip() if species_col in row else ""
+                        clean_species = slugify_species_name(raw_species) if raw_species else f"druh_{idx}"
+                        
+                        for u_idx, url in enumerate(urls):
+                            if url.startswith('http://') or url.startswith('https://'):
+                                ext = ".jpg"
+                                if ".png" in url.lower():
+                                    ext = ".png"
+                                elif ".jpeg" in url.lower():
+                                    ext = ".jpeg"
+                                safe_filename = f"{clean_species}_{organ}{ext}" if u_idx == 0 else f"{clean_species}_{organ}_{u_idx}{ext}"
+                                media_tasks[safe_filename] = (url, 'image')
+                                
+                    # Běžný obrázkový sloupec (iNaturalist, Wikimedia, GBIF Zoo, GBIF Houby, Zeměpis...)
+                    elif is_image_col(col, val):
+                        urls = [u.strip() for u in str(val).split(';') if u.strip()]
+                        raw_sp_name = str(row[columns[0]]).strip() if len(columns) > 0 else f"druh_{idx}"
+                        clean_sp = slugify_species_name(raw_sp_name) if raw_sp_name else f"druh_{idx}"
+                        
+                        for img_idx, url in enumerate(urls):
+                            if not url.startswith('http://') and not url.startswith('https://'):
+                                continue
+                            ext = ".jpg"
+                            if ".png" in url.lower():
+                                ext = ".png"
+                            elif ".jpeg" in url.lower():
+                                ext = ".jpeg"
+                            elif ".webp" in url.lower():
+                                ext = ".webp"
+                            safe_col = slugify(col)[:12]
+                            url_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()[:6]
+                            safe_filename = f"{clean_sp}_{safe_col}_{idx}_{img_idx}_{url_hash}{ext}"
+                            media_tasks[safe_filename] = (url, 'image')
+
+            # --- FÁZE 2: RYCHLÉ PARALELNÍ STAŽENÍ A OPTIMALIZACE VÍCE VLÁKNY ---
+            downloaded_media = []
+            total_tasks = len(media_tasks)
+            if total_tasks > 0:
+                status.text(f"Stahuji a optimalizuji média (0/{total_tasks})...")
+                progress_bar.progress(0.0)
+                
+                def _download_task(item):
+                    fname, (url, mtype) = item
+                    local_path = os.path.join(media_dir, fname)
+                    if os.path.exists(local_path) and os.path.getsize(local_path) > 0:
+                        return fname, local_path, True
+                    try:
+                        r_resp = requests.get(
+                            url, 
+                            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}, 
+                            timeout=(2.5, 5.0)
+                        )
+                        if r_resp.status_code == 200 and len(r_resp.content) > 0:
+                            if mtype == 'image':
+                                if save_optimized_image(r_resp.content, local_path, max_dim=800, quality=80):
+                                    if check_image_quality(local_path):
+                                        return fname, local_path, True
+                                    else:
+                                        if os.path.exists(local_path):
+                                            os.remove(local_path)
+                            else: # audio / tts
+                                with open(local_path, 'wb') as f:
+                                    f.write(r_resp.content)
+                                if os.path.exists(local_path) and os.path.getsize(local_path) > 0:
+                                    return fname, local_path, True
+                    except Exception:
+                        pass
+                    return fname, local_path, False
+
+                completed_count = 0
+                with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
+                    futures = {executor.submit(_download_task, item): item for item in media_tasks.items()}
+                    try:
+                        for future in concurrent.futures.as_completed(futures, timeout=75):
+                            completed_count += 1
+                            progress_bar.progress(completed_count / total_tasks)
+                            status.text(f"Stahuji a optimalizuji média: {completed_count}/{total_tasks} hotovo...")
+                            try:
+                                fname, local_path, success = future.result(timeout=1.0)
+                                if success:
+                                    downloaded_media.append(local_path)
+                            except Exception:
+                                pass
+                    except concurrent.futures.TimeoutError:
+                        status.text(f"Časový limit pro pomalá média vypršel ({completed_count}/{total_tasks}). Pokračuji v sestavování balíčku...")
+
+            # --- FÁZE 3: OKAMŽITÉ SESTAVENÍ KARET V PAMĚTI ---
+            status.text("Sestavuji kartičky...")
+            progress_bar.progress(1.0)
+            
+            processed_notes = []
             card_layout_mode = st.session_state.get("card_layout_radio", "Pod sebe (líc + rub)")
             is_only_back = (card_layout_mode == "Na druhou stranu (pouze rub)")
             total = len(df)
             
-            for idx, row in df.iterrows():
-                progress_bar.progress((idx + 1) / total)
-                status.text(f"Stahuji média a sestavuji kartu {idx+1}/{total}...")
-                
-                # Sestavení strany HTML
-                def compile_side_html(selected_cols, row_idx, row_data):
-                    html_parts = []
-                    for col in selected_cols:
-                        val = row_data[col]
-                        if pd.isna(val) or str(val).strip() == "" or str(val).lower() == "nan":
-                            continue
-                            
-                        # Načíst nastavení stylů pro tento sloupec
-                        show_label = True
-                        label_text = col
-                        if 'col_styles' in st.session_state and col in st.session_state.col_styles:
-                            show_label = st.session_state.col_styles[col].get("show_label", True)
-                            label_text = st.session_state.col_styles[col].get("custom_label", col)
+            def compile_side_html(selected_cols, row_idx, row_data):
+                html_parts = []
+                for col in selected_cols:
+                    val = row_data[col]
+                    if pd.isna(val) or str(val).strip() == "" or str(val).lower() == "nan":
+                        continue
                         
-                        val_css = get_value_css(col)
-                        val_style_attr = f' style="{val_css}"' if val_css else ''
-                        label_html = f'<span class="field-label">{label_text}</span>' if show_label else ''
+                    # Načíst nastavení stylů pro tento sloupec
+                    show_label = True
+                    label_text = col
+                    if 'col_styles' in st.session_state and col in st.session_state.col_styles:
+                        show_label = st.session_state.col_styles[col].get("show_label", True)
+                        label_text = st.session_state.col_styles[col].get("custom_label", col)
+                    
+                    val_css = get_value_css(col)
+                    val_style_attr = f' style="{val_css}"' if val_css else ''
+                    label_html = f'<span class="field-label">{label_text}</span>' if show_label else ''
+                    
+                    # TTS hlasový modul
+                    if str(col).startswith("[TTS]"):
+                        parts = str(val).split(';')
+                        if len(parts) >= 2:
+                            text_to_speak = parts[0].strip()
+                            lang_code = parts[1].strip()
+                            if text_to_speak and lang_code:
+                                safe_txt = slugify(text_to_speak)[:20]
+                                safe_filename = f"tts_{row_idx}_{safe_txt}_{lang_code}.mp3"
+                                local_path = os.path.join(media_dir, safe_filename)
+                                if os.path.exists(local_path):
+                                    html_parts.append(f"[sound:{safe_filename}]")
+                        continue
                         
-                        # TTS hlasový modul
-                        if str(col).startswith("[TTS]"):
-                            parts = str(val).split(';')
-                            if len(parts) >= 2:
-                                text_to_speak = parts[0].strip()
-                                lang_code = parts[1].strip()
-                                if text_to_speak and lang_code:
-                                    try:
-                                        safe_txt = slugify(text_to_speak)[:20]
-                                        safe_filename = f"tts_{row_idx}_{safe_txt}_{lang_code}.mp3"
-                                        local_path = os.path.join(media_dir, safe_filename)
-                                        
-                                        tts_url = f"https://translate.google.com/translate_tts?ie=UTF-8&tl={lang_code}&client=tw-ob&q={urllib.parse.quote(text_to_speak)}"
-                                        r_audio = requests.get(tts_url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
-                                        if r_audio.status_code == 200:
-                                            with open(local_path, 'wb') as f:
-                                                f.write(r_audio.content)
-                                            downloaded_media.append(local_path)
-                                            html_parts.append(f"[sound:{safe_filename}]")
-                                    except Exception:
-                                        pass
-                            continue
-                            
-                        # Xeno-canto hlasy ptáků (MP3/WAV URLs ze záznamu – formát "url|typ;url|typ")
-                        if col == "[Zvuky] Hlasy ptáků":
-                            entries = [e.strip() for e in str(val).split(';') if e.strip()]
-                            for s_idx, entry in enumerate(entries):
-                                if '|' in entry:
-                                    sound_url, stype = entry.rsplit('|', 1)
-                                else:
-                                    sound_url, stype = entry, "song"
-                                sound_url = sound_url.strip()
-                                if not sound_url.startswith('http'):
-                                    continue
-                                raw_sp_name = str(row_data[row_data.index[0]]) if len(row_data) > 0 else f"druh_{row_idx}"
-                                try:
-                                    safe_sp = slugify(raw_sp_name)[:20]
-                                    if not safe_sp:
-                                        safe_sp = f"druh_{row_idx}"
-                                    r_snd = requests.get(
-                                        sound_url,
-                                        headers={'User-Agent': 'Mozilla/5.0'},
-                                        timeout=20, allow_redirects=True
-                                    )
-                                    if r_snd.status_code == 200 and len(r_snd.content) > 0:
-                                        audio_content = r_snd.content
-                                        ext = detect_audio_extension(audio_content, default_ext=".mp3")
-                                        safe_filename = f"xc_{row_idx}_{s_idx}_{safe_sp}_{stype}{ext}"
-                                        local_path = os.path.join(media_dir, safe_filename)
-                                        with open(local_path, 'wb') as f:
-                                            f.write(audio_content)
-                                        if local_path not in downloaded_media:
-                                            downloaded_media.append(local_path)
-                                        type_label = "Zpěv" if stype == "song" else "Hlas"
-                                        html_parts.append(
-                                            f'<div class="card-field field-{slugify(col)}">'
-                                            f'{label_html}'
-                                            f'<div class="field-value">'
-                                            f'<span style="font-weight: 600; font-size: 13px; display: block; margin-bottom: 2px;">{type_label}</span>'
-                                            f'<audio controls controlslist="nodownload" preload="none" src="{safe_filename}"></audio>'
-                                            f'</div>'
-                                            f'</div>'
-                                        )
-                                except Exception as e:
-                                    if 'api_errors' not in st.session_state:
-                                        st.session_state.api_errors = []
-                                    st.session_state.api_errors.append(f"Druh: {raw_sp_name}, Zvuk: {sound_url}, Chyba: {str(e)}")
-                            continue
-                            
-                        # Speciální GBIF obrázkové sloupce
-                        is_gbif_photo = col in ["[GBIF] Habitus", "[GBIF] Květ", "[GBIF] List", "[GBIF] Plod", "[GBIF] Herbář"]
-                        if is_gbif_photo and is_image_col(col, val):
-                            urls = [u.strip() for u in str(val).split(';') if u.strip()]
-                            
-                            for url in urls:
-                                if url.startswith('http://') or url.startswith('https://'):
-                                    try:
-                                        ext = ".jpg"
-                                        if ".png" in url.lower():
-                                            ext = ".png"
-                                        elif ".jpeg" in url.lower():
-                                            ext = ".jpeg"
-                                            
-                                        organ_map = {
-                                            "[GBIF] Habitus": "habitus",
-                                            "[GBIF] Květ": "kvet",
-                                            "[GBIF] List": "list",
-                                            "[GBIF] Plod": "plod",
-                                            "[GBIF] Herbář": "herbar"
-                                        }
-                                        organ = organ_map.get(col, "foto")
-                                        
-                                        species_col = st.session_state.api_config.get("gbif_photo_col", columns[0])
-                                        raw_species = str(row_data[species_col]).strip()
-                                        clean_species = slugify_species_name(raw_species) if raw_species else f"druh_{row_idx}"
-                                        
-                                        safe_filename = f"{clean_species}_{organ}{ext}"
-                                        local_path = os.path.join(media_dir, safe_filename)
-                                        
-                                        r_img = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=8)
-                                        if r_img.status_code == 200 and len(r_img.content) > 0:
-                                            if save_optimized_image(r_img.content, local_path, max_dim=800, quality=80):
-                                                if check_image_quality(local_path):
-                                                    downloaded_media.append(local_path)
-                                                    
-                                                    img_tag = f'<div class="photo-container"><img src="{safe_filename}"></div>'
-                                                    html_parts.append(
-                                                        f'<div class="card-field field-{slugify(col)}">'
-                                                        f'{label_html}'
-                                                        f'<div class="photo-list">{img_tag}</div>'
-                                                        f'</div>'
-                                                    )
-                                                    break
-                                                else:
-                                                    if os.path.exists(local_path):
-                                                        os.remove(local_path)
-                                    except Exception as e:
-                                        if 'api_errors' not in st.session_state:
-                                            st.session_state.api_errors = []
-                                        st.session_state.api_errors.append(f"Druh: {raw_species}, Sloupec: {col}, URL: {url}, Chyba: {str(e)}")
-                            continue
-
-                        # Obrázkový sloupec (iNaturalist, Wikimedia, GBIF Zoologie, Vlajky...)
-                        if is_image_col(col, val):
-                            urls = [u.strip() for u in str(val).split(';') if u.strip()]
-                            local_filenames = []
-                            
-                            raw_sp_name = str(row_data[columns[0]]).strip() if len(columns) > 0 else f"druh_{row_idx}"
-                            clean_sp = slugify_species_name(raw_sp_name) if raw_sp_name else f"druh_{row_idx}"
-                            
-                            for img_idx, url in enumerate(urls):
-                                if not url.startswith('http://') and not url.startswith('https://'):
-                                    continue
-                                try:
-                                    ext = ".jpg"
-                                    if ".png" in url.lower():
-                                        ext = ".png"
-                                    elif ".jpeg" in url.lower():
-                                        ext = ".jpeg"
-                                    elif ".webp" in url.lower():
-                                        ext = ".webp"
-                                        
-                                    safe_col = slugify(col)[:12]
-                                    url_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()[:6]
-                                    safe_filename = f"{clean_sp}_{safe_col}_{row_idx}_{img_idx}_{url_hash}{ext}"
-                                    local_path = os.path.join(media_dir, safe_filename)
-                                    
-                                    r_img = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=12)
-                                    if r_img.status_code == 200 and len(r_img.content) > 0:
-                                        if save_optimized_image(r_img.content, local_path, max_dim=800, quality=80):
-                                            if check_image_quality(local_path):
-                                                local_filenames.append(safe_filename)
-                                                if local_path not in downloaded_media:
-                                                    downloaded_media.append(local_path)
-                                            else:
-                                                if os.path.exists(local_path):
-                                                    os.remove(local_path)
-                                except Exception as e:
-                                    if 'api_errors' not in st.session_state:
-                                        st.session_state.api_errors = []
-                                    st.session_state.api_errors.append(f"Druh: {raw_sp_name}, Sloupec: {col}, URL: {url}, Chyba: {str(e)}")
-                            
-                            if local_filenames:
-                                img_tags = "".join([
-                                    f'<div class="photo-container">'
-                                    f'<img src="{fn}">'
-                                    f'</div>'
-                                    for fn in local_filenames
-                                ])
+                    # Xeno-canto hlasy ptáků
+                    if col == "[Zvuky] Hlasy ptáků":
+                        entries = [e.strip() for e in str(val).split(';') if e.strip()]
+                        for s_idx, entry in enumerate(entries):
+                            if '|' in entry:
+                                sound_url, stype = entry.rsplit('|', 1)
+                            else:
+                                sound_url, stype = entry, "song"
+                            sound_url = sound_url.strip()
+                            if not sound_url.startswith('http'):
+                                continue
+                            raw_sp_name = str(row_data[row_data.index[0]]) if len(row_data) > 0 else f"druh_{row_idx}"
+                            safe_sp = slugify(raw_sp_name)[:20] or f"druh_{row_idx}"
+                            safe_filename = f"xc_{row_idx}_{s_idx}_{safe_sp}_{stype}.mp3"
+                            local_path = os.path.join(media_dir, safe_filename)
+                            if os.path.exists(local_path):
+                                type_label = "Zpěv" if stype == "song" else "Hlas"
                                 html_parts.append(
                                     f'<div class="card-field field-{slugify(col)}">'
                                     f'{label_html}'
-                                    f'<div class="photo-list">{img_tags}</div>'
+                                    f'<div class="field-value">'
+                                    f'<span style="font-weight: 600; font-size: 13px; display: block; margin-bottom: 2px;">{type_label}</span>'
+                                    f'<audio controls controlslist="nodownload" preload="none" src="{safe_filename}"></audio>'
+                                    f'</div>'
                                     f'</div>'
                                 )
+                        continue
                         
-                        # Speciální sloupce s hypertextovými odkazy (Pladias, Wikipedie)
-                        elif col.startswith("[Pladias]") or (col.startswith("[Wikipedie]") and str(val).startswith("http")):
-                            url = str(val).strip()
-                            if "pladias.cz" in url:
-                                link_label = "Otevřít profil na Pladias.cz"
-                            else:
-                                link_label = "Otevřít profil na Wikipedii"
+                    # Speciální GBIF obrázkové sloupce
+                    is_gbif_photo = col in ["[GBIF] Habitus", "[GBIF] Květ", "[GBIF] List", "[GBIF] Plod", "[GBIF] Herbář"]
+                    if is_gbif_photo and is_image_col(col, val):
+                        urls = [u.strip() for u in str(val).split(';') if u.strip()]
+                        organ_map = {
+                            "[GBIF] Habitus": "habitus",
+                            "[GBIF] Květ": "kvet",
+                            "[GBIF] List": "list",
+                            "[GBIF] Plod": "plod",
+                            "[GBIF] Herbář": "herbar"
+                        }
+                        organ = organ_map.get(col, "foto")
+                        species_col = st.session_state.api_config.get("gbif_photo_col", columns[0])
+                        raw_species = str(row_data[species_col]).strip() if species_col in row_data else ""
+                        clean_species = slugify_species_name(raw_species) if raw_species else f"druh_{row_idx}"
+                        
+                        for u_idx, url in enumerate(urls):
+                            ext = ".jpg"
+                            if ".png" in url.lower():
+                                ext = ".png"
+                            elif ".jpeg" in url.lower():
+                                ext = ".jpeg"
+                            safe_filename = f"{clean_species}_{organ}{ext}" if u_idx == 0 else f"{clean_species}_{organ}_{u_idx}{ext}"
+                            local_path = os.path.join(media_dir, safe_filename)
+                            if os.path.exists(local_path):
+                                img_tag = f'<div class="photo-container"><img src="{safe_filename}"></div>'
+                                html_parts.append(
+                                    f'<div class="card-field field-{slugify(col)}">'
+                                    f'{label_html}'
+                                    f'<div class="photo-list">{img_tag}</div>'
+                                    f'</div>'
+                                )
+                                break
+                        continue
+
+                    # Obrázkový sloupec (iNaturalist, Wikimedia, GBIF Zoologie, GBIF Houby, Vlajky...)
+                    if is_image_col(col, val):
+                        urls = [u.strip() for u in str(val).split(';') if u.strip()]
+                        local_filenames = []
+                        raw_sp_name = str(row_data[columns[0]]).strip() if len(columns) > 0 else f"druh_{row_idx}"
+                        clean_sp = slugify_species_name(raw_sp_name) if raw_sp_name else f"druh_{row_idx}"
+                        
+                        for img_idx, url in enumerate(urls):
+                            if not url.startswith('http://') and not url.startswith('https://'):
+                                continue
+                            ext = ".jpg"
+                            if ".png" in url.lower():
+                                ext = ".png"
+                            elif ".jpeg" in url.lower():
+                                ext = ".jpeg"
+                            elif ".webp" in url.lower():
+                                ext = ".webp"
+                            safe_col = slugify(col)[:12]
+                            url_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()[:6]
+                            safe_filename = f"{clean_sp}_{safe_col}_{row_idx}_{img_idx}_{url_hash}{ext}"
+                            local_path = os.path.join(media_dir, safe_filename)
+                            if os.path.exists(local_path):
+                                local_filenames.append(safe_filename)
+                        
+                        if local_filenames:
+                            img_tags = "".join([
+                                f'<div class="photo-container">'
+                                f'<img src="{fn}">'
+                                f'</div>'
+                                for fn in local_filenames
+                            ])
                             html_parts.append(
                                 f'<div class="card-field field-{slugify(col)}">'
                                 f'{label_html}'
-                                f'<div class="field-value"><a href="{url}" style="color: #48a973; font-weight: 600; text-decoration: underline; font-size: 0.95em;">{link_label}</a></div>'
+                                f'<div class="photo-list">{img_tags}</div>'
                                 f'</div>'
                             )
-                            
-                        # Běžný textový sloupec
+                    
+                    # Speciální sloupce s hypertextovými odkazy (Pladias, Wikipedie)
+                    elif col.startswith("[Pladias]") or (col.startswith("[Wikipedie]") and str(val).startswith("http")):
+                        url = str(val).strip()
+                        if "pladias.cz" in url:
+                            link_label = "Otevřít profil na Pladias.cz"
                         else:
-                            val_str = str(val)
-                            if not re.search(r'<[a-zA-Z0-9/]+[^>]*>', val_str):
-                                val_str = val_str.replace('\n', '<br>')
-                                
-                            html_parts.append(
-                                f'<div class="card-field field-{slugify(col)}">'
-                                f'{label_html}'
-                                f'<div class="field-value"{val_style_attr}>{val_str}</div>'
-                                f'</div>'
-                            )
-                    return "".join(html_parts)
-                
+                            link_label = "Otevřít profil na Wikipedii"
+                        html_parts.append(
+                            f'<div class="card-field field-{slugify(col)}">'
+                            f'{label_html}'
+                            f'<div class="field-value"><a href="{url}" target="_blank" style="color: #48a973; font-weight: 600; text-decoration: underline; font-size: 0.95em;">{link_label}</a></div>'
+                            f'</div>'
+                        )
+                        
+                    # Běžný textový sloupec
+                    else:
+                        val_str = str(val)
+                        if not re.search(r'<[a-zA-Z0-9/]+[^>]*>', val_str):
+                            val_str = val_str.replace('\n', '<br>')
+                            
+                        html_parts.append(
+                            f'<div class="card-field field-{slugify(col)}">'
+                            f'{label_html}'
+                            f'<div class="field-value"{val_style_attr}>{val_str}</div>'
+                            f'</div>'
+                        )
+                return "".join(html_parts)
+
+            for idx, row in df.iterrows():
                 front_html = compile_side_html(st.session_state.front_cols_ordered, idx, row)
                 back_html = compile_side_html(st.session_state.back_cols_ordered, idx, row)
                 
@@ -3067,7 +3152,6 @@ if st.session_state.df is not None:
                 
             if clear_temp_on_finish:
                 shutil.rmtree(temp_dir, ignore_errors=True)
-                import gc
                 gc.collect()
                 
             st.success("Balíček Anki byl úspěšně vygenerován.")
