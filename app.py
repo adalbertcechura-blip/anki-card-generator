@@ -815,6 +815,63 @@ def fetch_gbif_zoo_photos(species_name, max_photos=3):
         pass
     return photos
 
+def fetch_gbif_fungi_photos(species_name, max_photos=3):
+    """
+    Vyhledá fotky hub (říše Fungi / mykologie) z GBIF API (occurrence search) pro daný taxon.
+    """
+    photos = []
+    if not species_name or pd.isna(species_name):
+        return photos
+    species_name = str(species_name).strip()
+    if not species_name:
+        return photos
+    try:
+        clean_name = re.sub(r'\s*\(.*\)\s*', '', species_name).strip()
+        clean_name = re.sub(r'\s+sp(p)?\.?$', '', clean_name).strip()
+        
+        match_url = "https://api.gbif.org/v1/species/match"
+        match_params = {
+            "name": clean_name,
+            "kingdom": "Fungi",
+            "strict": "false"
+        }
+        r_match = requests.get(match_url, params=match_params, timeout=5)
+        usage_key = None
+        if r_match.status_code == 200:
+            match_data = r_match.json()
+            usage_key = match_data.get("usageKey")
+            
+        # Pokud se nepodařilo najít pod Fungi, zkusit bez kingdom filtru
+        if not usage_key:
+            r_match2 = requests.get(match_url, params={"name": clean_name, "strict": "false"}, timeout=5)
+            if r_match2.status_code == 200:
+                usage_key = r_match2.json().get("usageKey")
+                
+        if usage_key:
+            occ_url = "https://api.gbif.org/v1/occurrence/search"
+            occ_params = {
+                "taxonKey": usage_key,
+                "mediaType": "StillImage",
+                "limit": 35
+            }
+            r_occ = requests.get(occ_url, params=occ_params, timeout=8)
+            if r_occ.status_code == 200:
+                results = r_occ.json().get("results", [])
+                for occ in results:
+                    if len(photos) >= max_photos:
+                        break
+                    media_list = occ.get("media", [])
+                    for media in media_list:
+                        if media.get("type") == "StillImage" and media.get("identifier"):
+                            img_url = media.get("identifier")
+                            if img_url and img_url not in photos:
+                                photos.append(img_url)
+                                if len(photos) >= max_photos:
+                                    break
+    except Exception:
+        pass
+    return photos
+
 def fetch_bird_sounds_xenocanto(species_name, sound_types=None, max_sounds=1, api_key=""):
     """
     Stáhne přímé MP3 URL hlasů ptáků z databáze Xeno-canto (API v3).
@@ -1243,7 +1300,7 @@ def is_image_col(col_name, sample_val):
     non_img_prefixes = ["[Pladias]", "[Wikipedie] Odkaz", "[Wikipedie] Odka", "[Zvuky]", "[TTS]"]
     if any(col_name.startswith(pfx) for pfx in non_img_prefixes):
         return False
-    if any(k in col_name.lower() for k in ['photo', 'obrázk', 'obrazk', 'image', 'fotk', 'molekula', 'náhled', 'květ', 'kvet', 'list']):
+    if any(k in col_name.lower() for k in ['photo', 'obrázk', 'obrazk', 'image', 'fotk', 'molekula', 'náhled', 'květ', 'kvet', 'list', 'houby', 'zoologie']):
         return True
     if isinstance(sample_val, str) and (sample_val.startswith('http://') or sample_val.startswith('https://')):
         # Pokud je to audio URL, není to obrázek
@@ -1602,6 +1659,9 @@ if st.session_state.df is not None:
             "gbif_photo_col": columns[0] if columns else "",
             "enable_pladias": False,
             "pladias_col": columns[0] if columns else "",
+            "enable_gbif_fungi": False,
+            "gbif_fungi_col": columns[0] if columns else "",
+            "gbif_fungi_max": 3,
             "enable_gbif_zoo": False,
             "gbif_zoo_col": columns[0] if columns else "",
             "gbif_zoo_max": 3,
@@ -1633,7 +1693,7 @@ if st.session_state.df is not None:
     # Zajištění validních sloupců (pokud by se změnil DataFrame bez kompletního promazání)
     cfg = st.session_state.api_config
     col_keys = ["inat_col", "gbif_col", "gbif_photo_col", "desc_col", "pladias_col", 
-                "gbif_zoo_col", "bird_sounds_col", "wiki_link_col", "wiki_col", "trans_col", "tts_col", 
+                "gbif_fungi_col", "gbif_zoo_col", "bird_sounds_col", "wiki_link_col", "wiki_col", "trans_col", "tts_col", 
                 "dict_col", "country_col"]
     for col_key in col_keys:
         if col_key not in cfg or cfg[col_key] not in columns:
@@ -1668,7 +1728,7 @@ if st.session_state.df is not None:
     with col_t_btn1:
         if st.button("Zaškrtnout vše", key="btn_check_all_topic"):
             if selected_topic == "Biologie":
-                for k in ["enable_gbif_kvet", "enable_gbif_list", "enable_pladias", "enable_gbif_zoo", "enable_bird_sounds", "enable_inat", "enable_desc", "enable_gbif", "enable_wiki_img", "enable_wiki_link"]:
+                for k in ["enable_gbif_kvet", "enable_gbif_list", "enable_pladias", "enable_gbif_fungi", "enable_gbif_zoo", "enable_bird_sounds", "enable_inat", "enable_desc", "enable_gbif", "enable_wiki_img", "enable_wiki_link"]:
                     cfg[k] = True
                     st.session_state[f"w_{k}"] = True
             elif selected_topic == "Jazyky":
@@ -1683,7 +1743,7 @@ if st.session_state.df is not None:
     with col_t_btn2:
         if st.button("Zrušit výběr", key="btn_uncheck_all_topic"):
             if selected_topic == "Biologie":
-                for k in ["enable_gbif_kvet", "enable_gbif_list", "enable_pladias", "enable_gbif_zoo", "enable_bird_sounds", "enable_inat", "enable_desc", "enable_gbif", "enable_wiki_img", "enable_wiki_link"]:
+                for k in ["enable_gbif_kvet", "enable_gbif_list", "enable_pladias", "enable_gbif_fungi", "enable_gbif_zoo", "enable_bird_sounds", "enable_inat", "enable_desc", "enable_gbif", "enable_wiki_img", "enable_wiki_link"]:
                     cfg[k] = False
                     st.session_state[f"w_{k}"] = False
             elif selected_topic == "Jazyky":
@@ -1741,6 +1801,31 @@ if st.session_state.df is not None:
                     options=columns, 
                     index=pladias_col_idx,
                     key="w_pladias_col"
+                )
+                
+            st.markdown("---")
+            cfg["enable_gbif_fungi"] = st.checkbox(
+                "Aktivovat GBIF fotky - Houby (Mykologie)",
+                value=cfg.get("enable_gbif_fungi", False),
+                key="w_enable_gbif_fungi"
+            )
+            if cfg.get("enable_gbif_fungi", False):
+                gbif_fungi_col_val = cfg.get("gbif_fungi_col", columns[0])
+                try:
+                    gbif_fungi_col_idx = columns.index(gbif_fungi_col_val)
+                except ValueError:
+                    gbif_fungi_col_idx = 0
+                cfg["gbif_fungi_col"] = st.selectbox(
+                    "Sloupec s vědeckým jménem druhu houby (GBIF)",
+                    options=columns,
+                    index=gbif_fungi_col_idx,
+                    key="w_gbif_fungi_col"
+                )
+                cfg["gbif_fungi_max"] = st.slider(
+                    "Max fotek z GBIF Houby na řádek",
+                    1, 5,
+                    value=cfg.get("gbif_fungi_max", 3),
+                    key="w_gbif_fungi_max"
                 )
                 
         with tab_zoologie:
@@ -2058,6 +2143,7 @@ if st.session_state.df is not None:
         enable_gbif_kvet = cfg.get("enable_gbif_kvet", False)
         enable_gbif_list = cfg.get("enable_gbif_list", False)
         enable_pladias = cfg.get("enable_pladias", False)
+        enable_gbif_fungi = cfg.get("enable_gbif_fungi", False)
         enable_gbif_zoo = cfg.get("enable_gbif_zoo", False)
         enable_bird_sounds = cfg.get("enable_bird_sounds", False)
         enable_wiki_link = cfg.get("enable_wiki_link", False)
@@ -2076,6 +2162,8 @@ if st.session_state.df is not None:
         gbif_col = cfg.get("gbif_col", columns[0] if columns else "")
         gbif_photo_col = cfg.get("gbif_photo_col", columns[0] if columns else "")
         pladias_col = cfg.get("pladias_col", columns[0] if columns else "")
+        gbif_fungi_col = cfg.get("gbif_fungi_col", columns[0] if columns else "")
+        gbif_fungi_max = cfg.get("gbif_fungi_max", 3)
         gbif_zoo_col = cfg.get("gbif_zoo_col", columns[0] if columns else "")
         gbif_zoo_max = cfg.get("gbif_zoo_max", 3)
         bird_sounds_col = cfg.get("bird_sounds_col", columns[0] if columns else "")
@@ -2136,6 +2224,8 @@ if st.session_state.df is not None:
             new_df["[GBIF] List"] = ""
         if enable_pladias:
             new_df["[Pladias] Odkaz"] = ""
+        if enable_gbif_fungi:
+            new_df["[GBIF] Houby"] = ""
         if enable_gbif_zoo:
             new_df["[GBIF] Zoologie"] = ""
         if enable_wiki_link:
@@ -2247,6 +2337,14 @@ if st.session_state.df is not None:
                 encoded_sp = urllib.parse.quote(sp_clean)
                 new_df.at[idx, "[Pladias] Odkaz"] = f"https://pladias.cz/taxon/overview/{encoded_sp}"
                 
+            # GBIF Houby / Mykologie fotky
+            if enable_gbif_fungi:
+                raw_sp = str(row[gbif_fungi_col]).strip()
+                fungi_photos = fetch_gbif_fungi_photos(raw_sp, max_photos=gbif_fungi_max)
+                if not fungi_photos:
+                    unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'GBIF Houby'})
+                new_df.at[idx, "[GBIF] Houby"] = ";".join(fungi_photos)
+
             # GBIF Zoologie fotky
             if enable_gbif_zoo:
                 raw_sp = str(row[gbif_zoo_col]).strip()
