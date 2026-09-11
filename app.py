@@ -283,6 +283,39 @@ def check_image_quality(file_path):
     except Exception:
         return False
 
+def save_optimized_image(img_bytes: bytes, target_path: str, max_dim: int = 800, quality: int = 80) -> bool:
+    """
+    Uloží obrázek a automaticky jej zmenší/zkomprimuje pro Anki kartičky.
+    Zabrání přetečení paměti (OOM) na Streamlit Cloud a ušetří 80-95 % místa.
+    """
+    if not img_bytes:
+        return False
+    try:
+        from PIL import Image, ImageOps
+        import io
+        with Image.open(io.BytesIO(img_bytes)) as img:
+            img = ImageOps.exif_transpose(img)
+            w, h = img.size
+            if max_dim and (w > max_dim or h > max_dim):
+                img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
+            
+            # Pokud je PNG s průhledností a ukládáme .png
+            if target_path.lower().endswith('.png') and img.mode in ('RGBA', 'LA'):
+                img.save(target_path, format='PNG', optimize=True)
+                return True
+            
+            # Jinak uložit jako optimalizovaný JPEG
+            img = img.convert('RGB')
+            img.save(target_path, format='JPEG', quality=quality, optimize=True)
+            return True
+    except Exception:
+        try:
+            with open(target_path, 'wb') as f:
+                f.write(img_bytes)
+            return os.path.exists(target_path) and os.path.getsize(target_path) > 0
+        except Exception:
+            return False
+
 def detect_audio_extension(content: bytes, default_ext: str = ".mp3") -> str:
     """Detekuje správnou příponu audio souboru na základě hlavičky (magic bytes)."""
     if not content:
@@ -951,18 +984,19 @@ def fetch_wikimedia_images(query, max_photos=4):
     
     headers = {'User-Agent': 'AnkiCardGen/1.0 (contact: adalb@example.com)'}
     search_query = f"filetype:bitmap|drawing {query}"
-    url = f"https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch={urllib.parse.quote(search_query)}&gsrnamespace=6&gsrlimit={max_photos}&prop=imageinfo&iiprop=url&format=json"
+    url = f"https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch={urllib.parse.quote(search_query)}&gsrnamespace=6&gsrlimit={max_photos}&prop=imageinfo&iiprop=url&iiurlwidth=800&format=json"
     
     photos = []
     try:
-        r = requests.get(url, headers=headers, timeout=5)
+        r = requests.get(url, headers=headers, timeout=6)
         if r.status_code == 200:
             data = r.json()
             pages = data.get('query', {}).get('pages', {})
             for p in pages.values():
                 imageinfo = p.get('imageinfo', [])
                 if imageinfo:
-                    img_url = imageinfo[0].get('url')
+                    # Přednostně stáhnout optimalizovaný 800px náhled (thumburl), aby se nestahoval obří 30MB originál
+                    img_url = imageinfo[0].get('thumburl') or imageinfo[0].get('url')
                     if img_url and img_url not in photos:
                         photos.append(img_url)
     except Exception:
@@ -2717,24 +2751,22 @@ if st.session_state.df is not None:
                                         local_path = os.path.join(media_dir, safe_filename)
                                         
                                         r_img = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=8)
-                                        if r_img.status_code == 200:
-                                            with open(local_path, 'wb') as f:
-                                                f.write(r_img.content)
-                                            
-                                            if check_image_quality(local_path):
-                                                downloaded_media.append(local_path)
-                                                
-                                                img_tag = f'<div class="photo-container"><img src="{safe_filename}"></div>'
-                                                html_parts.append(
-                                                    f'<div class="card-field field-{slugify(col)}">'
-                                                    f'{label_html}'
-                                                    f'<div class="photo-list">{img_tag}</div>'
-                                                    f'</div>'
-                                                )
-                                                break
-                                            else:
-                                                if os.path.exists(local_path):
-                                                    os.remove(local_path)
+                                        if r_img.status_code == 200 and len(r_img.content) > 0:
+                                            if save_optimized_image(r_img.content, local_path, max_dim=800, quality=80):
+                                                if check_image_quality(local_path):
+                                                    downloaded_media.append(local_path)
+                                                    
+                                                    img_tag = f'<div class="photo-container"><img src="{safe_filename}"></div>'
+                                                    html_parts.append(
+                                                        f'<div class="card-field field-{slugify(col)}">'
+                                                        f'{label_html}'
+                                                        f'<div class="photo-list">{img_tag}</div>'
+                                                        f'</div>'
+                                                    )
+                                                    break
+                                                else:
+                                                    if os.path.exists(local_path):
+                                                        os.remove(local_path)
                                     except Exception as e:
                                         if 'api_errors' not in st.session_state:
                                             st.session_state.api_errors = []
@@ -2768,15 +2800,14 @@ if st.session_state.df is not None:
                                     
                                     r_img = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=12)
                                     if r_img.status_code == 200 and len(r_img.content) > 0:
-                                        with open(local_path, 'wb') as f:
-                                            f.write(r_img.content)
-                                        if check_image_quality(local_path):
-                                            local_filenames.append(safe_filename)
-                                            if local_path not in downloaded_media:
-                                                downloaded_media.append(local_path)
-                                        else:
-                                            if os.path.exists(local_path):
-                                                os.remove(local_path)
+                                        if save_optimized_image(r_img.content, local_path, max_dim=800, quality=80):
+                                            if check_image_quality(local_path):
+                                                local_filenames.append(safe_filename)
+                                                if local_path not in downloaded_media:
+                                                    downloaded_media.append(local_path)
+                                            else:
+                                                if os.path.exists(local_path):
+                                                    os.remove(local_path)
                                 except Exception as e:
                                     if 'api_errors' not in st.session_state:
                                         st.session_state.api_errors = []
@@ -2938,6 +2969,8 @@ if st.session_state.df is not None:
                 
             if clear_temp_on_finish:
                 shutil.rmtree(temp_dir, ignore_errors=True)
+                import gc
+                gc.collect()
                 
             st.success("Balíček Anki byl úspěšně vygenerován.")
             st.rerun()
