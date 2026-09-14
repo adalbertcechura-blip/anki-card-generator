@@ -13,6 +13,7 @@ import time
 import json
 import concurrent.futures
 import gc
+from bs4 import BeautifulSoup
 
 # --- NAČTENÍ GLOBÁLNÍ KONFIGURACE (API klíče pro správce) ---
 def _load_global_config() -> dict:
@@ -874,6 +875,169 @@ def fetch_gbif_fungi_photos(species_name, max_photos=3):
         pass
     return photos
 
+def fetch_mykologie_data(query, max_photos=4):
+    """
+    Vyhledá houbu na webu Mykologie.net a vrátí:
+    - photo_urls: seznam URL fotografií v plné kvalitě
+    - description: odborný český popis houby
+    - url: přímý odkaz na profil houby na Mykologie.net
+    - title: celý název (latinský + český)
+    - czech_name, latin_name
+    """
+    res = {
+        'title': '',
+        'czech_name': '',
+        'latin_name': '',
+        'description': '',
+        'photo_urls': [],
+        'url': '',
+        'source': 'Nenalezeno'
+    }
+    if not query or pd.isna(query):
+        return res
+    query_str = str(query).strip()
+    if not query_str:
+        return res
+        
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
+    }
+    
+    # Odstranění závorek a zkratek pro vyhledávání
+    clean_q = re.sub(r'\s*\(.*?\)\s*', ' ', query_str).strip()
+    clean_q = re.sub(r'\s+sp(p)?\.?$', '', clean_q).strip()
+    if not clean_q:
+        clean_q = query_str
+
+    def _do_search(search_term):
+        s_url = f"https://www.mykologie.net/index.php?option=com_k2&view=itemlist&task=search&searchword={urllib.parse.quote(search_term)}"
+        try:
+            r = requests.get(s_url, headers=headers, timeout=8)
+            if r.status_code != 200:
+                return []
+            soup = BeautifulSoup(r.text, 'html.parser')
+            items = []
+            for tag in soup.find_all(['h2', 'h3', 'div'], class_=re.compile(r'catItemHeader|catItemTitle|moduleItemTitle')):
+                a = tag.find('a')
+                if a and a.get('href') and '/item/' in a.get('href'):
+                    items.append((a.get_text(strip=True), a.get('href')))
+            if not items:
+                for a in soup.find_all('a'):
+                    href = a.get('href', '')
+                    if '/item/' in href and a.get_text(strip=True):
+                        items.append((a.get_text(strip=True), href))
+            return items
+        except Exception:
+            return []
+
+    try:
+        found_items = _do_search(clean_q)
+        
+        # Pokud se napoprvé nic nenajde a dotaz obsahuje české znaky / mezery, zkusíme vyhledat vědecké jméno přes iNaturalist
+        if not found_items and (any(ord(c) > 127 for c in clean_q) or len(clean_q.split()) != 2):
+            try:
+                r_tax = requests.get(
+                    "https://api.inaturalist.org/v1/taxa",
+                    params={"q": clean_q, "locale": "cs", "per_page": 3},
+                    headers=headers,
+                    timeout=5
+                )
+                if r_tax.status_code == 200:
+                    tax_results = r_tax.json().get("results", [])
+                    if tax_results:
+                        sci_candidate = tax_results[0].get("name", "")
+                        if sci_candidate:
+                            found_items = _do_search(sci_candidate)
+            except Exception:
+                pass
+
+        if not found_items:
+            return res
+
+        # Nalezení nejvhodnější shody v nalezených položkách
+        q_words = [w.lower() for w in clean_q.split() if len(w) > 2]
+        best_item = None
+        for text, href in found_items:
+            t_lower = text.lower()
+            if clean_q.lower() in t_lower:
+                best_item = (text, href)
+                break
+            if q_words and all(w in t_lower for w in q_words):
+                best_item = (text, href)
+                break
+                
+        if not best_item and q_words:
+            for text, href in found_items:
+                if q_words[0] in text.lower():
+                    best_item = (text, href)
+                    break
+                    
+        if not best_item:
+            best_item = found_items[0]
+
+        # Stažení detailu položky z Mykologie.net
+        item_href = best_item[1]
+        full_url = urllib.parse.urljoin('https://www.mykologie.net', item_href)
+        r_item = requests.get(full_url, headers=headers, timeout=8)
+        if r_item.status_code != 200:
+            return res
+            
+        item_soup = BeautifulSoup(r_item.text, 'html.parser')
+        
+        # Titulek a názvy
+        title_elem = item_soup.find('h2', class_='itemTitle')
+        full_title = title_elem.get_text(strip=True) if title_elem else best_item[0]
+        res['title'] = full_title
+        res['url'] = full_url
+        res['source'] = 'Mykologie.net'
+        
+        m_title = re.match(r'^(.*?)\s*\((.*?)\)$', full_title)
+        if m_title:
+            res['latin_name'] = m_title.group(1).strip()
+            res['czech_name'] = m_title.group(2).strip()
+        else:
+            res['latin_name'] = full_title
+
+        # Extrakce popisu a fotek
+        item_full_text = item_soup.find('div', class_='itemFullText') or item_soup.find('div', class_='itemIntroText')
+        paragraphs = []
+        images = []
+        
+        if item_full_text:
+            for p in item_full_text.find_all('p'):
+                for img in p.find_all('img'):
+                    src = img.get('src', '')
+                    if src:
+                        img_url = urllib.parse.urljoin('https://www.mykologie.net', src)
+                        if img_url not in images:
+                            images.append(img_url)
+                            
+                p_text = p.get_text(separator=' ', strip=True)
+                if p_text and '(c)' not in p_text and '©' not in p_text:
+                    if len(p_text) > 40:
+                        paragraphs.append(p_text)
+                        
+            for img in item_full_text.find_all('img'):
+                src = img.get('src', '')
+                if src:
+                    img_url = urllib.parse.urljoin('https://www.mykologie.net', src)
+                    if img_url not in images:
+                        images.append(img_url)
+
+            if paragraphs:
+                res['description'] = '\n\n'.join(paragraphs)
+
+        if not res['description']:
+            meta_desc = item_soup.find('meta', property='og:description') or item_soup.find('meta', attrs={'name': 'description'})
+            if meta_desc:
+                res['description'] = meta_desc.get('content', '').strip()
+
+        res['photo_urls'] = images[:max_photos]
+    except Exception:
+        pass
+
+    return res
+
 def fetch_bird_sounds_xenocanto(species_name, sound_types=None, max_sounds=1, api_key=""):
     """
     Stáhne přímé MP3 URL hlasů ptáků z databáze Xeno-canto (API v3).
@@ -1299,10 +1463,10 @@ def fetch_country_data(query, db):
 def is_image_col(col_name, sample_val):
     """Určí, zda sloupec obsahuje obrázkové URL odkazy."""
     # Audio a textové odkazy ignorujeme (nejsou to obrázky)
-    non_img_prefixes = ["[Pladias]", "[Wikipedie] Odkaz", "[Wikipedie] Odka", "[Zvuky]", "[TTS]"]
+    non_img_prefixes = ["[Pladias]", "[Mykologie.net] Odkaz", "[Mykologie.net] Popis", "[Wikipedie] Odkaz", "[Wikipedie] Odka", "[Zvuky]", "[TTS]"]
     if any(col_name.startswith(pfx) for pfx in non_img_prefixes):
         return False
-    if any(k in col_name.lower() for k in ['photo', 'obrázk', 'obrazk', 'image', 'fotk', 'molekula', 'náhled', 'květ', 'kvet', 'list', 'houby', 'zoologie']):
+    if any(k in col_name.lower() for k in ['photo', 'obrázk', 'obrazk', 'image', 'fotk', 'molekula', 'náhled', 'květ', 'kvet', 'list', 'houby', 'zoologie', 'mykolog']):
         return True
     if isinstance(sample_val, str) and (sample_val.startswith('http://') or sample_val.startswith('https://')):
         # Pokud je to audio URL, není to obrázek
@@ -1765,7 +1929,7 @@ if st.session_state.df is not None:
     with col_t_btn1:
         if st.button("Zaškrtnout vše", key="btn_check_all_topic"):
             if selected_topic == "Biologie":
-                for k in ["enable_gbif_kvet", "enable_gbif_list", "enable_pladias", "enable_gbif_fungi", "enable_gbif_zoo", "enable_bird_sounds", "enable_inat", "enable_desc", "enable_gbif", "enable_wiki_img", "enable_wiki_link"]:
+                for k in ["enable_gbif_kvet", "enable_gbif_list", "enable_pladias", "enable_mykologie_img", "enable_mykologie_desc", "enable_mykologie_link", "enable_gbif_fungi", "enable_gbif_zoo", "enable_bird_sounds", "enable_inat", "enable_desc", "enable_gbif", "enable_wiki_img", "enable_wiki_link"]:
                     cfg[k] = True
                     st.session_state[f"w_{k}"] = True
             elif selected_topic == "Jazyky":
@@ -1780,7 +1944,7 @@ if st.session_state.df is not None:
     with col_t_btn2:
         if st.button("Zrušit výběr", key="btn_uncheck_all_topic"):
             if selected_topic == "Biologie":
-                for k in ["enable_gbif_kvet", "enable_gbif_list", "enable_pladias", "enable_gbif_fungi", "enable_gbif_zoo", "enable_bird_sounds", "enable_inat", "enable_desc", "enable_gbif", "enable_wiki_img", "enable_wiki_link"]:
+                for k in ["enable_gbif_kvet", "enable_gbif_list", "enable_pladias", "enable_mykologie_img", "enable_mykologie_desc", "enable_mykologie_link", "enable_gbif_fungi", "enable_gbif_zoo", "enable_bird_sounds", "enable_inat", "enable_desc", "enable_gbif", "enable_wiki_img", "enable_wiki_link"]:
                     cfg[k] = False
                     st.session_state[f"w_{k}"] = False
             elif selected_topic == "Jazyky":
@@ -1794,11 +1958,11 @@ if st.session_state.df is not None:
             st.rerun()
 
     if selected_topic == "Biologie":
-        # Podzáložky Botanika a Zoologie
-        tab_botanika, tab_zoologie = st.tabs(["Botanika", "Zoologie"])
+        # Podzáložky Botanika, Houby a Zoologie
+        tab_botanika, tab_houby, tab_zoologie = st.tabs(["Botanika", "Houby (Mykologie)", "Zoologie"])
         
         with tab_botanika:
-            st.markdown("##### Specifická nastavení pro botaniku")
+            st.markdown("##### Specifická nastavení pro botaniku (Rostliny)")
             cfg["enable_gbif_kvet"] = st.checkbox(
                 "Aktivovat GBIF fotky - Květ", 
                 value=cfg.get("enable_gbif_kvet", False),
@@ -1839,10 +2003,72 @@ if st.session_state.df is not None:
                     index=pladias_col_idx,
                     key="w_pladias_col"
                 )
-                
+
+        with tab_houby:
+            st.markdown("##### Specifická nastavení pro houby (Mykologie)")
+            cfg["enable_mykologie_img"] = st.checkbox(
+                "Aktivovat fotky z Mykologie.net",
+                value=cfg.get("enable_mykologie_img", False),
+                key="w_enable_mykologie_img"
+            )
+            if cfg.get("enable_mykologie_img", False):
+                myko_img_col_val = cfg.get("mykologie_img_col", columns[0])
+                try:
+                    myko_img_col_idx = columns.index(myko_img_col_val)
+                except ValueError:
+                    myko_img_col_idx = 0
+                cfg["mykologie_img_col"] = st.selectbox(
+                    "Sloupec se jménem houby pro fotky z Mykologie.net",
+                    options=columns,
+                    index=myko_img_col_idx,
+                    key="w_mykologie_img_col"
+                )
+                cfg["mykologie_img_max"] = st.slider(
+                    "Max fotek z Mykologie.net na řádek",
+                    1, 5,
+                    value=cfg.get("mykologie_img_max", 3),
+                    key="w_mykologie_img_max"
+                )
+
+            cfg["enable_mykologie_desc"] = st.checkbox(
+                "Aktivovat český popis z Mykologie.net",
+                value=cfg.get("enable_mykologie_desc", False),
+                key="w_enable_mykologie_desc"
+            )
+            if cfg.get("enable_mykologie_desc", False):
+                myko_desc_col_val = cfg.get("mykologie_desc_col", columns[0])
+                try:
+                    myko_desc_col_idx = columns.index(myko_desc_col_val)
+                except ValueError:
+                    myko_desc_col_idx = 0
+                cfg["mykologie_desc_col"] = st.selectbox(
+                    "Sloupec se jménem houby pro popis z Mykologie.net",
+                    options=columns,
+                    index=myko_desc_col_idx,
+                    key="w_mykologie_desc_col"
+                )
+
+            cfg["enable_mykologie_link"] = st.checkbox(
+                "Aktivovat odkaz na profil na Mykologie.net",
+                value=cfg.get("enable_mykologie_link", False),
+                key="w_enable_mykologie_link"
+            )
+            if cfg.get("enable_mykologie_link", False):
+                myko_link_col_val = cfg.get("mykologie_link_col", columns[0])
+                try:
+                    myko_link_col_idx = columns.index(myko_link_col_val)
+                except ValueError:
+                    myko_link_col_idx = 0
+                cfg["mykologie_link_col"] = st.selectbox(
+                    "Sloupec se jménem houby pro odkaz na Mykologie.net",
+                    options=columns,
+                    index=myko_link_col_idx,
+                    key="w_mykologie_link_col"
+                )
+
             st.markdown("---")
             cfg["enable_gbif_fungi"] = st.checkbox(
-                "Aktivovat GBIF fotky - Houby (Mykologie)",
+                "Aktivovat GBIF fotky - Houby",
                 value=cfg.get("enable_gbif_fungi", False),
                 key="w_enable_gbif_fungi"
             )
@@ -2162,7 +2388,8 @@ if st.session_state.df is not None:
 
     # Přehled aktivních modulů
     active = [k.replace("enable_","") for k in ["enable_inat","enable_gbif","enable_gbif_kvet",
-              "enable_gbif_list","enable_pladias","enable_gbif_zoo","enable_wiki_link",
+              "enable_gbif_list","enable_pladias","enable_mykologie_img","enable_mykologie_desc",
+              "enable_mykologie_link","enable_gbif_fungi","enable_gbif_zoo","enable_wiki_link",
               "enable_trans","enable_tts","enable_dict","enable_country",
               "enable_wiki_img"] if cfg.get(k, False)]
     if active:
@@ -2180,6 +2407,9 @@ if st.session_state.df is not None:
         enable_gbif_kvet = cfg.get("enable_gbif_kvet", False)
         enable_gbif_list = cfg.get("enable_gbif_list", False)
         enable_pladias = cfg.get("enable_pladias", False)
+        enable_mykologie_img = cfg.get("enable_mykologie_img", False)
+        enable_mykologie_desc = cfg.get("enable_mykologie_desc", False)
+        enable_mykologie_link = cfg.get("enable_mykologie_link", False)
         enable_gbif_fungi = cfg.get("enable_gbif_fungi", False)
         enable_gbif_zoo = cfg.get("enable_gbif_zoo", False)
         enable_bird_sounds = cfg.get("enable_bird_sounds", False)
@@ -2199,6 +2429,10 @@ if st.session_state.df is not None:
         gbif_col = cfg.get("gbif_col", columns[0] if columns else "")
         gbif_photo_col = cfg.get("gbif_photo_col", columns[0] if columns else "")
         pladias_col = cfg.get("pladias_col", columns[0] if columns else "")
+        mykologie_img_col = cfg.get("mykologie_img_col", columns[0] if columns else "")
+        mykologie_img_max = cfg.get("mykologie_img_max", 3)
+        mykologie_desc_col = cfg.get("mykologie_desc_col", columns[0] if columns else "")
+        mykologie_link_col = cfg.get("mykologie_link_col", columns[0] if columns else "")
         gbif_fungi_col = cfg.get("gbif_fungi_col", columns[0] if columns else "")
         gbif_fungi_max = cfg.get("gbif_fungi_max", 3)
         gbif_zoo_col = cfg.get("gbif_zoo_col", columns[0] if columns else "")
@@ -2261,6 +2495,12 @@ if st.session_state.df is not None:
             new_df["[GBIF] List"] = ""
         if enable_pladias:
             new_df["[Pladias] Odkaz"] = ""
+        if enable_mykologie_img:
+            new_df["[Mykologie.net] Fotky"] = ""
+        if enable_mykologie_desc:
+            new_df["[Mykologie.net] Popis"] = ""
+        if enable_mykologie_link:
+            new_df["[Mykologie.net] Odkaz"] = ""
         if enable_gbif_fungi:
             new_df["[GBIF] Houby"] = ""
         if enable_gbif_zoo:
@@ -2386,6 +2626,33 @@ if st.session_state.df is not None:
                 sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp_clean).strip()
                 encoded_sp = urllib.parse.quote(sp_clean)
                 new_df.at[idx, "[Pladias] Odkaz"] = f"https://pladias.cz/taxon/overview/{encoded_sp}"
+
+            # Mykologie.net (Fotky, Popis, Odkaz)
+            if enable_mykologie_img or enable_mykologie_desc or enable_mykologie_link:
+                raw_val = ""
+                try:
+                    for c_cand in [mykologie_img_col if enable_mykologie_img else None,
+                                   mykologie_desc_col if enable_mykologie_desc else None,
+                                   mykologie_link_col if enable_mykologie_link else None]:
+                        if c_cand and c_cand in row:
+                            raw_val = str(row[c_cand]).strip()
+                            if raw_val:
+                                break
+                    if not raw_val and len(columns) > 0:
+                        raw_val = str(row[columns[0]]).strip()
+
+                    myko_data = fetch_mykologie_data(raw_val, max_photos=mykologie_img_max if enable_mykologie_img else 4)
+                    if myko_data.get('source') == 'Nenalezeno':
+                        unfound_list.append({'Řádek': idx + 1, 'Položka': raw_val, 'Modul': 'Mykologie.net'})
+
+                    if enable_mykologie_img:
+                        new_df.at[idx, "[Mykologie.net] Fotky"] = ";".join(myko_data.get('photo_urls', []))
+                    if enable_mykologie_desc:
+                        new_df.at[idx, "[Mykologie.net] Popis"] = myko_data.get('description', '')
+                    if enable_mykologie_link:
+                        new_df.at[idx, "[Mykologie.net] Odkaz"] = myko_data.get('url', '')
+                except Exception:
+                    unfound_list.append({'Řádek': idx + 1, 'Položka': str(raw_val), 'Modul': 'Mykologie.net (Chyba)'})
 
             # GBIF Houby / Mykologie fotky
             if enable_gbif_fungi:
@@ -2676,6 +2943,8 @@ if st.session_state.df is not None:
                     if val_str.startswith("http://") or val_str.startswith("https://"):
                         if "pladias.cz" in val_str:
                             val_str = f'<a href="{val_str}" target="_blank" style="color: #48a973; font-weight: 600; text-decoration: underline;">Otevřít profil na Pladias.cz</a>'
+                        elif "mykologie.net" in val_str:
+                            val_str = f'<a href="{val_str}" target="_blank" style="color: #48a973; font-weight: 600; text-decoration: underline;">Otevřít profil na Mykologie.net</a>'
                         elif "wikipedia.org" in val_str:
                             val_str = f'<a href="{val_str}" target="_blank" style="color: #48a973; font-weight: 600; text-decoration: underline;">Otevřít profil na Wikipedii</a>'
                     elif not re.search(r'<[a-zA-Z0-9/]+[^>]*>', val_str):
@@ -2734,6 +3003,8 @@ if st.session_state.df is not None:
                     if val_str.startswith("http://") or val_str.startswith("https://"):
                         if "pladias.cz" in val_str:
                             val_str = f'<a href="{val_str}" target="_blank" style="color: #48a973; font-weight: 600; text-decoration: underline;">Otevřít profil na Pladias.cz</a>'
+                        elif "mykologie.net" in val_str:
+                            val_str = f'<a href="{val_str}" target="_blank" style="color: #48a973; font-weight: 600; text-decoration: underline;">Otevřít profil na Mykologie.net</a>'
                         elif "wikipedia.org" in val_str:
                             val_str = f'<a href="{val_str}" target="_blank" style="color: #48a973; font-weight: 600; text-decoration: underline;">Otevřít profil na Wikipedii</a>'
                     elif not re.search(r'<[a-zA-Z0-9/]+[^>]*>', val_str):
@@ -3060,11 +3331,13 @@ if st.session_state.df is not None:
                                 f'</div>'
                             )
                     
-                    # Speciální sloupce s hypertextovými odkazy (Pladias, Wikipedie)
-                    elif col.startswith("[Pladias]") or (col.startswith("[Wikipedie]") and str(val).startswith("http")):
+                    # Speciální sloupce s hypertextovými odkazy (Pladias, Mykologie.net, Wikipedie)
+                    elif col.startswith("[Pladias]") or col.startswith("[Mykologie.net] Odkaz") or (col.startswith("[Wikipedie]") and str(val).startswith("http")):
                         url = str(val).strip()
                         if "pladias.cz" in url:
                             link_label = "Otevřít profil na Pladias.cz"
+                        elif "mykologie.net" in url:
+                            link_label = "Otevřít profil na Mykologie.net"
                         else:
                             link_label = "Otevřít profil na Wikipedii"
                         html_parts.append(
