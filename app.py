@@ -1631,7 +1631,33 @@ if st.session_state.df is not None:
     
     st.markdown("### Náhled tabulky")
     st.dataframe(df.head(5), **_compat_width())
-    st.caption(f"Celkem řádků: **{len(df)}** | Sloupců: **{len(columns)}**")
+    
+    col_cap, col_dl_csv, col_dl_xlsx = st.columns([2, 1.3, 1.3])
+    with col_cap:
+        st.caption(f"Celkem řádků: **{len(df)}** | Sloupců: **{len(columns)}**")
+    with col_dl_csv:
+        csv_data = df.to_csv(index=False, encoding='utf-8-sig')
+        st.download_button(
+            "Stáhnout tabulku (CSV)",
+            data=csv_data,
+            file_name="tabulka_dat.csv",
+            mime="text/csv",
+            key="dl_table_preview_csv",
+            **_compat_width()
+        )
+    with col_dl_xlsx:
+        import io
+        excel_buffer = io.BytesIO()
+        with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False)
+        st.download_button(
+            "Stáhnout tabulku (Excel)",
+            data=excel_buffer.getvalue(),
+            file_name="tabulka_dat.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="dl_table_preview_xlsx",
+            **_compat_width()
+        )
     
     col_clean1, col_clean2 = st.columns([2, 3])
     with col_clean1:
@@ -2244,8 +2270,8 @@ if st.session_state.df is not None:
         if enable_bird_sounds:
             new_df["[Zvuky] Hlasy ptáků"] = ""
             
-        unfound_list = []
         total = len(df)
+        unfound_list = []
         
         for idx, row in df.iterrows():
             progress_bar.progress((idx + 1) / total)
@@ -2253,93 +2279,106 @@ if st.session_state.df is not None:
             
             # 1. iNaturalist
             if enable_inat:
-                raw_sp = str(row[inat_col]).strip()
-                sp = re.sub(r'\s*\(.*\)\s*', '', raw_sp).strip()
-                sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp).strip()
-                
-                inat_data = fetch_inaturalist_data(sp_clean, inat_max_photos)
-                
-                if inat_data['source'] == 'Nenalezeno':
-                    unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'iNaturalist'})
-                
-                new_df.at[idx, "[iNat] České jméno"] = inat_data['common_name']
-                new_df.at[idx, "[iNat] Obrázky (URL)"] = ";".join(inat_data['photo_urls'])
-                
+                try:
+                    raw_sp = str(row[inat_col]).strip()
+                    sp = re.sub(r'\s*\(.*\)\s*', '', raw_sp).strip()
+                    sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp).strip()
+                    inat_data = fetch_inaturalist_data(sp_clean, inat_max_photos)
+                    if inat_data.get('source') == 'Nenalezeno':
+                        unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'iNaturalist'})
+                    new_df.at[idx, "[iNat] České jméno"] = inat_data.get('common_name', '')
+                    new_df.at[idx, "[iNat] Obrázky (URL)"] = ";".join(inat_data.get('photo_urls', []))
+                except Exception:
+                    unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(inat_col, "")), 'Modul': 'iNaturalist (Chyba)'})
+
             # 1b. Popis druhu z Wikipedie (rostliny i živočichové)
             if enable_desc:
-                raw_sp = str(row[desc_col]).strip()
-                sp = re.sub(r'\s*\(.*\)\s*', '', raw_sp).strip()
-                sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp).strip()
-                
-                desc_text = fetch_wiki_description(sp_clean)
-                
-                if not desc_text:
-                    unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'Popis z Wikipedie'})
-                
-                new_df.at[idx, "[Popis] Popis z Wikipedie"] = desc_text
-                
+                try:
+                    raw_sp = str(row[desc_col]).strip()
+                    sp = re.sub(r'\s*\(.*\)\s*', '', raw_sp).strip()
+                    sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp).strip()
+                    desc_text = fetch_wiki_description(sp_clean)
+                    if not desc_text:
+                        unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'Popis z Wikipedie'})
+                    new_df.at[idx, "[Popis] Popis z Wikipedie"] = desc_text
+                except Exception:
+                    unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(desc_col, "")), 'Modul': 'Popis z Wikipedie (Chyba)'})
+
             # 2. GBIF Taxonomie
             if enable_gbif:
-                raw_sp = str(row[gbif_col]).strip()
-                sp = re.sub(r'\s*\(.*\)\s*', '', raw_sp).strip()
-                sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp).strip()
-                gbif_data = fetch_gbif_taxonomy(sp_clean)
-                if gbif_data['source'] == 'Nenalezeno':
-                    unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'GBIF Taxonomie'})
-                new_df.at[idx, "[Taxonomie] Říše"] = gbif_data['kingdom']
-                new_df.at[idx, "[Taxonomie] Kmen"] = gbif_data['phylum']
-                new_df.at[idx, "[Taxonomie] Třída"] = gbif_data['class']
-                new_df.at[idx, "[Taxonomie] Řád"] = gbif_data['order']
-                new_df.at[idx, "[Taxonomie] Čeleď"] = gbif_data['family']
-                new_df.at[idx, "[Taxonomie] Rod"] = gbif_data['genus']
-                
+                try:
+                    raw_sp = str(row[gbif_col]).strip()
+                    sp = re.sub(r'\s*\(.*\)\s*', '', raw_sp).strip()
+                    sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp).strip()
+                    gbif_data = fetch_gbif_taxonomy(sp_clean)
+                    if gbif_data.get('source') == 'Nenalezeno':
+                        unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'GBIF Taxonomie'})
+                    new_df.at[idx, "[Taxonomie] Říše"] = gbif_data.get('kingdom', '')
+                    new_df.at[idx, "[Taxonomie] Kmen"] = gbif_data.get('phylum', '')
+                    new_df.at[idx, "[Taxonomie] Třída"] = gbif_data.get('class', '')
+                    new_df.at[idx, "[Taxonomie] Řád"] = gbif_data.get('order', '')
+                    new_df.at[idx, "[Taxonomie] Čeleď"] = gbif_data.get('family', '')
+                    new_df.at[idx, "[Taxonomie] Rod"] = gbif_data.get('genus', '')
+                except Exception:
+                    unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(gbif_col, "")), 'Modul': 'GBIF Taxonomie (Chyba)'})
+
             # GBIF Vyhledávač fotek rostlin (Květ / List)
             if enable_gbif_kvet or enable_gbif_list:
-                raw_sp = str(row[gbif_photo_col]).strip()
-                gbif_photo_data = fetch_gbif_plant_photos(raw_sp, get_kvet=enable_gbif_kvet, get_list=enable_gbif_list)
-                
-                found_any = any(gbif_photo_data[k] for k in ["kvet", "list"])
-                if not found_any:
-                    unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'GBIF Fotografie'})
-                
-                if enable_gbif_kvet:
-                    new_df.at[idx, "[GBIF] Květ"] = gbif_photo_data["kvet"]
-                if enable_gbif_list:
-                    new_df.at[idx, "[GBIF] List"] = gbif_photo_data["list"]
+                try:
+                    raw_sp = str(row[gbif_photo_col]).strip()
+                    gbif_photo_data = fetch_gbif_plant_photos(raw_sp, get_kvet=enable_gbif_kvet, get_list=enable_gbif_list)
+                    found_any = any(gbif_photo_data.get(k) for k in ["kvet", "list"])
+                    if not found_any:
+                        unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'GBIF Fotografie'})
+                    if enable_gbif_kvet:
+                        new_df.at[idx, "[GBIF] Květ"] = gbif_photo_data.get("kvet", "")
+                    if enable_gbif_list:
+                        new_df.at[idx, "[GBIF] List"] = gbif_photo_data.get("list", "")
+                except Exception:
+                    unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(gbif_photo_col, "")), 'Modul': 'GBIF Fotografie (Chyba)'})
 
             # 5. Wikimedia Commons
             if enable_wiki_img:
-                kw = str(row[wiki_img_col]).strip()
-                wiki_urls = fetch_wikimedia_images(kw, wiki_max_photos)
-                if not wiki_urls:
-                    unfound_list.append({'Řádek': idx + 1, 'Položka': kw, 'Modul': 'Wikimedia Commons'})
-                new_df.at[idx, "[Wikimedia] Obrázky (URL)"] = ";".join(wiki_urls)
-                
+                try:
+                    kw = str(row[wiki_img_col]).strip()
+                    wiki_urls = fetch_wikimedia_images(kw, wiki_max_photos)
+                    if not wiki_urls:
+                        unfound_list.append({'Řádek': idx + 1, 'Položka': kw, 'Modul': 'Wikimedia Commons'})
+                    new_df.at[idx, "[Wikimedia] Obrázky (URL)"] = ";".join(wiki_urls)
+                except Exception:
+                    unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(wiki_img_col, "")), 'Modul': 'Wikimedia Commons (Chyba)'})
+
             # 6. Překlad
             if enable_trans:
-                txt = str(row[trans_col]).strip()
-                src_code = languages[trans_src]
-                tgt_code = languages[trans_tgt]
-                translated = translate_text(txt, src_code, tgt_code)
-                new_df.at[idx, f"[Překlad] {trans_tgt}"] = translated
-                
+                try:
+                    txt = str(row[trans_col]).strip()
+                    src_code = languages[trans_src]
+                    tgt_code = languages[trans_tgt]
+                    translated = translate_text(txt, src_code, tgt_code)
+                    new_df.at[idx, f"[Překlad] {trans_tgt}"] = translated
+                except Exception:
+                    pass
+
             # 7. Google TTS
             if enable_tts:
                 txt = str(row[tts_col]).strip()
                 lang_code = languages[tts_lang]
                 if txt:
                     new_df.at[idx, "[TTS] Výslovnost (Audio)"] = f"{txt};{lang_code}"
-                    
+
             # 8. Dictionary API
             if enable_dict:
-                wd = str(row[dict_col]).strip()
-                dict_data = fetch_dictionary_data(wd)
-                if not dict_data['definition']:
-                    unfound_list.append({'Řádek': idx + 1, 'Položka': wd, 'Modul': 'Slovník'})
-                new_df.at[idx, "[Slovník] Výslovnost (Text)"] = dict_data['phonetic']
-                new_df.at[idx, "[Slovník] Definice"] = dict_data['definition']
-                new_df.at[idx, "[Slovník] Příkladová věta"] = dict_data['example']
-                
+                try:
+                    wd = str(row[dict_col]).strip()
+                    dict_data = fetch_dictionary_data(wd)
+                    if not dict_data.get('definition'):
+                        unfound_list.append({'Řádek': idx + 1, 'Položka': wd, 'Modul': 'Slovník'})
+                    new_df.at[idx, "[Slovník] Výslovnost (Text)"] = dict_data.get('phonetic', '')
+                    new_df.at[idx, "[Slovník] Definice"] = dict_data.get('definition', '')
+                    new_df.at[idx, "[Slovník] Příkladová věta"] = dict_data.get('example', '')
+                except Exception:
+                    unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(dict_col, "")), 'Modul': 'Slovník (Chyba)'})
+
             # Pladias odkaz
             if enable_pladias:
                 raw_sp = str(row[pladias_col]).strip()
@@ -2347,23 +2386,29 @@ if st.session_state.df is not None:
                 sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp_clean).strip()
                 encoded_sp = urllib.parse.quote(sp_clean)
                 new_df.at[idx, "[Pladias] Odkaz"] = f"https://pladias.cz/taxon/overview/{encoded_sp}"
-                
+
             # GBIF Houby / Mykologie fotky
             if enable_gbif_fungi:
-                raw_sp = str(row[gbif_fungi_col]).strip()
-                fungi_photos = fetch_gbif_fungi_photos(raw_sp, max_photos=gbif_fungi_max)
-                if not fungi_photos:
-                    unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'GBIF Houby'})
-                new_df.at[idx, "[GBIF] Houby"] = ";".join(fungi_photos)
+                try:
+                    raw_sp = str(row[gbif_fungi_col]).strip()
+                    fungi_photos = fetch_gbif_fungi_photos(raw_sp, max_photos=gbif_fungi_max)
+                    if not fungi_photos:
+                        unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'GBIF Houby'})
+                    new_df.at[idx, "[GBIF] Houby"] = ";".join(fungi_photos)
+                except Exception:
+                    unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(gbif_fungi_col, "")), 'Modul': 'GBIF Houby (Chyba)'})
 
             # GBIF Zoologie fotky
             if enable_gbif_zoo:
-                raw_sp = str(row[gbif_zoo_col]).strip()
-                zoo_photos = fetch_gbif_zoo_photos(raw_sp, max_photos=gbif_zoo_max)
-                if not zoo_photos:
-                    unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'GBIF Zoologie'})
-                new_df.at[idx, "[GBIF] Zoologie"] = ";".join(zoo_photos)
-                
+                try:
+                    raw_sp = str(row[gbif_zoo_col]).strip()
+                    zoo_photos = fetch_gbif_zoo_photos(raw_sp, max_photos=gbif_zoo_max)
+                    if not zoo_photos:
+                        unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'GBIF Zoologie'})
+                    new_df.at[idx, "[GBIF] Zoologie"] = ";".join(zoo_photos)
+                except Exception:
+                    unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(gbif_zoo_col, "")), 'Modul': 'GBIF Zoologie (Chyba)'})
+
             # Wikipedia odkaz
             if enable_wiki_link:
                 raw_sp = str(row[wiki_link_col]).strip()
@@ -2371,47 +2416,53 @@ if st.session_state.df is not None:
                 sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp_clean).strip()
                 slug_sp = sp_clean.replace(' ', '_')
                 new_df.at[idx, "[Wikipedie] Odkaz"] = f"https://cs.wikipedia.org/wiki/{slug_sp}"
-                
+
             # Hlasy ptáků (Xeno-canto API v3)
             if enable_bird_sounds:
-                raw_sp = str(row[bird_sounds_col]).strip()
-                sound_types_req = []
-                if bird_sounds_song:
-                    sound_types_req.append("song")
-                if bird_sounds_call:
-                    sound_types_req.append("call")
-                if not sound_types_req:
-                    sound_types_req = ["song"]
-                sound_results = fetch_bird_sounds_xenocanto(
-                    raw_sp,
-                    sound_types=sound_types_req,
-                    max_sounds=bird_sounds_max,
-                    api_key=xc_api_key
-                )
-                if not sound_results:
-                    unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'Hlasy ptáků (Xeno-canto)'})
-                # Uložit jako "url|typ;url|typ"
-                new_df.at[idx, "[Zvuky] Hlasy ptáků"] = ";".join(f"{u}|{t}" for u, t in sound_results)
-                
+                try:
+                    raw_sp = str(row[bird_sounds_col]).strip()
+                    sound_types_req = []
+                    if bird_sounds_song:
+                        sound_types_req.append("song")
+                    if bird_sounds_call:
+                        sound_types_req.append("call")
+                    if not sound_types_req:
+                        sound_types_req = ["song"]
+                    sound_results = fetch_bird_sounds_xenocanto(
+                        raw_sp,
+                        sound_types=sound_types_req,
+                        max_sounds=bird_sounds_max,
+                        api_key=xc_api_key
+                    )
+                    if not sound_results:
+                        unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'Hlasy ptáků (Xeno-canto)'})
+                    new_df.at[idx, "[Zvuky] Hlasy ptáků"] = ";".join(f"{u}|{t}" for u, t in sound_results)
+                except Exception:
+                    unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(bird_sounds_col, "")), 'Modul': 'Hlasy ptáků (Chyba)'})
+
             # 12. Zeměpis & Státy
             if enable_country:
-                c_name = str(row[country_col]).strip()
-                c_data = fetch_country_data(c_name, countries_db)
-                if c_data['source'] == 'Nenalezeno':
-                    unfound_list.append({'Řádek': idx + 1, 'Položka': c_name, 'Modul': 'Zeměpis'})
-                new_df.at[idx, "[Zeměpis] Český název"] = c_data['common_name']
-                new_df.at[idx, "[Zeměpis] Hlavní město"] = c_data['capital']
-                new_df.at[idx, "[Zeměpis] Region"] = f"{c_data['region']} ({c_data['subregion']})" if c_data['subregion'] else c_data['region']
-                new_df.at[idx, "[Zeměpis] Jazyky"] = c_data['languages']
-                new_df.at[idx, "[Zeměpis] Měna"] = c_data['currencies']
-                new_df.at[idx, "[Zeměpis] Rozloha"] = c_data['area']
-                new_df.at[idx, "[Zeměpis] Vlajka (URL)"] = c_data['flag_url']
-                
-            time.sleep(0.4)
+                try:
+                    c_name = str(row[country_col]).strip()
+                    c_data = fetch_country_data(c_name, countries_db)
+                    if c_data.get('source') == 'Nenalezeno':
+                        unfound_list.append({'Řádek': idx + 1, 'Položka': c_name, 'Modul': 'Zeměpis'})
+                    new_df.at[idx, "[Zeměpis] Český název"] = c_data.get('common_name', '')
+                    new_df.at[idx, "[Zeměpis] Hlavní město"] = c_data.get('capital', '')
+                    new_df.at[idx, "[Zeměpis] Region"] = f"{c_data['region']} ({c_data['subregion']})" if c_data.get('subregion') else c_data.get('region', '')
+                    new_df.at[idx, "[Zeměpis] Jazyky"] = c_data.get('languages', '')
+                    new_df.at[idx, "[Zeměpis] Měna"] = c_data.get('currencies', '')
+                    new_df.at[idx, "[Zeměpis] Rozloha"] = c_data.get('area', '')
+                    new_df.at[idx, "[Zeměpis] Vlajka (URL)"] = c_data.get('flag_url', '')
+                except Exception:
+                    unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(country_col, "")), 'Modul': 'Zeměpis (Chyba)'})
+
+            time.sleep(0.3)
             
         st.session_state.df = new_df
         st.session_state.enhancements_applied = True
         st.session_state.unfound_list = unfound_list
+        gc.collect()
         st.success("Obohacení dat bylo úspěšně dokončeno. Tabulka byla rozšířena o nové sloupce.")
         st.rerun()
 
