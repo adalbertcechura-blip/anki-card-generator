@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="cs">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Batch Replacer</title>
+    <style>
+/* Globální tmavé biologické téma sladěné s Generátorem kartiček Anki */
+:root {
+    --bg-dark: #0c140f;
+    --bg-panel: rgba(18, 29, 22, 0.95);
+    --bg-card: #121d16;
+    --bg-subtle: #0e1711;
+    --bg-input: #101913;
+    --primary: #1e5c38;
+    --primary-border: #2b7a4d;
+    --primary-hover: #267347;
+    --primary-hover-border: #389c62;
+    --primary-glow: rgba(46, 139, 87, 0.35);
+    --accent: #2e8b57;
+    --success: #205c39;
+    --success-border: #2e8b57;
+    --danger: #7a2320;
+    --danger-border: #9c2e2a;
+    --danger-text: #e74c3c;
+    --text-main: #f2f8f4;
+    --text-body: #d1e0d6;
+    --text-muted: #8da897;
+    --border: #1c2e22;
+    --border-input: #23362a;
+    --glass-blur: blur(8px);
+    --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Courier New', monospace;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: var(--bg-dark);
+    background-image:
+        radial-gradient(circle at 15% 15%, rgba(30, 92, 56, 0.12) 0%, transparent 45%),
+        radial-gradient(circle at 85% 85%, rgba(46, 139, 87, 0.08) 0%, transparent 45%);
+    color: var(--text-body);
+    font-family: var(--font-main);
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.app-container {
+    width: 100%;
+    max-width: 1400px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 1.25rem;
+    gap: 1.25rem;
+}
+
+/* Glass Panel Utility */
+.glass-panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+/* Header & Tabs */
+header {
+    padding: 0.6rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 8px;
+}
+
+header h1 {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    font-size: 1.35rem;
+    color: var(--text-main);
+    margin-right: 2rem;
+}
+
+header .accent {
+    font-weight: 700;
+    color: #48a973;
+}
+
+.tab-nav {
+    display: flex;
+    gap: 0.4rem;
+}
+
+.tab-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--text-muted);
+    padding: 0.55rem 1.15rem;
+    font-family: var(--font-main);
+    font-weight: 500;
+    font-size: 0.88rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.tab-btn:hover {
+    color: var(--text-main);
+    background: #18281e;
+    border-color: #283f30;
+}
+
+.tab-btn.active {
+    color: #ffffff;
+    background: var(--primary);
+    border-color: var(--primary-border);
+    box-shadow: 0 0 12px var(--primary-glow);
+    font-weight: 600;
+}
+
+/* Main Grid */
+.tab-content {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    gap: 1.25rem;
+}
+
+.tab-content.active {
+    display: flex;
+}
+
+.grid-layout {
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    gap: 1.25rem;
+    flex: 1;
+    min-height: 0;
+}
+
+.three-col-layout {
+    grid-template-columns: 1fr 1fr 1.2fr;
+}
+
+.card {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.card-header {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-subtle);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.card-header h2 {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.card-footer {
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--border);
+    background: var(--bg-subtle);
+}
+
+/* Inputs */
+textarea {
+    flex: 1;
+    background: var(--bg-input);
+    border: none;
+    color: var(--text-main);
+    font-family: var(--font-mono);
+    font-size: 0.88rem;
+    padding: 0.9rem;
+    resize: none;
+    outline: none;
+    line-height: 1.6;
+}
+
+textarea::placeholder {
+    color: rgba(141, 168, 151, 0.45);
+}
+
+.stats {
+    padding: 0.45rem 1rem;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    background: var(--bg-subtle);
+    border-top: 1px solid var(--border);
+    text-align: right;
+}
+
+/* Toolbar Actions */
+.toolbar-actions {
+    padding: 0.5rem 1rem;
+    background: var(--bg-subtle);
+    display: flex;
+    gap: 1.25rem;
+    font-size: 0.82rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    cursor: pointer;
+    color: var(--text-muted);
+    user-select: none;
+    font-size: 0.82rem;
+}
+
+.checkbox-label:hover {
+    color: var(--text-main);
+}
+
+.checkbox-label input {
+    cursor: pointer;
+    accent-color: var(--accent);
+}
+
+/* Matcher Results */
+.results-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+    background: var(--bg-input);
+}
+
+/* Hide 100% matches when flagged */
+.results-container.hide-perfect .match-item[data-score="100"] {
+    display: none;
+}
+
+.match-item {
+    display: flex;
+    align-items: center;
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.88rem;
+    gap: 0.85rem;
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+
+.match-item:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.match-item.selected {
+    background: rgba(46, 139, 87, 0.12);
+    border-left: 3px solid #389c62;
+}
+
+.match-source {
+    color: var(--danger-text);
+    text-decoration: line-through;
+    opacity: 0.85;
+}
+
+.match-arrow {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.match-target {
+    color: #48a973;
+    font-weight: 600;
+}
+
+.match-score {
+    margin-left: auto;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: rgba(0, 0, 0, 0.35);
+    padding: 2px 7px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.placeholder-text {
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 0.9rem;
+}
+
+/* Editor Container */
+.editor-container {
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg-input);
+}
+
+#target-input {
+    z-index: 2;
+    position: relative;
+    background: transparent;
+}
+
+.highlight-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    padding: 0.9rem;
+    font-family: var(--font-mono);
+    font-size: 0.88rem;
+    line-height: 1.6;
+    color: transparent;
+    white-space: pre-wrap;
+    overflow: hidden;
+    z-index: 1;
+}
+
+mark {
+    background: rgba(56, 156, 98, 0.3);
+    color: transparent;
+    border-radius: 4px;
+    box-shadow: 0 0 0 2px rgba(56, 156, 98, 0.5);
+}
+
+/* Control Bar */
+.control-bar {
+    padding: 0.75rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 8px;
+}
+
+/* Buttons */
+.btn {
+    padding: 0.65rem 1.4rem;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    color: #f4faf6;
+    font-weight: 500;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+    font-family: var(--font-main);
+}
+
+.btn:hover {
+    transform: none;
+}
+
+.btn.primary {
+    background: var(--primary);
+    border-color: var(--primary-border);
+}
+
+.btn.primary:hover {
+    background: var(--primary-hover);
+    border-color: var(--primary-hover-border);
+}
+
+.btn-small {
+    background: #18281e;
+    border: 1px solid #283f30;
+    color: var(--text-muted);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    cursor: pointer;
+}
+
+.btn-small:hover {
+    background: #203528;
+    color: var(--text-main);
+}
+
+.btn.secondary {
+    background: #18281e;
+    border: 1px solid #283f30;
+    color: var(--text-body);
+}
+
+.btn.secondary:hover {
+    background: #203528;
+    border-color: #365340;
+    color: #ffffff;
+}
+
+.btn.success {
+    background: var(--success);
+    border-color: var(--success-border);
+}
+
+.btn.success:hover {
+    background: #277549;
+    border-color: #389c62;
+}
+
+.btn.danger {
+    background: var(--danger);
+    border-color: var(--danger-border);
+    color: #fdeeed;
+}
+
+.btn.danger:hover {
+    background: #962b27;
+    border-color: #bd3833;
+}
+
+.btn.small {
+    padding: 0.45rem 0.9rem;
+    font-size: 0.82rem;
+}
+
+.full-width {
+    width: 100%;
+}
+
+.btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background: #152219 !important;
+    border-color: #1c2e22 !important;
+    color: #627a6c !important;
+}
+
+/* Toggle */
+.toggle-switch {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    cursor: pointer;
+    font-size: 0.88rem;
+    color: var(--text-body);
+}
+
+.toggle-switch input {
+    display: none;
+}
+
+.toggle-switch .slider {
+    width: 40px;
+    height: 22px;
+    background: #1c2e22;
+    border: 1px solid #283f30;
+    border-radius: 20px;
+    position: relative;
+    transition: 0.25s ease;
+}
+
+.toggle-switch .slider::before {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    background: #d1e0d6;
+    border-radius: 50%;
+    top: 2px;
+    left: 2px;
+    transition: 0.25s ease;
+}
+
+.toggle-switch input:checked + .slider {
+    background: var(--primary);
+    border-color: var(--primary-border);
+}
+
+.toggle-switch input:checked + .slider::before {
+    transform: translateX(18px);
+    background: #ffffff;
+}
+
+/* Step Controls Layout */
+#step-controls {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.current-rule-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    margin-right: 0.75rem;
+}
+
+#current-rule-text {
+    font-weight: 600;
+    font-size: 0.88rem;
+    color: var(--text-main);
+}
+
+.badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #48a973;
+    background: rgba(46, 139, 87, 0.15);
+    border: 1px solid rgba(46, 139, 87, 0.3);
+    padding: 2px 7px;
+    border-radius: 4px;
+}
+
+</style>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <header class="glass-panel">
+            <div class="brand">
+                <h1>Batch Replacer</h1>
+            </div>
+
+            <nav class="tab-nav">
+                <button class="tab-btn active" data-tab="tab-replacer">1. Hromadné Nahrazování</button>
+                <button class="tab-btn" data-tab="tab-matcher">2. Chytré Párování</button>
+                <button class="tab-btn" data-tab="tab-comparator">3. Dvousloupcová Kontrola</button>
+                <button class="tab-btn" data-tab="tab-generator">4. Generátor Pravidel</button>
+            </nav>
+        </header>
+
+        <main class="tab-content active" id="tab-replacer">
+            <div class="grid-layout">
+                <!-- Rules Section -->
+                <section class="card glass-panel" id="rules-section">
+                    <div class="card-header">
+                        <h2>1. Pravidla (Najít → Nahradit)</h2>
+                        <span class="info-tooltip" title="Zkopírujte dva sloupce z Excelu">ℹ️ Excel (TSV)</span>
+                    </div>
+                    <textarea id="rules-input"
+                        placeholder="Jablko    Pomeranč&#10;Auto      Autobus&#10;..."></textarea>
+                    <div class="stats" id="rules-stats">0 pravidel načteno</div>
+                </section>
+
+                <!-- Data Section -->
+                <section class="card glass-panel" id="data-section">
+                    <div class="card-header">
+                        <h2>2. Cílová data</h2>
+                        <button id="clear-data" class="btn-small">Vymazat</button>
+                    </div>
+                    <div class="editor-container">
+                        <textarea id="target-input" placeholder="Vložte text, který chcete upravit..."></textarea>
+                        <div id="target-highlight" class="highlight-overlay"></div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Control Bar -->
+            <footer class="control-bar glass-panel">
+                <div class="options">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="exact-match">
+                        <span class="slider"></span>
+                        <span class="label-text">Přesná shoda</span>
+                    </label>
+                </div>
+
+                <div class="actions">
+                    <button id="btn-analyze" class="btn primary">Analyzovat</button>
+                    <div id="step-controls" class="hidden">
+                        <div class="current-rule-info">
+                            <span id="current-rule-text">Pravidlo 1/5: A -> B</span>
+                            <span id="match-count" class="badge">0 výskytů</span>
+                        </div>
+                        <button id="btn-skip" class="btn secondary">Přeskočit</button>
+                        <button id="btn-apply" class="btn success">Použít</button>
+                        <button id="btn-apply-all" class="btn danger">Vše zbývající</button>
+                    </div>
+                </div>
+            </footer>
+        </main>
+
+        <main class="tab-content" id="tab-matcher">
+            <div class="grid-layout three-col-layout">
+                <!-- My Data -->
+                <section class="card glass-panel">
+                    <div class="card-header">
+                        <h2>A. Moje Data (S chybami)</h2>
+                    </div>
+                    <textarea id="matcher-input-source" placeholder="Ipnone&#10;Samung&#10;Nokea..."></textarea>
+                </section>
+
+                <!-- Reference Data -->
+                <section class="card glass-panel">
+                    <div class="card-header">
+                        <h2>B. Vzorová Data (Správně)</h2>
+                    </div>
+                    <textarea id="matcher-input-ref" placeholder="iPhone&#10;Samsung&#10;Nokia..."></textarea>
+                </section>
+
+                <!-- Results -->
+                <section class="card glass-panel result-panel">
+                    <div class="card-header">
+                        <h2>C. Návrhy Párování</h2>
+                        <button id="btn-match" class="btn primary small">Spárovat</button>
+                    </div>
+                    <div class="toolbar-actions">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="chk-select-all" checked> Vybrat vše
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="chk-hide-perfect"> Skrýt 100% shody
+                        </label>
+                    </div>
+                    <div class="results-container" id="matcher-results">
+                        <div class="placeholder-text">Vložte data a klikněte na Spárovat</div>
+                    </div>
+                    <div class="card-footer" style="display: flex; gap: 1rem;">
+                        <button id="btn-export-csv" class="btn secondary" style="flex: 1;" disabled>💾 Uložit
+                            (TXT)</button>
+                        <button id="btn-transfer-rules" class="btn success" style="flex: 2;" disabled>Použít vybrané
+                            jako Pravidla</button>
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <main class="tab-content" id="tab-comparator">
+            <div class="grid-layout three-col-layout">
+                <!-- Data A -->
+                <section class="card glass-panel">
+                    <div class="card-header">
+                        <h2>Tabulka 1 (Ke kontrole)</h2>
+                    </div>
+                    <textarea id="comp-input-a"
+                        placeholder="Sloupec 1 [TAB] Sloupec 2&#10;Jan Novák    2023"></textarea>
+                </section>
+
+                <!-- Data B -->
+                <section class="card glass-panel">
+                    <div class="card-header">
+                        <h2>Tabulka 2 (Referenční)</h2>
+                    </div>
+                    <textarea id="comp-input-b"
+                        placeholder="Sloupec 1 [TAB] Sloupec 2&#10;Jan Novák    2023"></textarea>
+                </section>
+
+                <!-- Results -->
+                <section class="card glass-panel result-panel">
+                    <div class="card-header">
+                        <h2>Výsledek Kontroly</h2>
+                        <button id="btn-compare" class="btn primary small">Porovnat</button>
+                    </div>
+                    <div class="toolbar-actions">
+                        <span id="comp-stats" style="font-size: 0.85rem; color: var(--text-muted);">Čekám na
+                            data...</span>
+                    </div>
+                    <div class="results-container" id="comp-results">
+                        <div class="placeholder-text">Vložte 2 sloupce do obou polí a porovnejte</div>
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <main class="tab-content" id="tab-generator">
+            <div class="grid-layout three-col-layout">
+                <!-- List A -->
+                <section class="card glass-panel">
+                    <div class="card-header">
+                        <h2>Seznam A: Co najít</h2>
+                    </div>
+                    <textarea id="gen-input-a" placeholder="jablko&#10;hruška&#10;..."></textarea>
+                </section>
+
+                <!-- List B -->
+                <section class="card glass-panel">
+                    <div class="card-header">
+                        <h2>Seznam B: Čím nahradit</h2>
+                    </div>
+                    <textarea id="gen-input-b" placeholder="jablko1&#10;hruška1&#10;..."></textarea>
+                </section>
+
+                <!-- Results -->
+                <section class="card glass-panel result-panel">
+                    <div class="card-header">
+                        <h2>Náhled Pravidel</h2>
+                        <button id="btn-generate" class="btn primary small">Generovat</button>
+                    </div>
+                    <div class="results-container" id="gen-results">
+                        <div class="placeholder-text">Vložte dva seznamy (musí mít stejný počet řádků)</div>
+                    </div>
+                    <div class="card-footer" style="display: flex; gap: 1rem;">
+                        <button id="btn-gen-transfer" class="btn success full-width" disabled>Použít jako
+                            Pravidla</button>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script>
+// State
+let rules = [];
+let currentRuleIndex = 0;
+let targetText = "";
+
+// DOM Elements - Tabs
+const tabBtns = document.querySelectorAll('.tab-btn');
+const tabContents = document.querySelectorAll('.tab-content');
+
+// DOM Elements - Replacer
+const rulesInput = document.getElementById('rules-input');
+const rulesStats = document.getElementById('rules-stats');
+const targetInput = document.getElementById('target-input');
+const clearDataBtn = document.getElementById('clear-data');
+const exactMatchToggle = document.getElementById('exact-match');
+
+const btnAnalyze = document.getElementById('btn-analyze');
+const stepControls = document.getElementById('step-controls');
+const currentRuleText = document.getElementById('current-rule-text');
+const matchCountBadge = document.getElementById('match-count');
+
+const btnSkip = document.getElementById('btn-skip');
+const btnApply = document.getElementById('btn-apply');
+const btnApplyAll = document.getElementById('btn-apply-all');
+
+// DOM Elements - Matcher
+const matcherInputSource = document.getElementById('matcher-input-source');
+const matcherInputRef = document.getElementById('matcher-input-ref');
+const btnMatch = document.getElementById('btn-match');
+const matcherResults = document.getElementById('matcher-results');
+const btnTransferRules = document.getElementById('btn-transfer-rules');
+const btnExportCsv = document.getElementById('btn-export-csv');
+
+const chkSelectAll = document.getElementById('chk-select-all');
+const chkHidePerfect = document.getElementById('chk-hide-perfect');
+
+// DOM Elements - Comparator
+const compInputA = document.getElementById('comp-input-a');
+const compInputB = document.getElementById('comp-input-b');
+const btnCompare = document.getElementById('btn-compare');
+const compResults = document.getElementById('comp-results');
+const compStats = document.getElementById('comp-stats');
+
+// DOM Elements - Generator
+const genInputA = document.getElementById('gen-input-a');
+const genInputB = document.getElementById('gen-input-b');
+const btnGenerate = document.getElementById('btn-generate');
+const genResults = document.getElementById('gen-results');
+const btnGenTransfer = document.getElementById('btn-gen-transfer');
+
+
+// --- Event Listeners ---
+
+// 0. Tabs
+tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        // Remove active class from all
+        tabBtns.forEach(b => b.classList.remove('active'));
+        tabContents.forEach(c => c.classList.remove('active'));
+
+        // Add to current
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.tab).classList.add('active');
+    });
+});
+
+// 1. Live Rules Parsing
+rulesInput.addEventListener('input', () => {
+    const raw = rulesInput.value;
+    const lines = raw.split('\n').filter(line => line.trim() !== '');
+    rulesStats.textContent = `${lines.length} pravidel načteno`;
+});
+
+// 2. Clear Data
+clearDataBtn.addEventListener('click', () => {
+    targetInput.value = '';
+    rulesInput.value = '';
+    resetUI();
+});
+
+// 3. Analyze / Start
+btnAnalyze.addEventListener('click', () => {
+    // Parse Rules
+    rules = parseRules(rulesInput.value);
+
+    if (rules.length === 0) {
+        alert("Zadejte prosím nějaká pravidla (Jablko [TAB] Pomeranč)");
+        return;
+    }
+    if (!targetInput.value.trim()) {
+        alert("Zadejte cílový text k úpravě.");
+        return;
+    }
+
+    targetText = targetInput.value;
+    currentRuleIndex = 0;
+
+    // Switch UI Mode
+    btnAnalyze.classList.add('hidden');
+    stepControls.classList.remove('hidden');
+
+    // Disable inputs during processing
+    rulesInput.disabled = true;
+    targetInput.disabled = true;
+
+    showCurrentRule();
+});
+
+// 4. Step Controls
+btnSkip.addEventListener('click', () => {
+    currentRuleIndex++;
+    showCurrentRule();
+});
+
+btnApply.addEventListener('click', () => {
+    applyCurrentRule();
+    currentRuleIndex++;
+    showCurrentRule();
+});
+
+btnApplyAll.addEventListener('click', () => {
+    while (currentRuleIndex < rules.length) {
+        applyCurrentRule();
+        currentRuleIndex++;
+    }
+    finishProcess();
+});
+
+// 5. Matcher Logic
+btnMatch.addEventListener('click', () => {
+    const rawSource = matcherInputSource.value.trim();
+    const rawRef = matcherInputRef.value.trim();
+
+    if (!rawSource || !rawRef) {
+        alert("Vyplňte prosím obě pole (Moje data i Vzorová data).");
+        return;
+    }
+
+    const sourceLines = [...new Set(rawSource.split('\n').map(s => s.trim()).filter(s => s))];
+    const refLines = rawRef.split('\n').map(s => s.trim()).filter(s => s);
+
+    matcherResults.innerHTML = ''; // Clear previous
+    let matchesFound = 0;
+
+    sourceLines.forEach(source => {
+        // Find best match in refLines
+        let bestMatch = null;
+        let bestScore = -1; // Higher is better (0-100)
+
+        refLines.forEach(ref => {
+            const score = similarity(source, ref);
+            if (score > bestScore) {
+                bestScore = score;
+                bestMatch = ref;
+            }
+        });
+
+        // Threshold for auto-suggestion (e.g. 40%)
+        if (bestScore > 0.4) {
+            matchesFound++;
+            createMatchRow(source, bestMatch, Math.round(bestScore * 100));
+        } else {
+            // Optional: Show "No match found" or just skip
+            createMatchRow(source, "?", 0);
+        }
+    });
+
+    if (matchesFound > 0) {
+        btnTransferRules.disabled = false;
+        btnExportCsv.disabled = false;
+        chkSelectAll.checked = true; // Auto select all on new match
+    }
+
+    // Apply filters instantly
+    updateFilters();
+});
+
+btnTransferRules.addEventListener('click', () => {
+    const selectedRows = document.querySelectorAll('.match-item.selected');
+    let rulesText = rulesInput.value ? rulesInput.value + '\n' : '';
+
+    let transferredCount = 0;
+    selectedRows.forEach(row => {
+        if (chkHidePerfect.checked && row.dataset.score == "100") return;
+
+        const source = row.dataset.source;
+        const target = row.dataset.target;
+        rulesText += `${source}\t${target}\n`;
+        transferredCount++;
+    });
+
+    if (transferredCount === 0) {
+        alert("Žádné položky k přenosu (zkontrolujte výběr nebo filtr).");
+        return;
+    }
+
+    rulesInput.value = rulesText;
+    rulesInput.dispatchEvent(new Event('input'));
+    document.querySelector('[data-tab="tab-replacer"]').click();
+});
+
+// 6. Matcher Filters
+chkSelectAll.addEventListener('change', () => {
+    const isChecked = chkSelectAll.checked;
+    const rows = document.querySelectorAll('.match-item');
+    rows.forEach(row => {
+        const checkbox = row.querySelector('input[type="checkbox"]');
+        checkbox.checked = isChecked;
+        if (isChecked) row.classList.add('selected');
+        else row.classList.remove('selected');
+    });
+});
+
+chkHidePerfect.addEventListener('change', () => {
+    updateFilters();
+});
+
+btnExportCsv.addEventListener('click', () => {
+    const selectedRows = document.querySelectorAll('.match-item.selected');
+    let content = "Find\tReplace\n"; // Header
+
+    let count = 0;
+    selectedRows.forEach(row => {
+        if (chkHidePerfect.checked && row.dataset.score == "100") return;
+
+        const source = row.dataset.source;
+        const target = row.dataset.target;
+        content += `${source}\t${target}\n`;
+        count++;
+    });
+
+    if (count === 0) {
+        alert("Žádná data k exportu.");
+        return;
+    }
+
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'parovani_export.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+});
+
+// 7. Comparator Logic
+btnCompare.addEventListener('click', () => {
+    const rawA = compInputA.value;
+    const rawB = compInputB.value;
+
+    if (!rawA.trim() || !rawB.trim()) {
+        alert("Vložte data do obou tabulek.");
+        return;
+    }
+
+    const refSet = new Set();
+    rawB.split('\n').forEach(line => {
+        const parts = splitRow(line);
+        if (parts.length >= 2) {
+            const key = `${parts[0].trim()}|${parts[1].trim()}`;
+            refSet.add(key.toLowerCase());
+        }
+    });
+
+    compResults.innerHTML = '';
+    let matches = 0;
+    let missing = 0;
+
+    const linesA = rawA.split('\n').filter(l => l.trim());
+    linesA.forEach(line => {
+        const parts = splitRow(line);
+        if (parts.length < 2) return;
+
+        const val1 = parts[0].trim();
+        const val2 = parts[1].trim();
+        const key = `${val1}|${val2}`.toLowerCase();
+
+        const isFound = refSet.has(key);
+
+        if (isFound) matches++;
+        else missing++;
+
+        renderCompRow(val1, val2, isFound);
+    });
+
+    compStats.textContent = `Nalezeno: ${matches} | Chybí: ${missing}`;
+});
+
+// 8. Generator Logic
+btnGenerate.addEventListener('click', () => {
+    const rawA = genInputA.value;
+    const rawB = genInputB.value;
+
+    if (!rawA.trim() || !rawB.trim()) {
+        alert("Vložte oba seznamy.");
+        return;
+    }
+
+    const linesA = rawA.split('\n').map(l => l.trim()).filter(l => l);
+    const linesB = rawB.split('\n').map(l => l.trim()).filter(l => l);
+
+    if (linesA.length !== linesB.length) {
+        alert(`Pozor: Seznamy mají různý počet řádků! (A: ${linesA.length}, B: ${linesB.length})\nVygeneruji jen tolik párů, kolik je v kratším seznamu.`);
+    }
+
+    genResults.innerHTML = '';
+    const limit = Math.min(linesA.length, linesB.length);
+
+    for (let i = 0; i < limit; i++) {
+        renderGenRow(linesA[i], linesB[i]);
+    }
+
+    if (limit > 0) {
+        btnGenTransfer.disabled = false;
+    }
+});
+
+btnGenTransfer.addEventListener('click', () => {
+    const rows = genResults.querySelectorAll('.match-item');
+    let rulesText = rulesInput.value ? rulesInput.value + '\n' : '';
+
+    rows.forEach(row => {
+        const source = row.dataset.source;
+        const target = row.dataset.target;
+        rulesText += `${source}\t${target}\n`;
+    });
+
+    rulesInput.value = rulesText;
+    rulesInput.dispatchEvent(new Event('input'));
+    document.querySelector('[data-tab="tab-replacer"]').click();
+});
+
+
+// Helper Funcs
+function splitRow(line) {
+    let parts = line.split('\t');
+    if (parts.length < 2) parts = line.split(/\s{2,}/);
+    return parts;
+}
+
+function renderCompRow(col1, col2, isFound) {
+    const div = document.createElement('div');
+    div.className = `match-item ${isFound ? 'comp-match' : 'comp-missing'}`;
+
+    const icon = isFound ? '✅' : '❌';
+
+    div.innerHTML = `
+        <span style="width: 20px;">${icon}</span>
+        <span style="flex: 1; font-family: var(--font-mono);">${col1}</span>
+        <span style="width: 1px; background: rgba(255,255,255,0.1); height: 1.2em;"></span>
+        <span style="flex: 1; font-family: var(--font-mono); margin-left:10px;">${col2}</span>
+        <span class="badge" style="${isFound ? 'background:rgba(46,139,87,0.2);color:#389c62;border:1px solid rgba(46,139,87,0.3);' : 'background:rgba(192,57,43,0.2);color:#e74c3c;border:1px solid rgba(192,57,43,0.3);'}">
+            ${isFound ? 'OK' : 'CHYBÍ'}
+        </span>
+    `;
+    compResults.appendChild(div);
+}
+
+function renderGenRow(source, target) {
+    const div = document.createElement('div');
+    div.className = 'match-item';
+    div.dataset.source = source;
+    div.dataset.target = target;
+
+    div.innerHTML = `
+        <span class="match-source" style="color: var(--text-main); text-decoration: none;">${source}</span>
+        <span class="match-arrow">→</span>
+        <span class="match-target">${target}</span>
+    `;
+    genResults.appendChild(div);
+}
+
+function updateFilters() {
+    if (chkHidePerfect.checked) {
+        matcherResults.classList.add('hide-perfect');
+    } else {
+        matcherResults.classList.remove('hide-perfect');
+    }
+}
+
+
+// --- Helper Functions ---
+
+function createMatchRow(source, target, score) {
+    const div = document.createElement('div');
+    div.className = 'match-item selected'; // Default to selected
+    div.dataset.source = source;
+    div.dataset.target = target;
+    div.dataset.score = score;
+
+    div.innerHTML = `
+        <input type="checkbox" checked style="margin-right: 10px; pointer-events: none;">
+        <span class="match-source" style="color: var(--text-main); text-decoration: none;">${source}</span>
+        <span class="match-arrow">→</span>
+        <span class="match-target">${target}</span>
+        <span class="match-score" style="color: ${getScoreColor(score)}">${score}%</span>
+    `;
+
+    div.addEventListener('click', (e) => {
+        if (e.target.type !== 'checkbox') {
+            const chk = div.querySelector('input');
+            chk.checked = !chk.checked;
+        }
+        div.classList.toggle('selected');
+    });
+
+    matcherResults.appendChild(div);
+}
+
+function getScoreColor(score) {
+    if (score > 80) return '#389c62'; // Green
+    if (score > 50) return '#d49b38'; // Amber
+    return '#e74c3c'; // Red
+}
+
+function parseRules(text) {
+    const lines = text.split('\n');
+    const parsed = [];
+
+    lines.forEach(line => {
+        if (!line.trim()) return;
+
+        let parts = line.split('\t');
+        if (parts.length < 2) parts = line.split(/\s{2,}/);
+        if (parts.length < 2) parts = line.split(' = '); // Support "A = B"
+        if (parts.length < 2 && line.includes(',')) parts = line.split(','); // Support CSV
+
+        if (parts.length >= 2) {
+            parsed.push({
+                find: parts[0].trim(),
+                replace: parts[1].trim()
+            });
+        }
+    });
+    return parsed;
+}
+
+function showCurrentRule() {
+    if (currentRuleIndex >= rules.length) {
+        finishProcess();
+        return;
+    }
+
+    const rule = rules[currentRuleIndex];
+    const isExact = exactMatchToggle.checked;
+    const matches = countMatches(targetText, rule.find, isExact);
+
+    currentRuleText.textContent = `Pravidlo ${currentRuleIndex + 1}/${rules.length}: "${rule.find}" → "${rule.replace}"`;
+    matchCountBadge.textContent = `${matches} výskytů`;
+
+    if (matches > 0) {
+        matchCountBadge.style.backgroundColor = 'rgba(46, 139, 87, 0.2)';
+        matchCountBadge.style.color = '#389c62';
+    } else {
+        matchCountBadge.style.backgroundColor = 'rgba(141, 168, 151, 0.1)';
+        matchCountBadge.style.color = '#8da897';
+    }
+}
+
+function countMatches(text, find, exact) {
+    if (!find) return 0;
+    try {
+        if (exact) {
+            const regex = new RegExp(`\\b${escapeRegExp(find)}\\b`, 'g');
+            const m = text.match(regex);
+            return m ? m.length : 0;
+        } else {
+            const regex = new RegExp(escapeRegExp(find), 'g');
+            const m = text.match(regex);
+            return m ? m.length : 0;
+        }
+    } catch (e) {
+        return 0;
+    }
+}
+
+function applyCurrentRule() {
+    const rule = rules[currentRuleIndex];
+    const isExact = exactMatchToggle.checked;
+
+    if (isExact) {
+        const regex = new RegExp(`\\b${escapeRegExp(rule.find)}\\b`, 'g');
+        targetText = targetText.replace(regex, rule.replace);
+    } else {
+        targetText = targetText.split(rule.find).join(rule.replace);
+    }
+
+    targetInput.value = targetText;
+
+    targetInput.style.color = '#389c62';
+    setTimeout(() => { targetInput.style.color = 'var(--text-main)'; }, 300);
+}
+
+function finishProcess() {
+    alert("Hotovo! Všechna pravidla byla zpracována.");
+    resetUI();
+}
+
+function resetUI() {
+    btnAnalyze.classList.remove('hidden');
+    stepControls.classList.add('hidden');
+    rulesInput.disabled = false;
+    targetInput.disabled = false;
+    currentRuleIndex = 0;
+}
+
+function escapeRegExp(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Levenshtein Similarity (0 to 1)
+function similarity(s1, s2) {
+    var longer = s1;
+    var shorter = s2;
+    if (s1.length < s2.length) {
+        longer = s2;
+        shorter = s1;
+    }
+    var longerLength = longer.length;
+    if (longerLength == 0) {
+        return 1.0;
+    }
+    return (longerLength - editDistance(longer, shorter)) / parseFloat(longerLength);
+}
+
+function editDistance(s1, s2) {
+    s1 = s1.toLowerCase();
+    s2 = s2.toLowerCase();
+
+    var costs = new Array();
+    for (var i = 0; i <= s1.length; i++) {
+        var lastValue = i;
+        for (var j = 0; j <= s2.length; j++) {
+            if (i == 0)
+                costs[j] = j;
+            else {
+                if (j > 0) {
+                    var newValue = costs[j - 1];
+                    if (s1.charAt(i - 1) != s2.charAt(j - 1))
+                        newValue = Math.min(Math.min(newValue, lastValue),
+                            costs[j]) + 1;
+                    costs[j - 1] = lastValue;
+                    lastValue = newValue;
+                }
+            }
+        }
+        if (i > 0)
+            costs[s2.length] = lastValue;
+    }
+    return costs[s2.length];
+}
+
+</script>
+</body>
+
+</html>

@@ -13,6 +13,9 @@ import time
 import json
 import concurrent.futures
 import gc
+import io
+import math
+from PIL import Image, ImageDraw
 from bs4 import BeautifulSoup
 
 # --- NAČTENÍ GLOBÁLNÍ KONFIGURACE (API klíče pro správce) ---
@@ -681,6 +684,249 @@ def slugify_species_name(name):
     name = re.sub(r'\s*\(.*\)\s*', '', name).strip()
     name = re.sub(r'\s+sp(p)?\.?$', '', name).strip()
     return slugify(name)
+
+_PLADIAS_BASE_MAP_CACHE = None
+
+def get_pladias_base_map():
+    """Načte a nacachuje v paměti podkladovou síť kvadrantů ČR z GeoServeru Pladias."""
+    global _PLADIAS_BASE_MAP_CACHE
+    if _PLADIAS_BASE_MAP_CACHE is not None:
+        return _PLADIAS_BASE_MAP_CACHE.copy()
+        
+    minx, miny, maxx, maxy = 1335000, 6190000, 2105000, 6640000
+    w, h = 800, 480
+    wms_url = (
+        f"https://geoserver.ibot.cas.cz/common/ows?service=WMS&version=1.1.1&request=GetMap"
+        f"&LAYERS=commonStyles:squares"
+        f"&STYLES=&SRS=EPSG:3857"
+        f"&BBOX={minx},{miny},{maxx},{maxy}"
+        f"&WIDTH={w}&HEIGHT={h}&FORMAT=image/png"
+    )
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    try:
+        r_wms = requests.get(wms_url, headers=headers, timeout=8)
+        if r_wms.status_code == 200 and len(r_wms.content) > 1000:
+            base_img = Image.open(io.BytesIO(r_wms.content)).convert("RGBA")
+            _PLADIAS_BASE_MAP_CACHE = base_img
+            return _PLADIAS_BASE_MAP_CACHE.copy()
+    except Exception:
+        pass
+    
+    blank = Image.new("RGBA", (w, h), (245, 248, 245, 255))
+    _PLADIAS_BASE_MAP_CACHE = blank
+    return _PLADIAS_BASE_MAP_CACHE.copy()
+
+def fetch_pladias_photos(species_name, max_photos=3):
+    """
+    Vyhledá fotografie rostliny z portálu Pladias.cz (Botanický ústav AV ČR) ve vysokém rozlišení.
+    """
+    photos = []
+    if not species_name or pd.isna(species_name):
+        return photos
+    species_name = str(species_name).strip()
+    if not species_name:
+        return photos
+        
+    clean_sp = re.sub(r'\s*\(.*?\)\s*', ' ', species_name).strip()
+    clean_sp = re.sub(r'\s+sp(p)?\.?$', '', clean_sp).strip()
+    if not clean_sp:
+        clean_sp = species_name
+        
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    for q_name in [clean_sp, species_name]:
+        url_pics = f"https://pladias.cz/taxon/pictures/{urllib.parse.quote(q_name)}"
+        try:
+            r = requests.get(url_pics, headers=headers, timeout=6)
+            if r.status_code == 200:
+                soup = BeautifulSoup(r.text, 'html.parser')
+                for a in soup.find_all('a', class_='pictureLink'):
+                    href = a.get('href', '')
+                    if 'cevs/images/taxa/' in href:
+                        large_url = href.replace('/thumbs/', '/large/')
+                        if large_url not in photos:
+                            photos.append(large_url)
+                            if len(photos) >= max_photos:
+                                break
+                
+                if len(photos) < max_photos:
+                    for img in soup.find_all('img'):
+                        src = img.get('src', '')
+                        if 'cevs/images/taxa/' in src:
+                            large_url = src.replace('/thumbs/', '/large/')
+                            if large_url not in photos:
+                                photos.append(large_url)
+                                if len(photos) >= max_photos:
+                                    break
+            if photos:
+                break
+        except Exception:
+            pass
+            
+    return photos[:max_photos]
+
+def render_pladias_distribution_map(species_name, output_path):
+    """
+    Vygeneruje mapu rozšíření druhu v ČR z databáze Pladias (Botanický ústav AV ČR)
+    včetně čtvercové sítě, bodů ověřeného/historického výskytu a citace zdroje.
+    """
+    if not species_name:
+        return False
+    species_name = str(species_name).strip()
+    clean_sp = re.sub(r'\s*\(.*?\)\s*', ' ', species_name).strip()
+    clean_sp = re.sub(r'\s+sp(p)?\.?$', '', clean_sp).strip()
+    if not clean_sp:
+        clean_sp = species_name
+
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    
+    taxon_id = None
+    for q_name in [clean_sp, species_name]:
+        url_dist = f"https://pladias.cz/taxon/distribution/{urllib.parse.quote(q_name)}"
+        try:
+            r = requests.get(url_dist, headers=headers, timeout=6)
+            if r.status_code == 200:
+                soup = BeautifulSoup(r.text, 'html.parser')
+                map_div = soup.find('div', id='map') or soup.find('div', class_='distributionMap')
+                if map_div and map_div.get('data-taxon-id'):
+                    taxon_id = map_div.get('data-taxon-id')
+                    break
+        except Exception:
+            pass
+            
+    if not taxon_id:
+        return False
+
+    minx, miny, maxx, maxy = 1335000, 6190000, 2105000, 6640000
+    w, h = 800, 480
+    base_img = get_pladias_base_map()
+    
+    canvas = Image.new("RGBA", (w, h + 46), (248, 250, 248, 255))
+    canvas.paste(base_img, (0, 0), base_img)
+
+    def lon_lat_to_pixel(lon, lat):
+        x_m = lon * 20037508.34 / 180.0
+        y_m = math.log(math.tan((90.0 + lat) * math.pi / 360.0)) / (math.pi / 180.0)
+        y_m = y_m * 20037508.34 / 180.0
+        px = int((x_m - minx) / (maxx - minx) * w)
+        py = int((maxy - y_m) / (maxy - miny) * h)
+        return px, py
+
+    draw = ImageDraw.Draw(canvas)
+    
+    # Nerevidované / starší záznamy (šedé)
+    url_neurceny = f"https://geoserver.ibot.cas.cz/pladias_wfs/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=neurceny&outputFormat=application/json&VIEWPARAMS=TAXON_ID:{taxon_id}"
+    try:
+        r_n = requests.get(url_neurceny, headers=headers, timeout=6)
+        if r_n.status_code == 200:
+            for f in r_n.json().get('features', []):
+                coords = f.get('geometry', {}).get('coordinates')
+                if coords and len(coords) == 2:
+                    px, py = lon_lat_to_pixel(coords[0], coords[1])
+                    r_dot = 3
+                    draw.ellipse([px - r_dot, py - r_dot, px + r_dot, py + r_dot], fill=(160, 160, 160, 220), outline=(120, 120, 120, 255))
+    except Exception:
+        pass
+
+    # Ověřené / jisté záznamy (zelené)
+    url_jisty = f"https://geoserver.ibot.cas.cz/pladias_wfs/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=jisty&outputFormat=application/json&VIEWPARAMS=TAXON_ID:{taxon_id}"
+    try:
+        r_j = requests.get(url_jisty, headers=headers, timeout=6)
+        if r_j.status_code == 200:
+            for f in r_j.json().get('features', []):
+                coords = f.get('geometry', {}).get('coordinates')
+                if coords and len(coords) == 2:
+                    px, py = lon_lat_to_pixel(coords[0], coords[1])
+                    r_dot = 3.5
+                    draw.ellipse([px - r_dot, py - r_dot, px + r_dot, py + r_dot], fill=(20, 110, 50, 240), outline=(10, 60, 25, 255))
+    except Exception:
+        pass
+
+    # Zápatí s legendou a citací
+    draw.rectangle([0, h, w, h + 46], fill=(238, 242, 239, 255), outline=(210, 220, 215, 255))
+    draw.ellipse([18, h + 14, 26, h + 22], fill=(20, 110, 50, 240), outline=(10, 60, 25, 255))
+    draw.text((32, h + 11), "Ověřený výskyt", fill=(30, 40, 35, 255))
+    
+    draw.ellipse([140, h + 14, 148, h + 22], fill=(160, 160, 160, 220), outline=(120, 120, 120, 255))
+    draw.text((154, h + 11), "Nerevidovaný údaj", fill=(60, 70, 65, 255))
+
+    attribution = "Zdroj dat: Pladias (Botanický ústav AV ČR) • pladias.cz"
+    draw.text((w - 360, h + 11), attribution, fill=(70, 90, 80, 255))
+
+    final_img = canvas.convert("RGB")
+    final_img.save(output_path, format="JPEG", quality=85, optimize=True)
+    return os.path.exists(output_path) and os.path.getsize(output_path) > 0
+
+def format_deck_description(desc_text):
+    """
+    Převede zadaný text popisu balíčku do čistého HTML (odstavce <p> a řádky <br>),
+    které Anki zobrazí pod názvem balíčku stejně jako na přehledu balíčku.
+    """
+    if not desc_text:
+        return ""
+    desc_text = str(desc_text).strip()
+    if not desc_text:
+        return ""
+    
+    raw_paras = re.split(r'\n\s*\n', desc_text)
+    html_paras = []
+    for para in raw_paras:
+        para_clean = para.strip()
+        if not para_clean:
+            continue
+        # Pokud je již odstavec obalen HTML blokem (<p>, <div>, <h3>, <hr>, <table>...)
+        if re.search(r'^<(p|div|h[1-6]|table|ul|ol|hr)[^>]*>', para_clean, re.IGNORECASE):
+            html_paras.append(para_clean)
+        else:
+            lines = [l.strip() for l in para_clean.split('\n')]
+            joined_lines = "<br>".join(lines)
+            html_paras.append(f"<p>{joined_lines}</p>")
+            
+    return "\n".join(html_paras)
+
+def build_deck_attribution(active_cols):
+    """
+    Vygeneruje formátovanou citaci a uvedení zdrojů (Pladias.cz, Mykologie.net)
+    pro popis balíčku v Anki.
+    """
+    sections = []
+    
+    # --- PLADIAS ---
+    has_pladias_photos = any("[Pladias] Fotky" in str(c) for c in active_cols)
+    has_pladias_map = any("[Pladias] Mapa rozšíření" in str(c) for c in active_cols)
+    has_pladias_any = any("[Pladias]" in str(c) for c in active_cols)
+    
+    if has_pladias_any:
+        p_parts = []
+        p_parts.append("<p>Tento balíček využívá data z databáze <strong>Pladias – databáze české flóry a vegetace</strong> (<a href=\"https://www.pladias.cz\">www.pladias.cz</a>).</p>")
+        if has_pladias_photos:
+            p_parts.append("<p>Fotografie rostlin pocházejí z databáze Pladias (Botanický ústav AV ČR & Masarykova univerzita).</p>")
+        if has_pladias_map:
+            p_parts.append("<p>Data o rozšíření a mapy výskytu: Wild J., Kaplan Z., Danihelka J. et al. (2019) <em>Plant distribution data for the Czech Republic integrated in the Pladias database</em>. – Preslia 91: 1–24. <a href=\"https://doi.org/10.23855/preslia.2019.001\">https://doi.org/10.23855/preslia.2019.001</a></p>")
+        p_parts.append("<p>Hlavní citace databáze: Chytrý M., Danihelka J., Kaplan Z., Wild J. et al. (2021) <em>Pladias Database of the Czech Flora and Vegetation</em>. – Preslia 93: 1–87. <a href=\"https://doi.org/10.23855/preslia.2021.001\">https://doi.org/10.23855/preslia.2021.001</a></p>")
+        p_parts.append("<p style=\"font-size: 0.85em; color: #777;\">Data jsou použita pro nekomerční výukové a studijní účely v souladu s Pravidly správy a použití databáze Pladias.</p>")
+        sections.append("\n".join(p_parts))
+
+    # --- MYKOLOGIE.NET ---
+    has_myko_img = any("[Mykologie.net] Fotky" in str(c) for c in active_cols)
+    has_myko_desc = any("[Mykologie.net] Popis" in str(c) for c in active_cols)
+    has_myko_link = any("[Mykologie.net] Odkaz" in str(c) for c in active_cols)
+    has_myko_any = any("[Mykologie.net]" in str(c) for c in active_cols)
+    
+    if has_myko_any:
+        m_parts = []
+        if has_myko_img and (has_myko_desc or has_myko_link):
+            m_parts.append("<p>Obrázky hub, popisy a taxonomické informace použité v tomto balíčku pocházejí z mykologického portálu <strong>Mykologie.net</strong> (<a href=\"https://www.mykologie.net\">www.mykologie.net</a>).</p>")
+        elif has_myko_img:
+            m_parts.append("<p>Obrázky a fotografie hub použité v tomto balíčku pocházejí ze serveru <strong>Mykologie.net</strong> (<a href=\"https://www.mykologie.net\">www.mykologie.net</a>).</p>")
+        elif has_myko_desc:
+            m_parts.append("<p>Textové popisy a informace o houbách pocházejí ze serveru <strong>Mykologie.net</strong> (<a href=\"https://www.mykologie.net\">www.mykologie.net</a>).</p>")
+        else:
+            m_parts.append("<p>Odkazy a data o houbách použité v tomto balíčku odkazují na mykologický portál <strong>Mykologie.net</strong> (<a href=\"https://www.mykologie.net\">www.mykologie.net</a>).</p>")
+            
+        m_parts.append("<p style=\"font-size: 0.85em; color: #777;\">Zdroj: Mykologie.net – Houby v České republice. Všechna autorská práva k fotografiím a textům náleží autorům a serveru Mykologie.net. Použito pro nekomerční vzdělávací účely.</p>")
+        sections.append("\n".join(m_parts))
+
+    return "\n<hr>\n".join(sections)
 
 def fetch_gbif_plant_photos(species_name, get_kvet=True, get_list=True):
     """
@@ -1463,10 +1709,12 @@ def fetch_country_data(query, db):
 def is_image_col(col_name, sample_val):
     """Určí, zda sloupec obsahuje obrázkové URL odkazy."""
     # Audio a textové odkazy ignorujeme (nejsou to obrázky)
-    non_img_prefixes = ["[Pladias]", "[Mykologie.net] Odkaz", "[Mykologie.net] Popis", "[Wikipedie] Odkaz", "[Wikipedie] Odka", "[Zvuky]", "[TTS]"]
+    non_img_prefixes = ["[Pladias] Odkaz", "[Mykologie.net] Odkaz", "[Mykologie.net] Popis", "[Wikipedie] Odkaz", "[Wikipedie] Odka", "[Zvuky]", "[TTS]"]
     if any(col_name.startswith(pfx) for pfx in non_img_prefixes):
         return False
-    if any(k in col_name.lower() for k in ['photo', 'obrázk', 'obrazk', 'image', 'fotk', 'molekula', 'náhled', 'květ', 'kvet', 'list', 'houby', 'zoologie', 'mykolog']):
+    if col_name == "[Pladias] Mapa rozšíření":
+        return True
+    if any(k in col_name.lower() for k in ['photo', 'obrázk', 'obrazk', 'image', 'fotk', 'molekula', 'náhled', 'květ', 'kvet', 'list', 'houby', 'zoologie', 'mykolog', 'mapa', 'mapy']):
         return True
     if isinstance(sample_val, str) and (sample_val.startswith('http://') or sample_val.startswith('https://')):
         # Pokud je to audio URL, není to obrázek
@@ -1929,7 +2177,7 @@ if st.session_state.df is not None:
     with col_t_btn1:
         if st.button("Zaškrtnout vše", key="btn_check_all_topic"):
             if selected_topic == "Biologie":
-                for k in ["enable_gbif_kvet", "enable_gbif_list", "enable_pladias", "enable_mykologie_img", "enable_mykologie_desc", "enable_mykologie_link", "enable_gbif_fungi", "enable_gbif_zoo", "enable_bird_sounds", "enable_inat", "enable_desc", "enable_gbif", "enable_wiki_img", "enable_wiki_link"]:
+                for k in ["enable_gbif_kvet", "enable_gbif_list", "enable_pladias_photos", "enable_pladias_map", "enable_pladias", "enable_mykologie_img", "enable_mykologie_desc", "enable_mykologie_link", "enable_gbif_fungi", "enable_gbif_zoo", "enable_bird_sounds", "enable_inat", "enable_desc", "enable_gbif", "enable_wiki_img", "enable_wiki_link"]:
                     cfg[k] = True
                     st.session_state[f"w_{k}"] = True
             elif selected_topic == "Jazyky":
@@ -1944,7 +2192,7 @@ if st.session_state.df is not None:
     with col_t_btn2:
         if st.button("Zrušit výběr", key="btn_uncheck_all_topic"):
             if selected_topic == "Biologie":
-                for k in ["enable_gbif_kvet", "enable_gbif_list", "enable_pladias", "enable_mykologie_img", "enable_mykologie_desc", "enable_mykologie_link", "enable_gbif_fungi", "enable_gbif_zoo", "enable_bird_sounds", "enable_inat", "enable_desc", "enable_gbif", "enable_wiki_img", "enable_wiki_link"]:
+                for k in ["enable_gbif_kvet", "enable_gbif_list", "enable_pladias_photos", "enable_pladias_map", "enable_pladias", "enable_mykologie_img", "enable_mykologie_desc", "enable_mykologie_link", "enable_gbif_fungi", "enable_gbif_zoo", "enable_bird_sounds", "enable_inat", "enable_desc", "enable_gbif", "enable_wiki_img", "enable_wiki_link"]:
                     cfg[k] = False
                     st.session_state[f"w_{k}"] = False
             elif selected_topic == "Jazyky":
@@ -1963,6 +2211,67 @@ if st.session_state.df is not None:
         
         with tab_botanika:
             st.markdown("##### Specifická nastavení pro botaniku (Rostliny)")
+            cfg["enable_pladias_photos"] = st.checkbox(
+                "Aktivovat fotky z Pladias.cz (Botanický ústav AV ČR)",
+                value=cfg.get("enable_pladias_photos", False),
+                key="w_enable_pladias_photos"
+            )
+            if cfg.get("enable_pladias_photos", False):
+                pladias_photos_col_val = cfg.get("pladias_photos_col", columns[0])
+                try:
+                    pladias_photos_col_idx = columns.index(pladias_photos_col_val)
+                except ValueError:
+                    pladias_photos_col_idx = 0
+                cfg["pladias_photos_col"] = st.selectbox(
+                    "Sloupec s vědeckým jménem druhu pro Pladias fotky",
+                    options=columns,
+                    index=pladias_photos_col_idx,
+                    key="w_pladias_photos_col"
+                )
+                cfg["pladias_photos_max"] = st.slider(
+                    "Max fotek z Pladias na řádek",
+                    1, 5,
+                    value=cfg.get("pladias_photos_max", 3),
+                    key="w_pladias_photos_max"
+                )
+
+            cfg["enable_pladias_map"] = st.checkbox(
+                "Aktivovat mapu rozšíření ČR z Pladias.cz",
+                value=cfg.get("enable_pladias_map", False),
+                key="w_enable_pladias_map"
+            )
+            if cfg.get("enable_pladias_map", False):
+                pladias_map_col_val = cfg.get("pladias_map_col", columns[0])
+                try:
+                    pladias_map_col_idx = columns.index(pladias_map_col_val)
+                except ValueError:
+                    pladias_map_col_idx = 0
+                cfg["pladias_map_col"] = st.selectbox(
+                    "Sloupec s vědeckým jménem druhu pro mapu z Pladiasu",
+                    options=columns,
+                    index=pladias_map_col_idx,
+                    key="w_pladias_map_col"
+                )
+
+            cfg["enable_pladias"] = st.checkbox(
+                "Aktivovat odkaz na profil na Pladias.cz",
+                value=cfg.get("enable_pladias", False),
+                key="w_enable_pladias"
+            )
+            if cfg.get("enable_pladias", False):
+                pladias_col_val = cfg.get("pladias_col", columns[0])
+                try:
+                    pladias_col_idx = columns.index(pladias_col_val)
+                except ValueError:
+                    pladias_col_idx = 0
+                cfg["pladias_col"] = st.selectbox(
+                    "Sloupec s vědeckým jménem druhu pro Pladias odkaz",
+                    options=columns, 
+                    index=pladias_col_idx,
+                    key="w_pladias_col"
+                )
+
+            st.markdown("---")
             cfg["enable_gbif_kvet"] = st.checkbox(
                 "Aktivovat GBIF fotky - Květ", 
                 value=cfg.get("enable_gbif_kvet", False),
@@ -1984,24 +2293,6 @@ if st.session_state.df is not None:
                     options=columns, 
                     index=gbif_photo_col_idx,
                     key="w_gbif_photo_col"
-                )
-                
-            cfg["enable_pladias"] = st.checkbox(
-                "Aktivovat odkaz na Pladias",
-                value=cfg.get("enable_pladias", False),
-                key="w_enable_pladias"
-            )
-            if cfg.get("enable_pladias", False):
-                pladias_col_val = cfg.get("pladias_col", columns[0])
-                try:
-                    pladias_col_idx = columns.index(pladias_col_val)
-                except ValueError:
-                    pladias_col_idx = 0
-                cfg["pladias_col"] = st.selectbox(
-                    "Sloupec s vědeckým jménem druhu pro Pladias",
-                    options=columns, 
-                    index=pladias_col_idx,
-                    key="w_pladias_col"
                 )
 
         with tab_houby:
@@ -2388,7 +2679,8 @@ if st.session_state.df is not None:
 
     # Přehled aktivních modulů
     active = [k.replace("enable_","") for k in ["enable_inat","enable_gbif","enable_gbif_kvet",
-              "enable_gbif_list","enable_pladias","enable_mykologie_img","enable_mykologie_desc",
+              "enable_gbif_list","enable_pladias_photos","enable_pladias_map","enable_pladias",
+              "enable_mykologie_img","enable_mykologie_desc",
               "enable_mykologie_link","enable_gbif_fungi","enable_gbif_zoo","enable_wiki_link",
               "enable_trans","enable_tts","enable_dict","enable_country",
               "enable_wiki_img"] if cfg.get(k, False)]
@@ -2406,6 +2698,8 @@ if st.session_state.df is not None:
         enable_desc = cfg.get("enable_desc", False)
         enable_gbif_kvet = cfg.get("enable_gbif_kvet", False)
         enable_gbif_list = cfg.get("enable_gbif_list", False)
+        enable_pladias_photos = cfg.get("enable_pladias_photos", False)
+        enable_pladias_map = cfg.get("enable_pladias_map", False)
         enable_pladias = cfg.get("enable_pladias", False)
         enable_mykologie_img = cfg.get("enable_mykologie_img", False)
         enable_mykologie_desc = cfg.get("enable_mykologie_desc", False)
@@ -2428,6 +2722,9 @@ if st.session_state.df is not None:
         desc_type_val = cfg.get("desc_type", "Vědecký anglický (popis, habitat, listy...)")
         gbif_col = cfg.get("gbif_col", columns[0] if columns else "")
         gbif_photo_col = cfg.get("gbif_photo_col", columns[0] if columns else "")
+        pladias_photos_col = cfg.get("pladias_photos_col", columns[0] if columns else "")
+        pladias_photos_max = cfg.get("pladias_photos_max", 3)
+        pladias_map_col = cfg.get("pladias_map_col", columns[0] if columns else "")
         pladias_col = cfg.get("pladias_col", columns[0] if columns else "")
         mykologie_img_col = cfg.get("mykologie_img_col", columns[0] if columns else "")
         mykologie_img_max = cfg.get("mykologie_img_max", 3)
@@ -2489,12 +2786,16 @@ if st.session_state.df is not None:
             new_df["[Zeměpis] Rozloha"] = ""
             new_df["[Zeměpis] Vlajka (URL)"] = ""
             
+        if enable_pladias_photos:
+            new_df["[Pladias] Fotky"] = ""
+        if enable_pladias_map:
+            new_df["[Pladias] Mapa rozšíření"] = ""
+        if enable_pladias:
+            new_df["[Pladias] Odkaz"] = ""
         if enable_gbif_kvet:
             new_df["[GBIF] Květ"] = ""
         if enable_gbif_list:
             new_df["[GBIF] List"] = ""
-        if enable_pladias:
-            new_df["[Pladias] Odkaz"] = ""
         if enable_mykologie_img:
             new_df["[Mykologie.net] Fotky"] = ""
         if enable_mykologie_desc:
@@ -2618,6 +2919,27 @@ if st.session_state.df is not None:
                     new_df.at[idx, "[Slovník] Příkladová věta"] = dict_data.get('example', '')
                 except Exception:
                     unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(dict_col, "")), 'Modul': 'Slovník (Chyba)'})
+
+            # Pladias fotky
+            if enable_pladias_photos:
+                try:
+                    raw_sp = str(row[pladias_photos_col]).strip()
+                    p_photos = fetch_pladias_photos(raw_sp, max_photos=pladias_photos_max)
+                    if not p_photos:
+                        unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'Pladias Fotky'})
+                    new_df.at[idx, "[Pladias] Fotky"] = ";".join(p_photos)
+                except Exception:
+                    unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(pladias_photos_col, "")), 'Modul': 'Pladias Fotky (Chyba)'})
+
+            # Pladias mapa rozšíření
+            if enable_pladias_map:
+                try:
+                    raw_sp = str(row[pladias_map_col]).strip()
+                    sp_clean = re.sub(r'\s*\(.*\)\s*', '', raw_sp).strip()
+                    sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp_clean).strip()
+                    new_df.at[idx, "[Pladias] Mapa rozšíření"] = f"https://pladias.cz/taxon/distribution/{urllib.parse.quote(sp_clean)}"
+                except Exception:
+                    unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(pladias_map_col, "")), 'Modul': 'Pladias Mapa (Chyba)'})
 
             # Pladias odkaz
             if enable_pladias:
@@ -3038,6 +3360,47 @@ if st.session_state.df is not None:
             tag_match_val = st.text_input("Hodnota ve sloupci pro označení (např. 1, u, ucitel):", value="1")
         with col_t3:
             tag_name_input = st.text_input("Název štítku v Anki (tag):", value="ucitele")
+
+    # Popis balíčku a citace zdrojů (Pladias / Mykologie.net / obecné)
+    active_cols_for_desc = list(dict.fromkeys(st.session_state.front_cols_ordered + st.session_state.back_cols_ordered))
+    has_pladias = any("[Pladias]" in str(c) for c in active_cols_for_desc)
+    has_myko = any("[Mykologie.net]" in str(c) for c in active_cols_for_desc)
+    has_attribution = has_pladias or has_myko
+    default_attribution_desc = build_deck_attribution(active_cols_for_desc) if has_attribution else ""
+    
+    deck_custom_desc = st.text_area(
+        "Vlastní popis balíčku (zobrazí se v Anki pod názvem balíčku):",
+        placeholder="Např.: Poznávačka rostlin České republiky: základní pensum druhů pro studenty...\nAutoři: ...",
+        help="Text se zobrazí na úvodní obrazovce balíčku v Anki. Můžete sem uvést název předmětu, autory, účel balíčku atd.",
+        height=95,
+        key="w_deck_custom_desc"
+    )
+    
+    auto_attach_citations = True
+    if has_attribution:
+        auto_attach_citations = st.checkbox(
+            "Automaticky připojit oficiální citace a licence zdrojů (Pladias / Mykologie.net)",
+            value=True,
+            key="w_auto_attach_citations"
+        )
+        if has_pladias and has_myko:
+            st.caption("ℹ️ *Do popisu balíčku budou automaticky připojeny oficiální citace databází Pladias a Mykologie.net.*")
+        elif has_pladias:
+            st.caption("ℹ️ *Do popisu balíčku bude automaticky připojena oficiální citace databáze Pladias splňující licenční požadavky (Chytrý et al. 2021, Wild et al. 2019).*")
+        elif has_myko:
+            st.caption("ℹ️ *Do popisu balíčku bude automaticky připojeno uvedení zdroje fotografií a textů z portálu Mykologie.net.*")
+
+    # Sestavení finálního popisu balíčku
+    full_desc_parts = []
+    if deck_custom_desc and deck_custom_desc.strip():
+        full_desc_parts.append(deck_custom_desc.strip())
+    if auto_attach_citations and default_attribution_desc:
+        full_desc_parts.append(default_attribution_desc)
+    deck_desc_input = "\n\n".join(full_desc_parts)
+
+    if deck_desc_input.strip():
+        with st.expander("🔍 Náhled kompletního popisu balíčku pro Anki", expanded=False):
+            st.markdown(format_deck_description(deck_desc_input), unsafe_allow_html=True)
     
     if st.button("Generovat balíček (.apkg)"):
         st.session_state.api_errors = []
@@ -3091,6 +3454,14 @@ if st.session_state.df is not None:
                             safe_filename = f"xc_{idx}_{s_idx}_{safe_sp}_{stype}.mp3"
                             media_tasks[safe_filename] = (sound_url, 'audio')
                             
+                    # Pladias mapa rozšíření
+                    elif col == "[Pladias] Mapa rozšíření":
+                        species_col = st.session_state.api_config.get("pladias_map_col", columns[0])
+                        raw_species = str(row[species_col]).strip() if species_col in row else str(val).strip()
+                        clean_species = slugify_species_name(raw_species) if raw_species else f"druh_{idx}"
+                        safe_filename = f"{clean_species}_pladias_map_{idx}.jpg"
+                        media_tasks[safe_filename] = (raw_species, 'pladias_map')
+
                     # Speciální GBIF orgánové sloupce
                     elif col in ["[GBIF] Habitus", "[GBIF] Květ", "[GBIF] List", "[GBIF] Plod", "[GBIF] Herbář"] and is_image_col(col, val):
                         urls = [u.strip() for u in str(val).split(';') if u.strip()]
@@ -3150,6 +3521,10 @@ if st.session_state.df is not None:
                     if os.path.exists(local_path) and os.path.getsize(local_path) > 0:
                         return fname, local_path, True
                     try:
+                        if mtype == 'pladias_map':
+                            if render_pladias_distribution_map(url, local_path):
+                                return fname, local_path, True
+                            return fname, local_path, False
                         r_resp = requests.get(
                             url, 
                             headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}, 
@@ -3258,6 +3633,23 @@ if st.session_state.df is not None:
                                 )
                         continue
                         
+                    # Pladias mapa rozšíření
+                    if col == "[Pladias] Mapa rozšíření":
+                        species_col = st.session_state.api_config.get("pladias_map_col", columns[0])
+                        raw_species = str(row_data[species_col]).strip() if species_col in row_data else str(val).strip()
+                        clean_species = slugify_species_name(raw_species) if raw_species else f"druh_{row_idx}"
+                        safe_filename = f"{clean_species}_pladias_map_{row_idx}.jpg"
+                        local_path = os.path.join(media_dir, safe_filename)
+                        if os.path.exists(local_path):
+                            img_tag = f'<div class="photo-container"><img src="{safe_filename}"></div>'
+                            html_parts.append(
+                                f'<div class="card-field field-{slugify(col)}">'
+                                f'{label_html}'
+                                f'<div class="photo-list">{img_tag}</div>'
+                                f'</div>'
+                            )
+                        continue
+
                     # Speciální GBIF obrázkové sloupce
                     is_gbif_photo = col in ["[GBIF] Habitus", "[GBIF] Květ", "[GBIF] List", "[GBIF] Plod", "[GBIF] Herbář"]
                     if is_gbif_photo and is_image_col(col, val):
@@ -3421,9 +3813,10 @@ if st.session_state.df is not None:
             )
             
             # Vytvoření balíčků (včetně podbalíčků)
+            formatted_deck_desc = format_deck_description(deck_desc_input)
             decks = {}
             parent_deck_id = get_stable_id(deck_name_input)
-            parent_deck = genanki.Deck(parent_deck_id, deck_name_input)
+            parent_deck = genanki.Deck(parent_deck_id, deck_name_input, description=formatted_deck_desc)
             decks[deck_name_input] = parent_deck
             
             for note_data in processed_notes:
@@ -3445,7 +3838,7 @@ if st.session_state.df is not None:
                     
                 if target_deck_name not in decks:
                     sub_deck_id = get_stable_id(target_deck_name)
-                    decks[target_deck_name] = genanki.Deck(sub_deck_id, target_deck_name)
+                    decks[target_deck_name] = genanki.Deck(sub_deck_id, target_deck_name, description=formatted_deck_desc)
                     
                 decks[target_deck_name].add_note(note)
                 
@@ -3514,4 +3907,39 @@ if st.session_state.df is not None:
             with st.expander("Log chyb stahování"):
                 for err in st.session_state.api_errors:
                     st.error(err)
+
+    # --- DOPLŇKOVÉ NÁSTROJE & POMOCNÍCI ---
+    st.markdown("---")
+    with st.expander("🛠️ Doplňkové nástroje: Batch Replacer (HTML aplikace)", expanded=False):
+        st.markdown("""
+        **Batch Replacer** je rychlý offline nástroj v HTML/JS pro přípravu a čištění tabulkových dat:
+        - **1. Hromadné nahrazování:** Zpracování textů podle tabulky pravidel (Najít → Nahradit).
+        - **2. Chytré párování:** Párování chyb a synonym s referenčním seznamem (Fuzzy / Levenshtein shoda s procentem jistoty).
+        - **3. Dvousloupcová kontrola:** Rychlé porovnání dvou tabulek a odhalení chybějících položek.
+        - **4. Generátor pravidel:** Automatické vytvoření pravidel ze dvou sloupců.
+        """)
+        
+        batch_replacer_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "BatchReplacer.html")
+        batch_replacer_html = None
+        if os.path.exists(batch_replacer_path):
+            try:
+                with open(batch_replacer_path, "r", encoding="utf-8") as f:
+                    batch_replacer_html = f.read()
+            except Exception:
+                pass
+                
+        if batch_replacer_html:
+            col_br1, col_br2 = st.columns([1, 2])
+            with col_br1:
+                st.download_button(
+                    label="📥 Stáhnout Batch Replacer (.html)",
+                    data=batch_replacer_html,
+                    file_name="BatchReplacer.html",
+                    mime="text/html",
+                    help="Stáhne samostatný HTML soubor, který můžete kdykoliv otevřít dvojklikem v prohlížeči doma i bez internetu.",
+                    key="download_batch_replacer_btn"
+                )
+            with col_br2:
+                st.caption("💡 *Soubor je kompletně soběstačný (Single-file HTML). Po stažení jej stačí otevřít v libovolném prohlížeči (Chrome, Firefox, Edge).*")
+
 
