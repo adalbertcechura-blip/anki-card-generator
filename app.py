@@ -1,6 +1,48 @@
+def register_pdf_fonts():
+
+    import os
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from reportlab.pdfbase.pdfmetrics import registerFontFamily
+
+    font_candidates = [
+        ("C:/Windows/Fonts/arial.ttf", "C:/Windows/Fonts/arialbd.ttf", "C:/Windows/Fonts/ariali.ttf"),
+        ("C:/Windows/Fonts/calibri.ttf", "C:/Windows/Fonts/calibrib.ttf", "C:/Windows/Fonts/calibrii.ttf"),
+        ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/segoeuib.ttf", "C:/Windows/Fonts/segoeuii.ttf"),
+        ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf"),
+        ("/usr/share/fonts/truetype/freefont/FreeSans.ttf", "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf", "/usr/share/fonts/truetype/freefont/FreeSansOblique.ttf"),
+    ]
+    fn_normal, fn_bold, fn_italic = "Helvetica", "Helvetica-Bold", "Helvetica-Oblique"
+    for norm_path, bold_path, ital_path in font_candidates:
+        if os.path.exists(norm_path):
+            try:
+                pdfmetrics.registerFont(TTFont("CustomSans", norm_path))
+                fn_normal = "CustomSans"
+                if os.path.exists(bold_path):
+                    pdfmetrics.registerFont(TTFont("CustomSans-Bold", bold_path))
+                    fn_bold = "CustomSans-Bold"
+                else:
+                    fn_bold = fn_normal
+                if os.path.exists(ital_path):
+                    pdfmetrics.registerFont(TTFont("CustomSans-Italic", ital_path))
+                    fn_italic = "CustomSans-Italic"
+                else:
+                    fn_italic = fn_normal
+
+                registerFontFamily(
+                    "CustomSans",
+                    normal="CustomSans",
+                    bold=fn_bold,
+                    italic=fn_italic,
+                    boldItalic=fn_bold
+                )
+                break
+            except Exception:
+                pass
+    return fn_normal, fn_bold, fn_italic
 
 def generate_citations_pdf():
-    """Vygeneruje PDF dokument s citacemi vědeckých databází a otevřených zdrojů."""
+
     from reportlab.lib.pagesizes import A4
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -12,11 +54,14 @@ def generate_citations_pdf():
         buffer, pagesize=A4,
         rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36
     )
+    fn_normal, fn_bold, fn_italic = register_pdf_fonts()
     styles = getSampleStyleSheet()
+    styles['Normal'].fontName = fn_normal
+
     title_style = ParagraphStyle(
         'CitTitle',
         parent=styles['Heading1'],
-        fontName='Helvetica-Bold',
+        fontName=fn_bold,
         fontSize=18,
         leading=22,
         textColor=colors.HexColor('#1b4332'),
@@ -25,7 +70,7 @@ def generate_citations_pdf():
     subtitle_style = ParagraphStyle(
         'CitSubtitle',
         parent=styles['Normal'],
-        fontName='Helvetica',
+        fontName=fn_italic,
         fontSize=10,
         leading=14,
         textColor=colors.HexColor('#555555'),
@@ -34,7 +79,7 @@ def generate_citations_pdf():
     head_style = ParagraphStyle(
         'CitItemHead',
         parent=styles['Heading3'],
-        fontName='Helvetica-Bold',
+        fontName=fn_bold,
         fontSize=11,
         leading=15,
         textColor=colors.HexColor('#2d6a4f'),
@@ -44,7 +89,7 @@ def generate_citations_pdf():
     body_style = ParagraphStyle(
         'CitItemBody',
         parent=styles['Normal'],
-        fontName='Helvetica',
+        fontName=fn_normal,
         fontSize=9,
         leading=13,
         textColor=colors.HexColor('#222222'),
@@ -94,7 +139,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 def render_category_select_all_checkbox(cat_id, cat_keys, label="Vybrat vše v této kategorii"):
-    """Vykreslí přepínací checkbox 'Vybrat vše v této kategorii' pro danou sadu klíčů modulů."""
+
     all_checked = all(st.session_state.api_config.get(k, False) for k in cat_keys) if cat_keys else False
     chk_key = f"chk_cat_{cat_id}"
     if chk_key not in st.session_state or st.session_state.get(f"_prev_all_{cat_id}") != all_checked:
@@ -111,7 +156,22 @@ def render_category_select_all_checkbox(cat_id, cat_keys, label="Vybrat vše v t
 
 import pandas as pd
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+_session = requests.Session()
+_adapter = HTTPAdapter(
+    pool_connections=50,
+    pool_maxsize=100,
+    max_retries=Retry(total=2, backoff_factor=0.3, status_forcelist=[500, 502, 503, 504])
+)
+_session.mount("https://", _adapter)
+_session.mount("http://", _adapter)
+requests.get = _session.get
+requests.head = _session.head
+import functools
 import os
+
 import re
 import urllib.parse
 import unicodedata
@@ -143,17 +203,15 @@ from reportlab.pdfgen import canvas
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
-
-# --- NAČTENÍ GLOBÁLNÍ KONFIGURACE (API klíče pro správce) ---
 def _load_global_config() -> dict:
-    """
-    Načte sdílenou konfiguraci z bezpečných zdrojů:
-    1. Streamlit Secrets (při běhu na Streamlit Cloud: st.secrets["XC_API_KEY"] nebo .streamlit/secrets.toml)
-    2. Proměnné prostředí (XC_API_KEY, ...)
-    3. Lokální soubor config.json (který je v .gitignore a nenahrává se na GitHub)
-    """
+\
+\
+\
+\
+\
+
     cfg = {}
-    # 1. Soubor config.json (lokální vývoj)
+
     config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
     if os.path.isfile(config_path):
         try:
@@ -163,10 +221,10 @@ def _load_global_config() -> dict:
                     cfg["xc_api_key"] = str(d["xc_api_key"]).strip()
         except Exception:
             pass
-    # 2. Proměnné prostředí
+
     if os.environ.get("XC_API_KEY"):
         cfg["xc_api_key"] = str(os.environ["XC_API_KEY"]).strip()
-    # 3. Streamlit Secrets (Streamlit Cloud dashboard nebo .streamlit/secrets.toml)
+
     try:
         if "XC_API_KEY" in st.secrets and st.secrets["XC_API_KEY"]:
             cfg["xc_api_key"] = str(st.secrets["XC_API_KEY"]).strip()
@@ -177,8 +235,6 @@ def _load_global_config() -> dict:
     return cfg
 
 GLOBAL_CONFIG = _load_global_config()
-
-# --- DYNAMICKÉ CSS PRO ANKI KARTY ---
 
 def get_anki_css(theme_name):
     base_css = """
@@ -327,196 +383,195 @@ code#typeans {
     if theme_name == "Světlý režim (vždy světlé)" or theme_name == "Světlý režim":
         color_css = type_ans_css + """
 .card {
-  color: #1e2923;
-  background-color: #f7faf8;
-  border: 1px solid #dce8e0;
+  color: #1f2937;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
 }
 .field-label {
-  color: #4d735d;
-  border-bottom: 1px solid #e1ece5;
+  color: #6b7280;
+  border-bottom: 1px solid #e5e7eb;
 }
 .field-value {
-  color: #1e2923;
+  color: #1f2937;
 }
 .photo-container {
-  border: 1px solid #d0e0d6;
+  border: 1px solid #e5e7eb;
 }
 .photo-caption {
-  color: #5c7566;
+  color: #6b7280;
   background: rgba(0, 0, 0, 0.035);
-  border-top: 1px solid #dce8e0;
+  border-top: 1px solid #e5e7eb;
 }
 .audio-caption {
-  color: #5c7566;
+  color: #6b7280;
 }
 .no-photo-placeholder {
-  border-color: #cbdad1;
-  color: #5c826c;
+  border-color: #d1d5db;
+  color: #6b7280;
 }
 .card-divider {
-  background: #dce8e0;
+  background: #e5e7eb;
 }
 """
     elif theme_name == "Tmavý režim (vždy tmavé)" or theme_name == "Tmavý režim":
         color_css = type_ans_css + """
 .card {
-  color: #e5ede8;
-  background-color: #121c16;
-  border: 1px solid #23362b;
+  color: #f4f4f5;
+  background-color: #2f2f31;
+  border: 1px solid #3f3f46;
 }
 input#typeans {
-  background-color: #19271e !important;
-  color: #f4faf6 !important;
-  border-color: #389c62 !important;
+  background-color: #202124 !important;
+  color: #ffffff !important;
+  border-color: #52525b !important;
 }
 code#typeans {
   background: rgba(255, 255, 255, 0.1) !important;
-  color: #f4faf6 !important;
+  color: #ffffff !important;
 }
 .field-label {
-  color: #8da897;
-  border-bottom: 1px solid #23362b;
+  color: #a1a1aa;
+  border-bottom: 1px solid #3f3f46;
 }
 .field-value {
-  color: #e5ede8;
+  color: #f4f4f5;
 }
 .photo-container {
-  border: 1px solid #2a4234;
+  border: 1px solid #3f3f46;
 }
 .photo-caption {
-  color: #8da897;
+  color: #a1a1aa;
   background: rgba(255, 255, 255, 0.05);
-  border-top: 1px solid #23362b;
+  border-top: 1px solid #3f3f46;
 }
 .audio-caption {
-  color: #8da897;
+  color: #a1a1aa;
 }
 .no-photo-placeholder {
-  border-color: #23362b;
-  color: #8da897;
+  border-color: #3f3f46;
+  color: #a1a1aa;
 }
 .card-divider {
-  background: #23362b;
+  background: #3f3f46;
 }
 """
-    else:  # Obojetné (automaticky přepínatelné - světle / tmavě v Anki)
+    else:
         color_css = type_ans_css + """
 .card {
-  color: #1e2923;
-  background-color: #f7faf8;
-  border: 1px solid #dce8e0;
+  color: #1f2937;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
 }
 .field-label {
-  color: #4d735d;
-  border-bottom: 1px solid #e1ece5;
+  color: #6b7280;
+  border-bottom: 1px solid #e5e7eb;
 }
 .field-value {
-  color: #1e2923;
+  color: #1f2937;
 }
 .photo-container {
-  border: 1px solid #d0e0d6;
+  border: 1px solid #e5e7eb;
 }
 .photo-caption {
-  color: #5c7566;
+  color: #6b7280;
   background: rgba(0, 0, 0, 0.035);
-  border-top: 1px solid #dce8e0;
+  border-top: 1px solid #e5e7eb;
 }
 .audio-caption {
-  color: #5c7566;
+  color: #6b7280;
 }
 .no-photo-placeholder {
-  border-color: #cbdad1;
-  color: #5c826c;
+  border-color: #d1d5db;
+  color: #6b7280;
 }
 .card-divider {
-  background: #dce8e0;
+  background: #e5e7eb;
 }
 
-/* Plná podpora nočního režimu Anki (moderní .night_mode i starší .nightMode, mobilní i desktopová) */
+/* Plná podpora standardního tmavého režimu Anki (.night_mode i .nightMode) */
 .night_mode.card, .nightMode.card, .night_mode .card, .nightMode .card, body.night_mode .card, body.nightMode .card {
-  background-color: #121c16 !important;
-  color: #e5ede8 !important;
-  border: 1px solid #23362b !important;
+  background-color: #2f2f31 !important;
+  color: #f4f4f5 !important;
+  border: 1px solid #3f3f46 !important;
 }
 .night_mode input#typeans, .nightMode input#typeans, body.night_mode input#typeans, body.nightMode input#typeans {
-  background-color: #19271e !important;
-  color: #f4faf6 !important;
-  border-color: #389c62 !important;
+  background-color: #202124 !important;
+  color: #ffffff !important;
+  border-color: #52525b !important;
 }
 .night_mode code#typeans, .nightMode code#typeans, body.night_mode code#typeans, body.nightMode code#typeans {
   background: rgba(255, 255, 255, 0.1) !important;
-  color: #f4faf6 !important;
+  color: #ffffff !important;
 }
 .night_mode .field-label, .nightMode .field-label, body.night_mode .field-label, body.nightMode .field-label {
-  color: #8da897 !important;
-  border-color: #23362b !important;
+  color: #a1a1aa !important;
+  border-color: #3f3f46 !important;
 }
 .night_mode .field-value, .nightMode .field-value, body.night_mode .field-value, body.nightMode .field-value {
-  color: #e5ede8 !important;
+  color: #f4f4f5 !important;
 }
 .night_mode .photo-container, .nightMode .photo-container, body.night_mode .photo-container, body.nightMode .photo-container {
-  border-color: #2a4234 !important;
+  border-color: #3f3f46 !important;
 }
 .night_mode .photo-caption, .nightMode .photo-caption, body.night_mode .photo-caption, body.nightMode .photo-caption {
-  color: #8da897 !important;
+  color: #a1a1aa !important;
   background: rgba(255, 255, 255, 0.05) !important;
-  border-top: 1px solid #23362b !important;
+  border-top: 1px solid #3f3f46 !important;
 }
 .night_mode .audio-caption, .nightMode .audio-caption, body.night_mode .audio-caption, body.nightMode .audio-caption {
-  color: #8da897 !important;
+  color: #a1a1aa !important;
 }
 .night_mode .no-photo-placeholder, .nightMode .no-photo-placeholder, body.night_mode .no-photo-placeholder, body.nightMode .no-photo-placeholder {
-  border-color: #23362b !important;
-  color: #8da897 !important;
+  border-color: #3f3f46 !important;
+  color: #a1a1aa !important;
 }
 .night_mode .card-divider, .nightMode .card-divider, body.night_mode .card-divider, body.nightMode .card-divider {
-  background: #23362b !important;
+  background: #3f3f46 !important;
 }
 
 @media (prefers-color-scheme: dark) {
   .card {
-    background-color: #121c16 !important;
-    color: #e5ede8 !important;
-    border: 1px solid #23362b !important;
+    background-color: #2f2f31 !important;
+    color: #f4f4f5 !important;
+    border: 1px solid #3f3f46 !important;
   }
   input#typeans {
-    background-color: #19271e !important;
-    color: #f4faf6 !important;
-    border-color: #389c62 !important;
+    background-color: #202124 !important;
+    color: #ffffff !important;
+    border-color: #52525b !important;
   }
   code#typeans {
     background: rgba(255, 255, 255, 0.1) !important;
-    color: #f4faf6 !important;
+    color: #ffffff !important;
   }
   .field-label {
-    color: #8da897 !important;
-    border-color: #23362b !important;
+    color: #a1a1aa !important;
+    border-color: #3f3f46 !important;
   }
   .field-value {
-    color: #e5ede8 !important;
+    color: #f4f4f5 !important;
   }
   .photo-container {
-    border-color: #2a4234 !important;
+    border-color: #3f3f46 !important;
   }
   .photo-caption {
-    color: #8da897 !important;
+    color: #a1a1aa !important;
     background: rgba(255, 255, 255, 0.05) !important;
-    border-top: 1px solid #23362b !important;
+    border-top: 1px solid #3f3f46 !important;
   }
   .audio-caption {
-    color: #8da897 !important;
+    color: #a1a1aa !important;
   }
   .no-photo-placeholder {
-    border-color: #23362b !important;
-    color: #8da897 !important;
+    border-color: #3f3f46 !important;
+    color: #a1a1aa !important;
   }
   .card-divider {
-    background: #23362b !important;
+    background: #3f3f46 !important;
   }
 }
 """
     return base_css + color_css
-
 
 ANKI_QFMT = """
 <div class="card">
@@ -532,13 +587,11 @@ ANKI_AFMT = """
 </div>
 """
 
-# --- POMOCNÉ FUNKCE ---
-
 def check_image_quality(file_path):
-    """
-    Ověří pouze existenci a neprázdnost staženého souboru.
-    Odstraňuje přísné filtry na ostrost a rozlišení, aby se předešlo chybnému vyřazení snímků.
-    """
+\
+\
+\
+
     try:
         import os
         return os.path.exists(file_path) and os.path.getsize(file_path) > 0
@@ -546,10 +599,10 @@ def check_image_quality(file_path):
         return False
 
 def save_optimized_image(img_bytes: bytes, target_path: str, max_dim: int = 800, quality: int = 80) -> bool:
-    """
-    Uloží obrázek a automaticky jej zmenší/zkomprimuje pro Anki kartičky a PDF brožury.
-    Ověří integritu dat v PIL a nikdy nezapisuje neplatné/HTML/poškozené soubory na disk.
-    """
+\
+\
+\
+
     if not img_bytes or len(img_bytes) < 32:
         return False
     try:
@@ -562,13 +615,11 @@ def save_optimized_image(img_bytes: bytes, target_path: str, max_dim: int = 800,
                 return False
             if max_dim and (w > max_dim or h > max_dim):
                 img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
-            
-            # Pokud je PNG s průhledností a ukládáme .png
+
             if target_path.lower().endswith('.png') and img.mode in ('RGBA', 'LA'):
                 img.save(target_path, format='PNG', optimize=True)
                 return os.path.exists(target_path) and os.path.getsize(target_path) > 0
-            
-            # Jinak standardní bezpečný RGB JPEG (100% kompatibilní s ReportLab a Anki)
+
             img = img.convert('RGB')
             img.save(target_path, format='JPEG', quality=quality, optimize=True)
             return os.path.exists(target_path) and os.path.getsize(target_path) > 0
@@ -576,7 +627,7 @@ def save_optimized_image(img_bytes: bytes, target_path: str, max_dim: int = 800,
         return False
 
 def detect_audio_extension(content: bytes, default_ext: str = ".mp3") -> str:
-    """Detekuje správnou příponu audio souboru na základě hlavičky (magic bytes)."""
+
     if not content:
         return default_ext
     if content.startswith(b'RIFF') and b'WAVE' in content[:16]:
@@ -592,24 +643,24 @@ def detect_audio_extension(content: bytes, default_ext: str = ".mp3") -> str:
     return default_ext
 
 def slugify(value):
-    """Vytvoří bezpečný název pro soubor."""
+
     value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore').decode('ascii')
     value = re.sub(r'[^\w\s-]', '', value).strip().lower()
     return re.sub(r'[-\s]+', '_', value)
 
 def get_stable_id(name):
-    """Vygeneruje stabilní 32bitové celé číslo na základě textu."""
+
     return int(hashlib.md5(name.encode('utf-8')).hexdigest()[:8], 16)
 
 def clean_html(text):
-    """Odstraní nepovolené HTML tagy, ale ponechá základní formátování."""
+
     if not text:
         return ""
     text = re.sub(r'</?(?!b|i|u|em|strong|p|br|div|span)[a-zA-Z0-9]+[^>]*>', '', text)
     return text.strip()
 
 def get_value_css(col):
-    """Vrátí inline CSS styl pro hodnotu sloupce na základě nastavení."""
+
     styles = []
     if 'col_styles' in st.session_state and col in st.session_state.col_styles:
         style = st.session_state.col_styles[col]
@@ -629,56 +680,51 @@ def get_value_css(col):
     return "; ".join(styles)
 
 def sync_ordered_cols(selected_cols, state_key):
-    """Synchronizuje vybrané sloupce s uspořádaným seznamem v session_state."""
+
     if state_key not in st.session_state:
         st.session_state[state_key] = []
     current_ordered = st.session_state[state_key]
-    # Ponechat pouze ty, které jsou stále vybrané
+
     new_ordered = [c for c in current_ordered if c in selected_cols]
-    # Přidat ty, které jsou vybrané, ale ještě nejsou v seznamu
+
     for c in selected_cols:
         if c not in new_ordered:
             new_ordered.append(c)
     st.session_state[state_key] = new_ordered
 
 def get_smart_column_default(cols, cfg_dict, cfg_key, preferred_keywords, fallback_idx=0):
-    """Najde nejvhodnější výchozí sloupec na základě klíčových slov."""
+
     if not cols:
         return 0
     val = cfg_dict.get(cfg_key)
     if val and val in cols:
         return cols.index(val)
-    # 1. Hledání podle preferovaných klíčových slov
+
     for kw in preferred_keywords:
         for idx, c in enumerate(cols):
             if kw.lower() in c.lower():
                 return idx
-    # 2. Hledání sloupce, který není "Vědecké jméno" a nezačíná na "["
+
     for idx, c in enumerate(cols):
         c_low = c.lower()
         if not c.startswith("[") and "vědecké jméno" not in c_low and "scientific" not in c_low:
             return idx
     return fallback_idx if fallback_idx < len(cols) else 0
 
-# --- DATUM PARSER PRO ON THIS DAY ---
-
 def parse_date(date_str):
-    """Rozparsuje datum v různých formátech na (měsíc, den)."""
+
     if not date_str or pd.isna(date_str):
         return None, None
     date_str = str(date_str).strip().lower()
-    
-    # Formát: MM/DD nebo M/D
+
     match1 = re.match(r'^(\d{1,2})/(\d{1,2})$', date_str)
     if match1:
         return int(match1.group(1)), int(match1.group(2))
-        
-    # Formát: DD.MM. nebo D.M.
+
     match2 = re.match(r'^(\d{1,2})\.\s*(\d{1,2})\.?$', date_str)
     if match2:
         return int(match2.group(2)), int(match2.group(1))
-        
-    # České měsíce
+
     cz_months = {
         'leden': 1, 'ledna': 1,
         'unor': 2, 'unora': 2, 'únor': 2, 'února': 2,
@@ -693,50 +739,45 @@ def parse_date(date_str):
         'listopad': 11, 'listopadu': 11,
         'prosinec': 12, 'prosince': 12
     }
-    
+
     match3 = re.match(r'^(\d{1,2})\.\s*([a-zžáíěuořčšý]+)$', date_str)
     if match3:
         day = int(match3.group(1))
         month_name = match3.group(2)
-        # Odstraníme diakritiku pro bezpečné porovnání
+
         month_clean = unicodedata.normalize('NFKD', month_name).encode('ascii', 'ignore').decode('ascii')
         for k, v in cz_months.items():
             k_clean = unicodedata.normalize('NFKD', k).encode('ascii', 'ignore').decode('ascii')
             if month_clean == k_clean:
                 return v, day
-            
-    # Anglické měsíce
+
     en_months = {
         'january': 1, 'jan': 1, 'february': 2, 'feb': 2, 'march': 3, 'mar': 3,
         'april': 4, 'apr': 4, 'may': 5, 'june': 6, 'jun': 6, 'july': 7, 'jul': 7,
         'august': 8, 'aug': 8, 'september': 9, 'sep': 9, 'october': 10, 'oct': 10,
         'november': 11, 'nov': 11, 'december': 12, 'dec': 12
     }
-    
-    # June 26
+
     match4 = re.match(r'^([a-z]+)\s*(\d{1,2})$', date_str)
     if match4:
         month_name = match4.group(1)
         day = int(match4.group(2))
         if month_name in en_months:
             return en_months[month_name], day
-            
-    # 26 June
+
     match5 = re.match(r'^(\d{1,2})\s*([a-z]+)$', date_str)
     if match5:
         day = int(match5.group(1))
         month_name = match5.group(2)
         if month_name in en_months:
             return en_months[month_name], day
-            
-    return None, None
 
-# --- ENHANCER API FUNKCE & LICENČNÍ FILTRY ---
+    return None, None
 
 VALID_CC_CODES = {'cc0', 'cc-by', 'cc-by-nc', 'cc-by-sa', 'cc-by-nc-sa', 'cc-by-nd', 'cc-by-nc-nd', 'public-domain', 'pdm'}
 
 def is_cc_license(license_str: str) -> bool:
-    """Ověří, zda řetězec licence odpovídá otevřené Creative Commons / Public Domain licenci."""
+
     if not license_str:
         return True
     ls = str(license_str).lower()
@@ -745,7 +786,7 @@ def is_cc_license(license_str: str) -> bool:
     return any(k in ls for k in ["creative", "cc0", "cc_", "cc-", "publicdomain", "pdm", "by", "zero", "open", "gnu"])
 
 def _format_inat_attribution(photo_obj: dict) -> str:
-    """Zformátuje autora a licenci pro fotografii z iNaturalist."""
+
     attr = str(photo_obj.get('attribution') or "").strip()
     lic = str(photo_obj.get('license_code') or "").upper()
     if attr:
@@ -760,7 +801,7 @@ def _format_inat_attribution(photo_obj: dict) -> str:
     return "iNaturalist (CC)"
 
 def extract_gbif_attribution(media_obj: dict, occ_obj: dict = None) -> str:
-    """Extrahuje a naformátuje autora a Creative Commons licenci pro GBIF média."""
+
     lic_raw = str(media_obj.get("license", "")).strip()
     lic_name = "CC BY"
     if "zero" in lic_raw.lower() or "cc0" in lic_raw.lower() or "publicdomain" in lic_raw.lower():
@@ -788,7 +829,6 @@ def extract_gbif_attribution(media_obj: dict, occ_obj: dict = None) -> str:
     author = str(author).strip()
     return f"© {author} ({lic_name} via GBIF)"
 
-# 1. iNaturalist botanický modul
 def fetch_inaturalist_data(species_name, max_photos=4):
     headers = {'User-Agent': 'AnkiSpeciesGenerator/1.0 (contact: adalb@example.com)'}
     res_data = {
@@ -796,10 +836,10 @@ def fetch_inaturalist_data(species_name, max_photos=4):
         'photo_urls': [],
         'source': 'Nenalezeno'
     }
-    
+
     encoded_name = urllib.parse.quote(species_name)
     search_url = f"https://api.inaturalist.org/v1/taxa?q={encoded_name}&locale=cs"
-    
+
     taxon_id = None
     try:
         r_inat = requests.get(search_url, timeout=5)
@@ -830,7 +870,6 @@ def fetch_inaturalist_data(species_name, max_photos=4):
         except Exception:
             pass
 
-    # Stažení fotek z iNaturalist s filtrem na volné Creative Commons licence
     inat_photos = []
     if taxon_id:
         detail_url = f"https://api.inaturalist.org/v1/taxa/{taxon_id}?locale=cs"
@@ -844,7 +883,7 @@ def fetch_inaturalist_data(species_name, max_photos=4):
                     for tp in taxon_photos:
                         photo_obj = tp.get('photo', {})
                         lic_code = str(photo_obj.get('license_code', '')).lower()
-                        # Filtrovat pouze položky s povolenou licencí (vyloučit None / all-rights-reserved)
+
                         if lic_code and lic_code in VALID_CC_CODES:
                             photo_url = photo_obj.get('medium_url') or photo_obj.get('small_url') or photo_obj.get('url')
                             if photo_url:
@@ -854,7 +893,7 @@ def fetch_inaturalist_data(species_name, max_photos=4):
                                 entry = f"{photo_url}|{attr_text}"
                                 if not any(p.split('|')[0] == photo_url for p in inat_photos):
                                     inat_photos.append(entry)
-                                    
+
                     if len(inat_photos) < max_photos:
                         obs_url = f"https://api.inaturalist.org/v1/observations?taxon_id={taxon_id}&photos=true&license=cc0,cc-by,cc-by-nc,cc-by-sa,cc-by-nc-sa,cc-by-nd,cc-by-nc-nd&per_page=15"
                         r_obs = requests.get(obs_url, timeout=5)
@@ -895,25 +934,24 @@ def fetch_inaturalist_data(species_name, max_photos=4):
                         break
             except Exception:
                 pass
-                
+
     return res_data
 
+@functools.lru_cache(maxsize=4096)
+def _cached_wiki_description(species_name: str) -> str:
+\
+\
+\
+\
 
-def fetch_wiki_description(species_name):
-    """
-    Stáhne vědecký anglický popis druhu z Wikipedie.
-    Funguje pro rostliny i živočichy – hledá sekce popis, morfologie,
-    habitat, distribuce, ekologie, chování, výskyt aj.
-    """
     headers = {'User-Agent': 'AnkiSpeciesGenerator/1.0 (contact: adalb@example.com)'}
-    
+
     if not species_name or pd.isna(species_name):
         return ""
     species_name = str(species_name).strip()
     if not species_name:
         return ""
 
-    # Klíčová slova pro sekce platné pro rostliny I živočichy
     DESC_KEYS   = {'description', 'morphology', 'appearance', 'physical', 'plumage', 'identification'}
     HABITAT_KEYS = {'habitat', 'distribution', 'ecology', 'range', 'behaviour', 'behavior', 'diet', 'feeding'}
 
@@ -933,7 +971,6 @@ def fetch_wiki_description(species_name):
             return ""
         text = page['extract']
 
-        # Rozsekat text na sekce (== Název ==)
         sections = {}
         current_section = "lead"
         current_content = []
@@ -966,7 +1003,6 @@ def fetch_wiki_description(species_name):
                 desc_html += "<br>"
             desc_html += f'<div class="scientific-section"><strong>Habitat / Ecology:</strong><br>{t.replace(chr(10), "<br>")}</div>'
 
-        # Záložní: úvodní odstavec (lead)
         if not desc_html:
             lead = sections.get('lead', '')
             if lead:
@@ -977,19 +1013,23 @@ def fetch_wiki_description(species_name):
     except Exception:
         return ""
 
-# Legacy alias
+def fetch_wiki_description(species_name):
+    if not species_name or pd.isna(species_name):
+        return ""
+    sp = str(species_name).strip()
+    if not sp:
+        return ""
+    return _cached_wiki_description(sp)
+
 def fetch_plant_description(species_name, scientific_desc=True):
     return fetch_wiki_description(species_name)
 
-
-# 2. GBIF Taxonomický modul
-
 def gbif_class_to_category(kingdom, phylum, class_):
-    """
-    Převede GBIF taxonomické hodnoty (kingdom, phylum, class) na českou
-    kategorii vhodnou pro třídění podbalíčků.
-    Vrátí prázdný řetězec pokud taxonomie chybí.
-    """
+\
+\
+\
+\
+
     k = (kingdom or "").strip()
     p = (phylum or "").strip()
     c = (class_ or "").strip()
@@ -1000,7 +1040,7 @@ def gbif_class_to_category(kingdom, phylum, class_):
         return ""
 
     if k == "Animalia":
-        # Obratlovci
+
         if cl in ("aves",):
             return "Ptáci (Aves)"
         if cl in ("mammalia",):
@@ -1011,7 +1051,7 @@ def gbif_class_to_category(kingdom, phylum, class_):
             return "Obojživelníci (Amphibia)"
         if cl in ("actinopterygii", "chondrichthyes", "cephalaspidomorphi", "myxini", "sarcopterygii"):
             return "Ryby (Pisces)"
-        # Bezobratlí
+
         if cl in ("insecta",):
             return "Hmyz (Insecta)"
         if cl in ("arachnida",):
@@ -1031,7 +1071,7 @@ def gbif_class_to_category(kingdom, phylum, class_):
         return "Živočichové – ostatní"
 
     if k == "Plantae":
-        # Cévnaté rostliny
+
         if pl in ("tracheophyta",) or cl in (
             "magnoliopsida", "liliopsida", "polypodiopsida",
             "pinopsida", "gnetopsida", "cycadopsida", "ginkgoopsida"
@@ -1045,7 +1085,7 @@ def gbif_class_to_category(kingdom, phylum, class_):
             if cl in ("pinopsida", "gnetopsida", "cycadopsida", "ginkgoopsida"):
                 return "Nahosemenné rostliny (Gymnospermae)"
             return "Cévnaté rostliny (Tracheophyta)"
-        # Mechorosty
+
         if pl in ("bryophyta",) or cl in ("bryopsida", "polytrichopsida", "tetraphidopsida"):
             return "Mechorosty – mechy (Bryophyta)"
         if pl in ("marchantiophyta",) or cl in ("marchantiopsida", "jungermanniopsida"):
@@ -1095,19 +1135,13 @@ def gbif_class_to_category(kingdom, phylum, class_):
 
     return f"Ostatní ({k})"
 
-
-def fetch_gbif_taxonomy(species_name):
+@functools.lru_cache(maxsize=4096)
+def _cached_gbif_taxonomy(species_name: str):
     res = {
-        "kingdom": "", "phylum": "", "class": "", 
-        "order": "", "family": "", "genus": "", 
+        "kingdom": "", "phylum": "", "class": "",
+        "order": "", "family": "", "genus": "",
         "source": "Nenalezeno"
     }
-    if not species_name or pd.isna(species_name):
-        return res
-    species_name = str(species_name).strip()
-    if not species_name:
-        return res
-        
     url = f"https://api.gbif.org/v1/species/match?name={urllib.parse.quote(species_name)}&strict=true"
     try:
         r = requests.get(url, timeout=5)
@@ -1125,8 +1159,24 @@ def fetch_gbif_taxonomy(species_name):
         pass
     return res
 
+def fetch_gbif_taxonomy(species_name):
+    if not species_name or pd.isna(species_name):
+        return {
+            "kingdom": "", "phylum": "", "class": "",
+            "order": "", "family": "", "genus": "",
+            "source": "Nenalezeno"
+        }
+    sp = str(species_name).strip()
+    if not sp:
+        return {
+            "kingdom": "", "phylum": "", "class": "",
+            "order": "", "family": "", "genus": "",
+            "source": "Nenalezeno"
+        }
+    return _cached_gbif_taxonomy(sp).copy()
+
 def slugify_species_name(name):
-    """Odstraní autorská označení, závorky a vytvoří bezpečný název souboru."""
+
     if not name or pd.isna(name):
         return "druh"
     name = str(name).strip()
@@ -1135,35 +1185,35 @@ def slugify_species_name(name):
     return slugify(name)
 
 def get_map_font(size=12, bold=False):
-    """Vrátí TrueType font s plnou podporou české diakritiky (Segoe UI, Arial apod.) pro mapové popisky."""
-    font_names = (
-        ["segoeuib.ttf", "arialbd.ttf", "calibrib.ttf", "DejaVuSans-Bold.ttf"]
-        if bold else
-        ["segoeui.ttf", "arial.ttf", "calibri.ttf", "DejaVuSans.ttf", "tahoma.ttf"]
-    )
-    for fn in font_names:
-        try:
-            return ImageFont.truetype(fn, size)
-        except Exception:
-            pass
+
     windir = os.environ.get("WINDIR", "C:\\Windows")
+    font_names = (
+        ["arialbd.ttf", "segoeuib.ttf", "calibrib.ttf", "DejaVuSans-Bold.ttf"]
+        if bold else
+        ["arial.ttf", "segoeui.ttf", "calibri.ttf", "DejaVuSans.ttf", "tahoma.ttf"]
+    )
     for fn in font_names:
         fp = os.path.join(windir, "Fonts", fn)
         if os.path.exists(fp):
             try:
-                return ImageFont.truetype(fp, size)
+                return ImageFont.truetype(fp, size, encoding="unic")
             except Exception:
                 pass
+    for fn in font_names:
+        try:
+            return ImageFont.truetype(fn, size, encoding="unic")
+        except Exception:
+            pass
     return ImageFont.load_default()
 
 _PLADIAS_BASE_MAP_CACHE = None
 
 def get_pladias_base_map():
-    """Načte a nacachuje v paměti podkladovou síť kvadrantů ČR z GeoServeru Pladias.cz."""
+
     global _PLADIAS_BASE_MAP_CACHE
     if _PLADIAS_BASE_MAP_CACHE is not None:
         return _PLADIAS_BASE_MAP_CACHE.copy()
-        
+
     minx, miny, maxx, maxy = 1335000, 6190000, 2105000, 6640000
     w, h = 800, 480
     wms_url = (
@@ -1182,7 +1232,7 @@ def get_pladias_base_map():
             return _PLADIAS_BASE_MAP_CACHE.copy()
     except Exception:
         pass
-    
+
     blank = Image.new("RGBA", (w, h), (245, 248, 245, 255))
     _PLADIAS_BASE_MAP_CACHE = blank
     return _PLADIAS_BASE_MAP_CACHE.copy()
@@ -1190,15 +1240,15 @@ def get_pladias_base_map():
 _TOPO_BASE_MAP_CACHE = {}
 
 def get_topographic_base_map(minx=1335000, miny=6190000, maxx=2105000, maxy=6640000, w=800, h=480, light_layer=True):
-    """
-    Načte lehkou topografickou podkladovou vrstvu (města, toky, silnice, kopce a reliéf)
-    z ArcGIS REST export služby pro zadaný BBOX a rozměry.
-    Pokud light_layer=True, podklad jemně zjemní a zesvětlí pro optimální kontrast s body výskytu.
-    """
+\
+\
+\
+\
+
     cache_key = f"{int(minx)}_{int(miny)}_{int(maxx)}_{int(maxy)}_{w}_{h}_{light_layer}"
     if cache_key in _TOPO_BASE_MAP_CACHE:
         return _TOPO_BASE_MAP_CACHE[cache_key].copy()
-    
+
     url = (
         f"https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/export?"
         f"bbox={int(minx)},{int(miny)},{int(maxx)},{int(maxy)}&bboxSR=3857&imageSR=3857&size={w},{h}&format=png&f=image"
@@ -1209,7 +1259,7 @@ def get_topographic_base_map(minx=1335000, miny=6190000, maxx=2105000, maxy=6640
         if r.status_code == 200 and len(r.content) > 3000:
             img = Image.open(io.BytesIO(r.content)).convert("RGBA")
             if light_layer:
-                # 84% topo + 16% bílá pro lehkou, vzdušnou vrstvu
+
                 white_wash = Image.new("RGBA", (w, h), (255, 255, 255, 255))
                 img = Image.blend(img, white_wash, 0.16)
             _TOPO_BASE_MAP_CACHE[cache_key] = img
@@ -1217,7 +1267,6 @@ def get_topographic_base_map(minx=1335000, miny=6190000, maxx=2105000, maxy=6640
     except Exception:
         pass
     return None
-
 
 PLADIAS_CATEGORY_MAPPING = {
     "Celá rostlina (habitus)": ("[Pladias.cz] Celá rostlina", {1}),
@@ -1232,21 +1281,21 @@ PLADIAS_CATEGORY_MAPPING = {
 }
 
 PLADIAS_PARTS_MAPPING = {
-    "celek": {1},          # Celá rostlina / habitus
+    "celek": {1},
     "cela": {1},
     "habitus": {1},
-    "kvet": {2},           # Květ / květenství
-    "plod": {3},           # Plod / semeno
+    "kvet": {2},
+    "plod": {3},
     "semen": {3},
-    "list": {4},           # List
-    "stonek": {5},         # Stonek / lodyha
+    "list": {4},
+    "stonek": {5},
     "lodyh": {5},
-    "kmen": {6},           # Kmen / borka
+    "kmen": {6},
     "bork": {6},
-    "herbar": {None, 7},   # Herbář / sken (Clo-Pla)
+    "herbar": {None, 7},
     "clopla": {None, 7},
     "sken": {None, 7},
-    "mikrofoto": {8},      # Mikrofoto / detail
+    "mikrofoto": {8},
     "detail": {8},
 }
 
@@ -1262,7 +1311,7 @@ def resolve_target_pladias_successions(parts):
     return allowed if allowed else None
 
 def fetch_pladias_species_images(species_name):
-    """Dotáže oficiální REST API Pladiasu (PostgREST: https://api.pladias.cz/prest/images) a vrátí surový seznam záznamů fotografií pro daný druh."""
+
     if not species_name or pd.isna(species_name):
         return []
     clean_sp = re.sub(r'\s*\(.*?\)\s*', ' ', str(species_name)).strip()
@@ -1322,7 +1371,7 @@ def fetch_pladias_species_images(species_name):
     return []
 
 def extract_pladias_category_photos(all_items, target_succ, max_photos=3, fallback=False):
-    """Z filtrovaných položek druhu vybere fotografie dané kategorie s URL ve vysokém rozlišení."""
+
     if not all_items:
         return []
     matched = all_items
@@ -1398,13 +1447,13 @@ MUSHROOM_COLOR_ATLAS_DATA = {
 }
 
 def fetch_mushroom_color_atlas(species_name):
-    """Zkontroluje a vrátí odkaz na profil barvířské houby na Mushroom Color Atlas."""
+
     if not species_name or pd.isna(species_name):
         return None
     sp_norm = ''.join(c for c in unicodedata.normalize('NFKD', str(species_name)) if unicodedata.category(c) != 'Mn').lower().strip()
     sp_norm = re.sub(r'\s*\(.*?\)\s*', ' ', sp_norm).strip()
     words = sp_norm.split()
-    
+
     cand = None
     if len(words) >= 2:
         two_words = f"{words[0]} {words[1]}"
@@ -1419,7 +1468,7 @@ def fetch_mushroom_color_atlas(species_name):
                 break
     if not cand:
         return None
-        
+
     slug, full_name = cand
     profile_url = f"https://mushroomcoloratlas.com/mushroom/{slug}/"
     return {
@@ -1429,7 +1478,7 @@ def fetch_mushroom_color_atlas(species_name):
     }
 
 def resolve_inat_place_id(place_type_or_name: str) -> str:
-    """Převede zvolený název území na přesné iNaturalist place_id (Česko = 8264, 14 krajů ČR, okresy, NP)."""
+
     if not place_type_or_name:
         return "8264"
     p_raw = str(place_type_or_name).strip()
@@ -1461,7 +1510,7 @@ def resolve_inat_place_id(place_type_or_name: str) -> str:
     for k, v in builtins.items():
         if k in p_lower:
             return v
-    
+
     clean_query = re.sub(r'\b(kraj|okres|město|mesto|oblast|národní park|narodni park|np|republika|region)\b', '', p_lower, flags=re.IGNORECASE).strip()
     if not clean_query:
         clean_query = p_raw
@@ -1484,7 +1533,7 @@ def resolve_inat_place_id(place_type_or_name: str) -> str:
     return "8264"
 
 def get_inat_observation_points(obs_url: str, limit: int = 40):
-    """Z URL pozorování iNaturalist extrahuje taxon_id a place_id a stáhne souřadnice pozorování pro živou mapu."""
+
     if not obs_url or "inaturalist.org" not in obs_url:
         return []
     try:
@@ -1507,14 +1556,14 @@ def get_inat_observation_points(obs_url: str, limit: int = 40):
                 if loc:
                     p = [float(x) for x in loc.split(',')]
                     pts.append({"lat": p[0], "lon": p[1], "latitude": p[0], "longitude": p[1]})
-# Žádný celosvětový fallback - respektujeme vybrané území uživatele
+
             return pts
     except Exception:
         pass
     return []
 
 def fetch_inaturalist_map_url(species_name, place_id="8264"):
-    """Vyhledá taxon na iNaturalist a vrátí přímý odkaz na mapu pozorování v zadaném území (výchozí ČR: place_id=8264)."""
+
     if not species_name or pd.isna(species_name):
         return ""
     clean_sp = re.sub(r'\s*\(.*?\)\s*', ' ', str(species_name)).strip()
@@ -1538,27 +1587,26 @@ def fetch_inaturalist_map_url(species_name, place_id="8264"):
         pass
     return ""
 
-
 def fetch_pladias_photos(species_name, max_photos=3, parts=None, fallback=True):
-    """
-    Vyhledá fotografie rostliny z portálu Pladias.cz (Botanický ústav AV ČR) ve vysokém rozlišení
-    pomocí oficiálního REST API (PostgREST: https://api.pladias.cz/prest/images)
-    s možností filtrace podle částí rostliny (sloupec 'succession': celek, květ, plod, list, stonek, herbář...).
-    """
+\
+\
+\
+\
+
     photos = []
     if not species_name or pd.isna(species_name):
         return photos
     species_name = str(species_name).strip()
     if not species_name:
         return photos
-        
+
     clean_sp = re.sub(r'\s*\(.*?\)\s*', ' ', species_name).strip()
     clean_sp = re.sub(r'\s+sp(p)?\.?$', '', clean_sp).strip()
     if not clean_sp:
         clean_sp = species_name
 
     target_succ = resolve_target_pladias_successions(parts)
-    
+
     candidates = [clean_sp]
     words = clean_sp.split()
     if len(words) >= 3 and not any(w in ['subsp.', 'ssp.', 'var.', 'f.', 'sect.', 'agg.'] for w in words):
@@ -1568,8 +1616,7 @@ def fetch_pladias_photos(species_name, max_photos=3, parts=None, fallback=True):
 
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
     items = []
-    
-    # 1. Dotaz na oficiální REST API Pladias (PostgREST)
+
     for cand in candidates:
         q = urllib.parse.quote(cand)
         url = f"https://api.pladias.cz/prest/images?name_lat=eq.{q}&order=succession.asc.nullslast"
@@ -1582,8 +1629,7 @@ def fetch_pladias_photos(species_name, max_photos=3, parts=None, fallback=True):
                     break
         except Exception:
             pass
-            
-    # Pokud nebyl nalezen přesný název a máme aspoň dvouslovné jméno, zkusit ilike prefix
+
     if not items and len(words) >= 2:
         q_prefix = urllib.parse.quote(f"{words[0]} {words[1]}")
         url_ilike = f"https://api.pladias.cz/prest/images?name_lat=ilike.{q_prefix}*&order=succession.asc.nullslast"
@@ -1596,7 +1642,6 @@ def fetch_pladias_photos(species_name, max_photos=3, parts=None, fallback=True):
         except Exception:
             pass
 
-    # Filtrování podle požadovaných částí rostliny
     if items:
         matched_items = items
         if target_succ is not None:
@@ -1607,7 +1652,7 @@ def fetch_pladias_photos(species_name, max_photos=3, parts=None, fallback=True):
                 return []
             else:
                 matched_items = items
-                
+
         for it in matched_items:
             fn = it.get('filename')
             succ = it.get('succession')
@@ -1626,7 +1671,6 @@ def fetch_pladias_photos(species_name, max_photos=3, parts=None, fallback=True):
         elif not fallback:
             return []
 
-    # 2. Záložní scraping webové stránky, pokud API selhalo nebo nevrátilo nic
     for q_name in [clean_sp, species_name]:
         url_pics = f"https://pladias.cz/taxon/pictures/{urllib.parse.quote(q_name)}"
         try:
@@ -1641,7 +1685,7 @@ def fetch_pladias_photos(species_name, max_photos=3, parts=None, fallback=True):
                             photos.append(large_url)
                             if len(photos) >= max_photos:
                                 break
-                
+
                 if len(photos) < max_photos:
                     for img in soup.find_all('img'):
                         src = img.get('src', '')
@@ -1655,14 +1699,14 @@ def fetch_pladias_photos(species_name, max_photos=3, parts=None, fallback=True):
                 break
         except Exception:
             pass
-            
+
     return photos[:max_photos]
 
 def render_pladias_distribution_map(species_name, output_path):
-    """
-    Vygeneruje mapu rozšíření druhu v ČR z databáze Pladias.cz (Botanický ústav AV ČR)
-    včetně čtvercové sítě, bodů ověřeného/historického výskytu a citace zdroje.
-    """
+\
+\
+\
+
     if not species_name:
         return False
     species_name = str(species_name).strip()
@@ -1672,7 +1716,7 @@ def render_pladias_distribution_map(species_name, output_path):
         clean_sp = species_name
 
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-    
+
     taxon_id = None
     for q_name in [clean_sp, species_name]:
         url_dist = f"https://pladias.cz/taxon/distribution/{urllib.parse.quote(q_name)}"
@@ -1686,7 +1730,7 @@ def render_pladias_distribution_map(species_name, output_path):
                     break
         except Exception:
             pass
-            
+
     if not taxon_id:
         return False
 
@@ -1694,7 +1738,7 @@ def render_pladias_distribution_map(species_name, output_path):
     w, h = 800, 480
     base_img = get_pladias_base_map()
     topo_img = get_topographic_base_map(minx, miny, maxx, maxy, w=w, h=h, light_layer=True)
-    
+
     canvas = Image.new("RGBA", (w, h + 46), (248, 250, 248, 255))
     if topo_img:
         canvas.paste(topo_img, (0, 0))
@@ -1711,8 +1755,7 @@ def render_pladias_distribution_map(species_name, output_path):
         return px, py
 
     draw = ImageDraw.Draw(canvas)
-    
-    # Nerevidované / starší záznamy (šedé)
+
     url_neurceny = f"https://geoserver.ibot.cas.cz/pladias_wfs/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=neurceny&outputFormat=application/json&VIEWPARAMS=TAXON_ID:{taxon_id}"
     try:
         r_n = requests.get(url_neurceny, headers=headers, timeout=6)
@@ -1726,7 +1769,6 @@ def render_pladias_distribution_map(species_name, output_path):
     except Exception:
         pass
 
-    # Ověřené / jisté záznamy (zelené)
     url_jisty = f"https://geoserver.ibot.cas.cz/pladias_wfs/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=jisty&outputFormat=application/json&VIEWPARAMS=TAXON_ID:{taxon_id}"
     try:
         r_j = requests.get(url_jisty, headers=headers, timeout=6)
@@ -1740,13 +1782,12 @@ def render_pladias_distribution_map(species_name, output_path):
     except Exception:
         pass
 
-    # Zápatí s legendou a citací
     font_regular = get_map_font(12, bold=False)
     draw.rectangle([0, h, w, h + 46], fill=(238, 242, 239, 255), outline=(210, 220, 215, 255))
-    
+
     draw.ellipse([18, h + 15, 26, h + 23], fill=(20, 110, 50, 240), outline=(10, 60, 25, 255))
     draw.text((32, h + 13), "Ověřený výskyt", font=font_regular, fill=(30, 40, 35, 255))
-    
+
     draw.ellipse([140, h + 15, 148, h + 23], fill=(160, 160, 160, 220), outline=(120, 120, 120, 255))
     draw.text((154, h + 13), "Nerevidovaný údaj", font=font_regular, fill=(60, 70, 65, 255))
 
@@ -1762,56 +1803,115 @@ def render_pladias_distribution_map(species_name, output_path):
     final_img.save(output_path, format="JPEG", quality=85, optimize=True)
     return os.path.exists(output_path) and os.path.getsize(output_path) > 0
 
-def fetch_pladias_taxonomy(species_name):
-    """
-    Získá přesnou českou botanickou taxonomii z portálu Pladias.cz (Klíč / Květena ČR).
-    Vrací slovník s oddělením, třídou, řádem, čeledí a rodem odpovídající výuce na školách a univerzitách v ČR.
-    """
+@functools.lru_cache(maxsize=4096)
+def _cached_pladias_taxonomy(sp_clean: str):
+\
+\
+\
+
     res = {
-        "phylum": "", "class": "", "order": "", 
-        "family": "", "genus": "", "source": "Nenalezeno"
+        "phylum": "", "class": "", "order": "",
+        "family": "", "genus": "", "czech_name": "", "source": "Nenalezeno"
     }
-    if not species_name or pd.isna(species_name):
+    if not sp_clean or pd.isna(sp_clean):
         return res
+    raw = str(sp_clean).strip()
+    raw = re.sub(r'\s*\(.*?\)\s*', ' ', raw).strip()
+    raw = re.sub(r'\s+sp(p)?\.?$', '', raw).strip()
+    if not raw:
+        return res
+
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    words = raw.split()
+
+    candidates = []
+    if len(words) >= 2:
+        binom = f"{words[0].capitalize()} {words[1].lower()}"
+        candidates.append(binom)
+        rest = " ".join(words[1:])
+        candidates.append(f"{words[0].capitalize()} {rest}")
+        if len(words) >= 3 and words[2].lower() in ['agg.', 'agg', 'sect.', 'subsp.', 'ssp.', 'var.']:
+            candidates.append(f"{words[0].capitalize()} {words[1].lower()} {words[2]}")
+    elif len(words) == 1:
+        candidates.append(words[0].capitalize())
+
+    if raw not in candidates:
+        candidates.append(raw)
+
+    soup = None
+    for cand in candidates:
+        url = f"https://pladias.cz/taxon/overview/{urllib.parse.quote(cand)}"
+        try:
+            r = requests.get(url, headers=headers, timeout=6)
+            if r.status_code == 200 and '/taxon/overview/' in r.url:
+                s_cand = BeautifulSoup(r.text, 'html.parser')
+                if s_cand.find('ol', class_='breadcrumb'):
+                    soup = s_cand
+                    break
+        except Exception:
+            pass
+
+    if not soup:
+        genus_cand = words[0].capitalize() if words else ""
+        if genus_cand and len(genus_cand) >= 3:
+            try:
+                r_gen = requests.get(f"https://pladias.cz/taxon/overview/{urllib.parse.quote(genus_cand)}", headers=headers, timeout=6)
+                if r_gen.status_code == 200 and '/taxon/overview/' in r_gen.url:
+                    s_gen = BeautifulSoup(r_gen.text, 'html.parser')
+                    if s_gen.find('ol', class_='breadcrumb'):
+                        soup = s_gen
+            except Exception:
+                pass
+
+    if soup:
+        bc = soup.find('ol', class_='breadcrumb')
+        if bc:
+            items = [li.get_text(strip=True) for li in bc.find_all('li')]
+            nav_words = {'druhy', 'přehled', 'taxony', 'hledání'}
+            clean_items = [it for it in items if it.lower() not in nav_words]
+            if clean_items:
+                res["source"] = "Pladias.cz"
+                for rk in clean_items:
+                    if rk.endswith('phyta'): res["phylum"] = rk
+                    elif rk.endswith('opsida'): res["class"] = rk
+                    elif rk.endswith('ales'): res["order"] = rk
+                    elif rk.endswith('aceae'): res["family"] = rk
+
+                last_it = clean_items[-1]
+                res["genus"] = last_it.split()[0]
+
+                if not res["phylum"] and (res["class"] or res["order"] or res["family"]):
+                    res["phylum"] = "Tracheophyta"
+
+        for h1_cand in soup.find_all('h1'):
+            t_h1 = h1_cand.get_text(strip=True)
+            if '\u2013' in t_h1 or '–' in t_h1 or '-' in t_h1:
+                parts = re.split(r'\s*[\u2013\u2014\-]\s*', t_h1, maxsplit=1)
+                if len(parts) > 1 and parts[1].strip() and 'pladias' not in parts[1].lower():
+                    res["czech_name"] = parts[1].strip()
+                    break
+        if not res["czech_name"] and soup.title:
+            t_title = soup.title.get_text(strip=True)
+            title_parts = re.split(r'\s*[\u2013\u2014\-]\s*', t_title)
+            if len(title_parts) >= 2 and title_parts[1].strip() and 'pladias' not in title_parts[1].lower():
+                res["czech_name"] = title_parts[1].strip()
+
+    return res
+
+def fetch_pladias_taxonomy(species_name):
+    if not species_name or pd.isna(species_name):
+        return {
+            "phylum": "", "class": "", "order": "",
+            "family": "", "genus": "", "czech_name": "", "source": "Nenalezeno"
+        }
     sp_clean = re.sub(r'\s*\(.*?\)\s*', ' ', str(species_name)).strip()
     sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp_clean).strip()
     if not sp_clean:
-        return res
-        
-    url = f"https://pladias.cz/taxon/overview/{urllib.parse.quote(sp_clean)}"
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-    try:
-        r = requests.get(url, headers=headers, timeout=6)
-        soup = None
-        if r.status_code == 200 and '/taxon/overview/' in r.url:
-            soup = BeautifulSoup(r.text, 'html.parser')
-            
-        # Záložní pokus na rod (např. Taraxacum officinale -> rod Taraxacum pro agregáty a synonyma)
-        if not soup or not soup.find('ol', class_='breadcrumb'):
-            genus_cand = sp_clean.split()[0] if ' ' in sp_clean else ""
-            if genus_cand and len(genus_cand) >= 3:
-                r_gen = requests.get(f"https://pladias.cz/taxon/overview/{urllib.parse.quote(genus_cand)}", headers=headers, timeout=6)
-                if r_gen.status_code == 200 and '/taxon/overview/' in r_gen.url:
-                    soup = BeautifulSoup(r_gen.text, 'html.parser')
-                    
-        if soup:
-            bc = soup.find('ol', class_='breadcrumb')
-            if bc:
-                items = [li.get_text(strip=True) for li in bc.find_all('li')]
-                ranks = [it for it in items if it not in ('Druhy', 'Přehled', 'Taxony') and it.lower() != sp_clean.lower()]
-                if ranks:
-                    res["source"] = "Pladias.cz"
-                    for rk in ranks:
-                        if rk.endswith('phyta'): res["phylum"] = rk
-                        elif rk.endswith('opsida'): res["class"] = rk
-                        elif rk.endswith('ales'): res["order"] = rk
-                        elif rk.endswith('aceae'): res["family"] = rk
-                    if len(ranks) >= 2:
-                        res["genus"] = ranks[-1]
-    except Exception:
-        pass
-    return res
-
+        return {
+            "phylum": "", "class": "", "order": "",
+            "family": "", "genus": "", "czech_name": "", "source": "Nenalezeno"
+        }
+    return _cached_pladias_taxonomy(sp_clean).copy()
 
 CZ_REGION_BBOXES_3857 = {
     "12800": (1595000, 6440000, 1635000, 6480000, "Praha"),
@@ -1833,15 +1933,15 @@ CZ_REGION_BBOXES_3857 = {
 }
 
 def render_inat_observation_map(obs_url, output_path, species_name=""):
-    """
-    Vygeneruje mapu pozorování druhu z portálu iNaturalist jako JPG obrázek.
-    Vykresluje lehký topografický podklad s městy, toky, silnicemi a kopci.
-    Pokud je vybráno konkrétní území (kraj, okres), automaticky ořízne a přiblíží
-    mapu na toto území v plném rozlišení.
-    """
+\
+\
+\
+\
+\
+
     w, h = 800, 480
     minx, miny, maxx, maxy = 1335000, 6190000, 2105000, 6640000
-    
+
     parsed = urllib.parse.urlparse(obs_url)
     params = urllib.parse.parse_qs(parsed.query)
     p_id = params.get("place_id", [""])[0]
@@ -1857,7 +1957,6 @@ def render_inat_observation_map(obs_url, output_path, species_name=""):
     is_cropped = False
     crop_minx, crop_miny, crop_maxx, crop_maxy = minx, miny, maxx, maxy
 
-    # 1. Bounding box podle zvoleného kraje/oblasti ČR
     if p_id in CZ_REGION_BBOXES_3857:
         is_cropped = True
         r_minx, r_miny, r_maxx, r_maxy, place_name = CZ_REGION_BBOXES_3857[p_id]
@@ -1877,7 +1976,7 @@ def render_inat_observation_map(obs_url, output_path, species_name=""):
             crop_miny = r_miny
             crop_maxy = r_maxy
     else:
-        # 2. Bounding box podle rozprostření pozorovacích bodů
+
         merc_pts = [lon_lat_to_merc(p["lon"], p["lat"]) for p in pts if p.get("lon") and p.get("lat")]
         valid_pts = [(x, y) for x, y in merc_pts if minx <= x <= maxx and miny <= y <= maxy]
         if valid_pts:
@@ -1905,13 +2004,12 @@ def render_inat_observation_map(obs_url, output_path, species_name=""):
                 crop_miny = max(miny, cy - b_h / 2)
                 crop_maxy = min(maxy, cy + b_h / 2)
 
-    # Načíst ostrý topografický podklad pro dané území
     topo_img = get_topographic_base_map(crop_minx, crop_miny, crop_maxx, crop_maxy, w=w, h=h, light_layer=True)
     if not topo_img:
-        # Fallback na Pladias kvadranty
+
         base_grid = get_pladias_base_map()
         if is_cropped:
-            # Převést BBOX na souřadnice gridu
+
             gx1 = int((crop_minx - minx) / (maxx - minx) * w)
             gx2 = int((crop_maxx - minx) / (maxx - minx) * w)
             gy1 = int((maxy - crop_maxy) / (maxy - miny) * h)
@@ -1942,14 +2040,13 @@ def render_inat_observation_map(obs_url, output_path, species_name=""):
                 draw.ellipse([c_px - r_dot, c_py - r_dot, c_px + r_dot, c_py + r_dot], fill=(230, 75, 20, 245), outline=(160, 35, 10, 255), width=2 if is_cropped else 1)
                 drawn_count += 1
 
-    # Zápatí s legendou a citací
     font_regular = get_map_font(12, bold=False)
     font_bold = get_map_font(12, bold=True)
 
     draw.rectangle([0, h, w, h + 46], fill=(238, 242, 239, 255), outline=(210, 220, 215, 255))
     draw.ellipse([18, h + 15, 26, h + 23], fill=(225, 80, 25, 240), outline=(170, 40, 10, 255))
 
-    lbl = f" • {place_name}" if place_name else ""
+    lbl = f" - {place_name}" if place_name else ""
     if is_cropped:
         if drawn_count > 0:
             count_str = f"Pozorování iNaturalist{lbl} ({drawn_count} nálezů)"
@@ -1960,7 +2057,6 @@ def render_inat_observation_map(obs_url, output_path, species_name=""):
 
     draw.text((32, h + 13), count_str, font=font_regular, fill=(25, 35, 30, 255))
 
-    # Pravá strana: Citace zdroje
     attribution = "Zdroj: iNaturalist.org"
     try:
         attr_bbox = font_regular.getbbox(attribution)
@@ -1970,35 +2066,35 @@ def render_inat_observation_map(obs_url, output_path, species_name=""):
     attr_x = w - attr_w - 18
     draw.text((attr_x, h + 13), attribution, font=font_regular, fill=(75, 95, 85, 255))
 
-    # Střed: Jméno druhu bez kolize s textem
     try:
         left_bbox = font_regular.getbbox(count_str)
         left_end_x = 32 + (left_bbox[2] - left_bbox[0])
     except Exception:
-        left_end_x = 32 + len(count_str) * 7
+        left_end_x = 32 + len(count_str) * 8
 
     sp_title = species_name.strip() if species_name else ""
     if sp_title:
-        avail_w = attr_x - left_end_x - 24
-        if avail_w > 90:
-            try:
-                sp_bbox = font_bold.getbbox(sp_title)
-                sp_w = sp_bbox[2] - sp_bbox[0]
-            except Exception:
-                sp_w = len(sp_title) * 8
-            sp_x = max(left_end_x + 16, (left_end_x + attr_x - sp_w) // 2)
-            draw.text((sp_x, h + 13), sp_title, font=font_bold, fill=(40, 65, 50, 255))
+        try:
+            sp_bbox = font_bold.getbbox(sp_title)
+            sp_w = sp_bbox[2] - sp_bbox[0]
+        except Exception:
+            sp_w = len(sp_title) * 8
+        avail_w = attr_x - left_end_x - 30
+        if avail_w >= sp_w + 16:
+            mid_x = (left_end_x + attr_x - sp_w) // 2
+            sp_x = max(left_end_x + 20, mid_x)
+            if sp_x + sp_w <= attr_x - 10:
+                draw.text((sp_x, h + 13), sp_title, font=font_bold, fill=(40, 65, 50, 255))
 
     final_img = canvas.convert("RGB")
     final_img.save(output_path, format="JPEG", quality=88, optimize=True)
     return os.path.exists(output_path) and os.path.getsize(output_path) > 0
 
-
 def get_or_render_inat_map_image(species_name, obs_url):
-    """
-    Vrátí cestu k vygenerovanému obrázku mapy pozorování iNaturalist (využívá cache).
-    Cache klíč obsahuje hash URL (včetně zvoleného území), aby se při změně kraje/oblasti mapa vždy přegenerovala.
-    """
+\
+\
+\
+
     if not obs_url:
         return ""
     clean_sp = slugify_species_name(species_name) if species_name else "inat_obs"
@@ -2014,9 +2110,9 @@ def get_or_render_inat_map_image(species_name, obs_url):
     return ""
 
 def get_or_render_pladias_map_image(species_name):
-    """
-    Vrátí cestu k vygenerovanému obrázku mapy rozšíření Pladias.cz (využívá cache v test_media).
-    """
+\
+\
+
     if not species_name or pd.isna(species_name):
         return ""
     clean_sp = slugify_species_name(species_name)
@@ -2030,39 +2126,351 @@ def get_or_render_pladias_map_image(species_name):
         return cache_path
     return ""
 
+def resolve_local_media_path(raw_path: str) -> str:
+
+    if not raw_path:
+        return ""
+    clean = str(raw_path).strip()
+    if clean.startswith("file:///"):
+        clean = urllib.parse.unquote(clean[8:])
+    elif clean.startswith("file://"):
+        clean = urllib.parse.unquote(clean[7:])
+    candidates = [
+        clean,
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), clean),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "custom_media", os.path.basename(clean)),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_media", os.path.basename(clean)),
+        os.path.join("custom_media", os.path.basename(clean)),
+        os.path.join("test_media", os.path.basename(clean)),
+    ]
+    for c in candidates:
+        if os.path.isfile(c):
+            return os.path.abspath(c)
+    return ""
+
+def download_media_file(url: str, local_path: str) -> bool:
+
+    if not url or not local_path:
+        return False
+    if os.path.exists(local_path) and os.path.getsize(local_path) > 0:
+        return True
+    try:
+        os.makedirs(os.path.dirname(os.path.abspath(local_path)), exist_ok=True)
+    except Exception:
+        pass
+    url_str = str(url).strip()
+
+    if "pladias.cz" in url_str and "distribution" in url_str:
+        try:
+            sp_m = url_str.split("distribution/")[-1].split("?")[0].strip().replace("%20", " ")
+            if render_pladias_distribution_map(sp_m, local_path):
+                return True
+        except Exception:
+            pass
+
+    if "inaturalist.org" in url_str and "observations" in url_str:
+        try:
+            if render_inat_observation_map(url_str, local_path):
+                return True
+        except Exception:
+            pass
+
+    local_src = resolve_local_media_path(url_str)
+    if local_src and os.path.isfile(local_src):
+        try:
+            shutil.copy2(local_src, local_path)
+            if os.path.exists(local_path) and os.path.getsize(local_path) > 0:
+                return True
+        except Exception:
+            pass
+
+    if url_str.startswith("data:image"):
+        try:
+            head, b64_data = url_str.split(",", 1)
+            raw_bytes = base64.b64decode(b64_data)
+            with open(local_path, "wb") as f_out:
+                f_out.write(raw_bytes)
+            return True
+        except Exception:
+            pass
+
+    if url_str.startswith("http://") or url_str.startswith("https://"):
+        try:
+            r = requests.get(
+                url_str,
+                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'},
+                timeout=(3.0, 7.0)
+            )
+            if r.status_code == 404 and 'cevs/images/taxa/' in url_str:
+                alt_url = url_str.replace('/taxa/large/', '/taxa/clopla/large/') if '/taxa/clopla/' not in url_str else url_str.replace('/taxa/clopla/large/', '/taxa/large/')
+                try:
+                    alt_resp = requests.get(alt_url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}, timeout=(3.0, 7.0))
+                    if alt_resp.status_code == 200:
+                        r = alt_resp
+                except Exception:
+                    pass
+            if r.status_code == 200 and len(r.content) > 0:
+                if not save_optimized_image(r.content, local_path, max_dim=900, quality=82):
+                    with open(local_path, "wb") as f_out:
+                        f_out.write(r.content)
+                return os.path.exists(local_path) and os.path.getsize(local_path) > 0
+        except Exception:
+            pass
+
+    return False
+
+def generate_obsidian_vault_zip(
+    df: pd.DataFrame,
+    output_zip_path: str,
+    vault_name: str = "Studijni_Karticky",
+    front_cols: list = None,
+    back_cols: list = None,
+    col_styles: dict = None,
+    media_tasks: dict = None,
+    include_guide: bool = True,
+    include_index: bool = True,
+    card_separator: str = "?"
+) -> int:
+\
+\
+\
+\
+
+    import zipfile, io, re, html, json, time
+    if front_cols is None: front_cols = []
+    if back_cols is None: back_cols = []
+    if col_styles is None: col_styles = {}
+    if media_tasks is None: media_tasks = {}
+
+    v_slug = slugify(vault_name) or "Studijni_Karticky"
+    zip_buffer = io.BytesIO()
+
+    def _format_obs_field(col_name, val_str):
+        if not val_str:
+            return ""
+        s = str(val_str).strip()
+        if not s or s.lower() == "nan":
+            return ""
+        st_cfg = col_styles.get(col_name, {})
+        txt_style = st_cfg.get("txt_style", "Výchozí")
+        color = st_cfg.get("color", "Výchozí (šedá)")
+
+        if s.startswith("http://") or s.startswith("https://"):
+            link_lbl = "Otevřít odkaz"
+            if "mykologie.net" in s: link_lbl = "Otevřít profil na Mykologie.net"
+            elif "pladias.cz" in s: link_lbl = "Otevřít taxon na Pladias.cz"
+            elif "biolib.cz" in s: link_lbl = "Otevřít taxon na BioLib.cz"
+            elif "inaturalist.org" in s: link_lbl = "Zobrazit pozorování na iNaturalist"
+            return f"[{link_lbl}]({s})"
+
+        s = s.replace("\r\n", "\n").replace("\n\n", "<br><br>").replace("\n", "<br>")
+
+        styled_val = s
+        if txt_style == "Tučné":
+            styled_val = f"**{s}**"
+        elif txt_style == "Kurzíva":
+            styled_val = f"*{s}*"
+        elif txt_style == "Podtržené":
+            styled_val = f"<u>{s}</u>"
+
+        color_map = {
+            "Zelená": "#4ade80",
+            "Modrá": "#60a5fa",
+            "Žlutá": "#fbbf24",
+            "Červená": "#f87171",
+            "Fialová": "#c084fc",
+            "Šedá": "#9ca3af"
+        }
+        if color in color_map:
+            styled_val = f'<span style="color:{color_map[color]}">{styled_val}</span>'
+
+        return f"**{col_name}:** {styled_val}"
+
+    preloaded_cards = []
+
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+
+        if include_guide:
+            readme_content = f"""# Jak používat tyto kartičky (Offline na mobilu i PC)
+
+Tento balíček obsahuje kompletní studijní kartičky a poznámky s fotografiemi offline.
+
+## Možnost 1: Okamžité spuštění bez instalace (iPhone, Android, PC)
+1. Rozbalte stažený archiv `.zip` ve svém zařízení (na iPhonu v aplikaci **Soubory**, na Androidu v aplikaci **Správce souborů**).
+2. Otevřete soubor **`index.html`** nebo **`Karty.html`** poklepáním.
+3. Všechny kartičky se okamžitě zobrazí s fotografiemi, statistikami a možností učení (otáčení i vepisování)!
+
+## Možnost 2: Aplikace Obsidian (iOS, Android, PC - 100% zdarma)
+1. **Instalace Obsidianu:** Stáhněte si bezplatnou aplikaci **Obsidian** z App Store / Google Play.
+2. **Přidání kartiček:**
+   - Rozbalenou složku `{v_slug}` přesuňte do složky **Obsidian** na vašem zařízení / iCloudu.
+   - V Obsidianu klikněte na *Open folder as vault* a vyberte tuto složku.
+3. **Zkoušení kartiček (Spaced Repetition):**
+   - V Nastavení Obsidianu zapněte komunitní doplněk **Spaced Repetition** (autor Stephen R. Adams).
+   - V levém panelu klepněte na ikonu kartiček pro spuštění zkoušení.
+"""
+            zf.writestr(f"{v_slug}/00_NAVOD_JAK_POUZIVAT.md", readme_content.encode('utf-8'))
+            zf.writestr("00_NAVOD_JAK_POUZIVAT.md", readme_content.encode('utf-8'))
+
+        index_lines = [
+            f"# Rejstřík a přehled: {vault_name}",
+            "",
+            f"Celkem položek: **{len(df)}**",
+            "",
+            "## Seznam položek:",
+            ""
+        ]
+
+        for idx, row in df.iterrows():
+            primary_name = str(row.iloc[0]).strip() if len(row) > 0 else f"Položka {idx + 1}"
+            safe_filename = re.sub(r'[\\/*?:"<>|]', '_', primary_name).strip() or f"Polozka_{idx+1}"
+
+            front_parts = []
+            back_parts = []
+
+            for col in front_cols:
+                val = row.get(col)
+                if pd.isna(val) or str(val).strip() == "" or str(val).lower() == "nan":
+                    continue
+                if check_col_is_image(col, df) or is_image_col(col, val):
+                    entries = [u.strip() for u in str(val).split(';') if u.strip()]
+                    for entry in entries:
+                        raw_u = entry.split('|')[0].strip()
+                        lpath = media_tasks.get(raw_u, "")
+                        img_fn = os.path.basename(lpath) if lpath else os.path.basename(raw_u)
+                        if not img_fn.endswith(('.jpg', '.jpeg', '.png', '.webp')):
+                            img_fn = f"{safe_filename}_{len(front_parts)}.jpg"
+                        front_parts.append(f"![[{img_fn}]]")
+                else:
+                    front_parts.append(_format_obs_field(col, val))
+
+            for col in back_cols:
+                val = row.get(col)
+                if pd.isna(val) or str(val).strip() == "" or str(val).lower() == "nan":
+                    continue
+                if check_col_is_image(col, df) or is_image_col(col, val):
+                    entries = [u.strip() for u in str(val).split(';') if u.strip()]
+                    for entry in entries:
+                        raw_u = entry.split('|')[0].strip()
+                        lpath = media_tasks.get(raw_u, "")
+                        img_fn = os.path.basename(lpath) if lpath else os.path.basename(raw_u)
+                        if not img_fn.endswith(('.jpg', '.jpeg', '.png', '.webp')):
+                            img_fn = f"{safe_filename}_back_{len(back_parts)}.jpg"
+                        back_parts.append(f"![[{img_fn}]]")
+                else:
+                    back_parts.append(_format_obs_field(col, val))
+
+            front_md = "\n".join(front_parts) if front_parts else f"**{primary_name}**"
+            back_md = "\n".join(back_parts) if back_parts else "Popis není k dispozici"
+
+            clean_tag_slug = re.sub(r'[^a-zA-Z0-9_\-\u00C0-\u017F]', '_', v_slug).strip('_') or "Karticky"
+            deck_tag = f"#flashcards/{clean_tag_slug}"
+
+            note_md = f"""---
+tags:
+  - flashcards
+  - atlas
+---
+
+{deck_tag}
+
+# {primary_name}
+{front_md}
+{card_separator}
+{back_md}
+"""
+            zf.writestr(f"{v_slug}/{safe_filename}.md", note_md.encode('utf-8'))
+            index_lines.append(f"- [[{safe_filename}|{primary_name}]]")
+
+            preloaded_cards.append({
+                "id": f"c_{idx}_{v_slug}",
+                "title": primary_name,
+                "front": front_md,
+                "back": back_md,
+                "interval": 0,
+                "reps": 0,
+                "ease": 2.5,
+                "due": 0,
+                "state": 0
+            })
+
+        if include_index:
+            zf.writestr(f"{v_slug}/00_Atlas_a_Prehled.md", "\n".join(index_lines).encode('utf-8'))
+
+        deck_obj = {
+            "id": f"deck_{v_slug}",
+            "name": vault_name,
+            "createdAt": int(time.time() * 1000),
+            "cards": preloaded_cards
+        }
+        deck_js_str = f"window.PRELOADED_DECK = {json.dumps(deck_obj, ensure_ascii=False)};"
+        zf.writestr(f"{v_slug}/deck_data.js", deck_js_str.encode('utf-8'))
+        zf.writestr("deck_data.js", deck_js_str.encode('utf-8'))
+
+        karty_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Karty.html")
+        if os.path.exists(karty_path):
+            try:
+                with open(karty_path, "r", encoding="utf-8") as f_k:
+                    karty_str = f_k.read()
+
+                karty_inlined = karty_str.replace("/* __INLINED_DECK_DATA__ */", deck_js_str)
+                karty_bytes = karty_inlined.encode("utf-8")
+                zf.writestr("index.html", karty_bytes)
+                zf.writestr("Karty.html", karty_bytes)
+                zf.writestr(f"{v_slug}/index.html", karty_bytes)
+                zf.writestr(f"{v_slug}/Karty.html", karty_bytes)
+            except Exception:
+                pass
+
+        if media_tasks:
+            added_media = set()
+            for raw_u, lpath in media_tasks.items():
+                if lpath and os.path.exists(lpath) and os.path.isfile(lpath):
+                    fn = os.path.basename(lpath)
+                    if fn not in added_media:
+                        try:
+                            zf.write(lpath, f"{v_slug}/{fn}")
+                            zf.write(lpath, fn)
+                            added_media.add(fn)
+                        except Exception:
+                            pass
+
+    zip_bytes = zip_buffer.getvalue()
+    with open(output_zip_path, "wb") as f_out:
+        f_out.write(zip_bytes)
+    return len(zip_bytes)
+
 def format_deck_description(desc_text):
-    """
-    Převede zadaný text popisu balíčku do čistého HTML (odstavce <p> a řádky <br>),
-    které Anki zobrazí pod názvem balíčku stejně jako na přehledu balíčku.
-    """
+\
+\
+\
+
     if not desc_text:
         return ""
     desc_text = str(desc_text).strip()
     if not desc_text:
         return ""
-    
+
     raw_paras = re.split(r'\n\s*\n', desc_text)
     html_paras = []
     for para in raw_paras:
         para_clean = para.strip()
         if not para_clean:
             continue
-        # Pokud je již odstavec obalen HTML blokem (<p>, <div>, <h3>, <hr>, <table>...)
+
         if re.search(r'^<(p|div|h[1-6]|table|ul|ol|hr)[^>]*>', para_clean, re.IGNORECASE):
             html_paras.append(para_clean)
         else:
             lines = [l.strip() for l in para_clean.split('\n')]
             joined_lines = "<br>".join(lines)
             html_paras.append(f"<p>{joined_lines}</p>")
-            
-    return "\n".join(html_paras)
 
-# --- LOKÁLNÍ BOTANICKÉ DATABÁZE A REGISTRY ČR (Klíč 2019, Nepůvodní druhy, Biotopy, Ellenberg, Červený seznam) ---
+    return "\n".join(html_paras)
 
 _LOCAL_FLORA_DB_CACHE = None
 
 def get_local_dataset_path(key_name: str) -> str:
-    """Nalezne cestu k datovému souboru v Downloads nebo ve složce data/."""
+
     candidates = {
         "klic_2019": [
             r"C:\Users\adalb\Downloads\taxonList_legend_2025_12_15.xls",
@@ -2099,7 +2507,7 @@ def get_local_dataset_path(key_name: str) -> str:
     return ""
 
 def load_local_flora_databases():
-    """Načte a zaindexuje lokální botanické tabulky do paměťového slovníku pro bleskový lookup."""
+
     global _LOCAL_FLORA_DB_CACHE
     if _LOCAL_FLORA_DB_CACHE is not None:
         return _LOCAL_FLORA_DB_CACHE
@@ -2112,7 +2520,6 @@ def load_local_flora_databases():
         "cerveny_seznam": {}
     }
 
-    # Pomocná normalizace pro indexování
     def _norm(name_s):
         if not name_s or pd.isna(name_s):
             return ""
@@ -2124,7 +2531,6 @@ def load_local_flora_databases():
             s = f"{parts[0]} {parts[1]}"
         return re.sub(r'\s+', ' ', s).strip().lower()
 
-    # 1. Klíč 2019 / Pladias Checklist
     p1 = get_local_dataset_path("klic_2019")
     if p1 and os.path.exists(p1):
         try:
@@ -2160,7 +2566,6 @@ def load_local_flora_databases():
         except Exception:
             pass
 
-    # 2. Nepůvodní druhy (Pyšek et al. 2022)
     p2 = get_local_dataset_path("nepuvodni")
     if p2 and os.path.exists(p2):
         try:
@@ -2223,7 +2628,6 @@ def load_local_flora_databases():
         except Exception:
             pass
 
-    # 3. Biotopy ČR (Chytrý & Rafajová 2003 / Sádlo et al. 2007)
     p3 = get_local_dataset_path("biotopy")
     if p3 and os.path.exists(p3):
         try:
@@ -2258,7 +2662,6 @@ def load_local_flora_databases():
         except Exception:
             pass
 
-    # 4. Ellenbergovské indikační hodnoty (Chytrý et al. 2018)
     p4 = get_local_dataset_path("ellenberg")
     if p4 and os.path.exists(p4):
         try:
@@ -2306,7 +2709,6 @@ def load_local_flora_databases():
         except Exception:
             pass
 
-    # 5. Červený seznam ČR (AOPK ČR / nature.cz – Všechny organismy)
     p5 = get_local_dataset_path("cerveny_seznam")
     if p5 and os.path.exists(p5):
         try:
@@ -2428,8 +2830,7 @@ def _query_local_db(section_name: str, species_name: str):
         return sub_db[s]
     if s.lower() in sub_db:
         return sub_db[s.lower()]
-    
-    # Normalizované botanické jméno
+
     clean_s = re.sub(r'\(.*?\)', '', s)
     clean_s = re.sub(r'\s+(subsp|ssp|var|f|agg|sect|nothosubsp)\.?(\s+.*|$)', '', clean_s, flags=re.IGNORECASE)
     parts = clean_s.split()
@@ -2462,7 +2863,7 @@ def get_genus_pdf_text(genus: str) -> str:
         return ""
     if g_clean in _GENUS_PDF_TEXT_CACHE:
         return _GENUS_PDF_TEXT_CACHE[g_clean]
-    
+
     url = f"https://files.ibot.cas.cz/cevs/images/taxa/kvetena_cr/{g_clean}.pdf"
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
@@ -2483,12 +2884,12 @@ def get_genus_pdf_text(genus: str) -> str:
         return ""
 
 def fetch_kvetena_cr_description(species_name: str, max_chars: int = 450) -> str:
-    """
-    Stáhne a extrahuje stručný botanický popis taxonu z PDF Květeny ČR (Botanický ústav AV ČR).
-    """
+\
+\
+
     if not species_name or pd.isna(species_name):
         return ""
-    
+
     s_clean = str(species_name).strip()
     s_clean = re.sub(r'\(.*?\)', '', s_clean)
     parts = s_clean.split()
@@ -2501,39 +2902,36 @@ def fetch_kvetena_cr_description(species_name: str, max_chars: int = 450) -> str
     epithet_clean = re.sub(r'[^a-zA-Z]', '', epithet)
     if not epithet_clean:
         return ""
-    
+
     pdf_text = get_genus_pdf_text(genus)
     if not pdf_text:
         return ""
-    
-    # 1. Najít záhlaví druhu
+
     sp_patterns = [
         re.compile(rf'(?:^|\n)\s*(?:\d+[\.\,\s]+)?{genus}\s+{epithet_clean}\b[^\n]*', re.IGNORECASE),
         re.compile(rf'(?:^|\n)\s*\d+[\.\,\s]+[A-Z]\.?\s+{epithet_clean}\b[^\n]*', re.IGNORECASE),
         re.compile(rf'(?:^|\n)\s*{genus}\s+{epithet_clean}\b', re.IGNORECASE)
     ]
-    
+
     match = None
     for p in sp_patterns:
         match = p.search(pdf_text)
         if match:
             break
-            
+
     if not match:
         return ""
-    
+
     start_pos = match.end()
     chunk = pdf_text[start_pos:start_pos + 4000]
-    
-    # Odstranit vodoznaky OCR
+
     chunk = re.sub(r'Searchable PDF created by OCR\.space[^\n]*', '', chunk, flags=re.IGNORECASE)
-    
-    # 2. Hledat začátek vlastního morfologického popisu
+
     exs_match = re.search(r'(?:Exsik[aá]ty|Exs\.)\s*:[^\n]+(?:\n[^\n]+){1,6}?\n', chunk, re.IGNORECASE)
     sub_chunk = chunk
     if exs_match:
         sub_chunk = chunk[exs_match.end():]
-        
+
     morph_patterns = [
         r'(?:^|\n)\s*([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž\s–\-]{0,30}?(?:byliny|stromy|keře|polokeře|dřeviny|strom|keř|bylina)\b[^\n]*)',
         r'(?:^|\n)\s*([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž\s–\-]{0,20}?\d+[\s–\-]+(?:\d+[\s–\-]*)?(?:cm|m|mm)\s+vys\.[^\n]*)',
@@ -2541,7 +2939,7 @@ def fetch_kvetena_cr_description(species_name: str, max_chars: int = 450) -> str
         r'(?:^|\n)\s*(Lodyha\s+[^\n]*)',
         r'(?:^|\n)\s*(Kmen\s+[^\n]*)'
     ]
-    
+
     desc_start = None
     for mp in morph_patterns:
         m_morph = re.search(mp, sub_chunk)
@@ -2549,7 +2947,7 @@ def fetch_kvetena_cr_description(species_name: str, max_chars: int = 450) -> str
             desc_start = m_morph.start()
             sub_chunk = sub_chunk[desc_start:]
             break
-            
+
     if not desc_start:
         lines = sub_chunk.split('\n')
         clean_lines = []
@@ -2564,7 +2962,6 @@ def fetch_kvetena_cr_description(species_name: str, max_chars: int = 450) -> str
             clean_lines.append(l_s)
         sub_chunk = "\n".join(clean_lines)
 
-    # 3. Oříznout před následujícími kapitolami
     end_delimiters = [
         r'(?:Ekologie\s+a\s+fytocenologie|Ekologie|Fytocenologie)\s*:',
         r'(?:Rozšíření\s+v\s+ČR|Rozšíření|Výskyt\s+v\s+ČR)\s*:',
@@ -2574,18 +2971,16 @@ def fetch_kvetena_cr_description(species_name: str, max_chars: int = 450) -> str
         r'Poznámka\s*:',
         r'\n\s*\d+\.\s+[A-Z][a-z]+'
     ]
-    
+
     for delim in end_delimiters:
         end_match = re.search(delim, sub_chunk, re.IGNORECASE)
         if end_match:
             sub_chunk = sub_chunk[:end_match.start()]
-            
-    # 4. Formátování a vyčištění textu
+
     sub_chunk = re.sub(r'(\w+)-\s*\n\s*(\w+)', r'\1\2', sub_chunk)
     sub_chunk = re.sub(r'\s*\n\s*', ' ', sub_chunk)
     sub_chunk = re.sub(r'\s+', ' ', sub_chunk).strip()
-    
-    # 5. Oříznutí na požadovanou délku (pokud max_chars > 0)
+
     if max_chars and max_chars > 0 and len(sub_chunk) > max_chars:
         sentences = re.split(r'(?<=\.)\s+', sub_chunk)
         accum = []
@@ -2597,22 +2992,21 @@ def fetch_kvetena_cr_description(species_name: str, max_chars: int = 450) -> str
             else:
                 break
         sub_chunk = " ".join(accum)
-        
+
     return sub_chunk
 
 def build_deck_attribution(active_cols):
-    """
-    Vygeneruje formátovanou citaci a uvedení zdrojů (Pladias.cz, Mykologie.net, DaLiBor, DiatomBase, AlgaeBase,
-    Klíč ke květeně ČR 2019, Katalog nepůvodních druhů, Biotopy ČR, Ellenbergovy hodnoty, Červený seznam 2017,
-    Květena ČR) pro popis balíčku v Anki.
-    """
+\
+\
+\
+\
+
     sections = []
-    
-    # --- PLADIAS ---
+
     has_pladias_photos = any("[Pladias.cz] Fotky" in str(c) for c in active_cols)
     has_pladias_map = any("[Pladias.cz] Mapa rozšíření" in str(c) for c in active_cols)
     has_pladias_any = any(("[Pladias]" in str(c) or "[Pladias.cz]" in str(c)) for c in active_cols)
-    
+
     if has_pladias_any:
         p_parts = []
         p_parts.append("<p>Tento balíček využívá data z databáze <strong>Pladias.cz – databáze české flóry a vegetace</strong> (<a href=\"https://www.pladias.cz\">www.pladias.cz</a>).</p>")
@@ -2624,7 +3018,6 @@ def build_deck_attribution(active_cols):
         p_parts.append("<p style=\"font-size: 0.85em; color: #777;\">Data jsou použita pro nekomerční výukové a studijní účely v souladu s Pravidly správy a použití databáze Pladias.cz.cz.</p>")
         sections.append("\n".join(p_parts))
 
-    # --- 1. KLÍČ KE KVĚTENĚ ČR (Kaplan et al. 2019) ---
     has_klic_any = any("[Klíč 2019]" in str(c) for c in active_cols)
     if has_klic_any:
         k_parts = []
@@ -2632,7 +3025,6 @@ def build_deck_attribution(active_cols):
         k_parts.append("<p><strong>Kaplan Z., Danihelka J., Chrtek J., Kirschner J., Kubát K., Štech M. & Štěpánek J. (eds) (2019) <em>Klíč ke květeně České republiky [Key to the flora of the Czech Republic]</em>. Ed. 2. – Academia, Praha.</strong></p>")
         sections.append("\n".join(k_parts))
 
-    # --- 2. KATALOG NEPŮVODNÍCH DRUHŮ ROSTLIN ČR (Pyšek et al. 2022) ---
     has_nepuvodni_any = any("[Nepůvodní flóra]" in str(c) for c in active_cols)
     if has_nepuvodni_any:
         np_parts = []
@@ -2640,7 +3032,6 @@ def build_deck_attribution(active_cols):
         np_parts.append("<p><strong>Pyšek P., Sádlo J., Chrtek J. Jr., Chytrý M., Kaplan Z., Pergl J., Pokorná A., Axmanová I., Čuda J., Doležal J., Dřevojan P., Hejda M., Kočár P., Kortz A., Lososová Z., Lustyk P., Skálová H., Štajerová K., Večeřa M., Vítková M., Wild J. & Danihelka J. (2022) <em>Catalogue of alien plants of the Czech Republic (3rd edition): species richness, status, distributions, habitats, regional invasion levels, introduction pathways and impacts</em>. – Preslia 94: 447–577. <a href=\"https://www.preslia.cz/article/view?id=11548\">https://www.preslia.cz/article/view?id=11548</a></strong></p>")
         sections.append("\n".join(np_parts))
 
-    # --- 3. VÝSKYT V BIOTOPECH ČR (Chytrý & Rafajová 2003 / Sádlo et al. 2007) ---
     has_biotopy_any = any("[Biotopy]" in str(c) for c in active_cols)
     if has_biotopy_any:
         b_parts = []
@@ -2648,7 +3039,6 @@ def build_deck_attribution(active_cols):
         b_parts.append("<p><strong>Chytrý M. & Rafajová M. (2003) <em>Czech National Phytosociological Database: basic statistics of the available vegetation-plot data</em>. – Preslia 75: 1–15.</strong><br>Sádlo J., Chytrý M. & Pyšek P. (2007) <em>Regional invasion levels in the flora of the Czech Republic</em>. – Preslia 79: 81–96 (Appendix 1).</p>")
         sections.append("\n".join(b_parts))
 
-    # --- 4. ELLENBERGOVY INDIKAČNÍ HODNOTY (Chytrý et al. 2018) ---
     has_ellenberg_any = any("[Ekologie]" in str(c) or "[Ellenberg]" in str(c) for c in active_cols)
     if has_ellenberg_any:
         e_parts = []
@@ -2656,7 +3046,6 @@ def build_deck_attribution(active_cols):
         e_parts.append("<p><strong>Chytrý M., Tichý L., Dřevojan P., Sádlo J. & Zelený D. (2018) <em>Ellenberg-type indicator values for the Czech flora</em>. – Preslia 90: 83–103. <a href=\"https://doi.org/10.23855/preslia.2018.083\">https://doi.org/10.23855/preslia.2018.083</a></strong></p>")
         sections.append("\n".join(e_parts))
 
-    # --- 5. ČERVENÝ SEZNAM ČR (AOPK ČR – Všechny organismy) ---
     has_cerveny_any = any("[Červený seznam]" in str(c) for c in active_cols)
     if has_cerveny_any:
         cs_parts = []
@@ -2664,7 +3053,6 @@ def build_deck_attribution(active_cols):
         cs_parts.append("<p><strong>Agentura ochrany přírody a krajiny ČR (AOPK ČR): <em>Červené seznamy ohrožených druhů České republiky (cévnaté rostliny, houby, mechorosty, lišejníky, bezobratlí, obratlovci)</em>. – Příroda, Praha / portal23.nature.cz.</strong></p>")
         sections.append("\n".join(cs_parts))
 
-    # --- 6. KVĚTENA ČESKÉ REPUBLIKY (Hejný & Slavík et al.) ---
     has_kvetena_any = any("[Květena ČR]" in str(c) for c in active_cols)
     if has_kvetena_any:
         kv_parts = []
@@ -2673,12 +3061,11 @@ def build_deck_attribution(active_cols):
         kv_parts.append("<p style=\"font-size: 0.85em; color: #777;\">Zdroj: Botanický ústav AV ČR (files.ibot.cas.cz/cevs/images/taxa/kvetena_cr/). Použito pro nekomerční vzdělávací a studijní účely.</p>")
         sections.append("\n".join(kv_parts))
 
-    # --- MYKOLOGIE.NET ---
     has_myko_img = any("[Mykologie.net] Fotky" in str(c) for c in active_cols)
     has_myko_desc = any("[Mykologie.net] Popis" in str(c) for c in active_cols)
     has_myko_link = any("[Mykologie.net] Odkaz" in str(c) for c in active_cols)
     has_myko_any = any("[Mykologie.net]" in str(c) for c in active_cols)
-    
+
     if has_myko_any:
         m_parts = []
         if has_myko_img and (has_myko_desc or has_myko_link):
@@ -2689,11 +3076,10 @@ def build_deck_attribution(active_cols):
             m_parts.append("<p>Textové popisy a informace o houbách pocházejí ze serveru <strong>Mykologie.net</strong> (<a href=\"https://www.mykologie.net\">www.mykologie.net</a>).</p>")
         else:
             m_parts.append("<p>Odkazy a data o houbách použité v tomto balíčku odkazují na mykologický portál <strong>Mykologie.net</strong> (<a href=\"https://www.mykologie.net\">www.mykologie.net</a>).</p>")
-            
+
         m_parts.append("<p style=\"font-size: 0.85em; color: #777;\">Zdroj: Mykologie.net – Houby v České republice. Všechna autorská práva k fotografiím a textům náleží autorům a serveru Mykologie.net. Použito pro nekomerční vzdělávací účely.</p>")
         sections.append("\n".join(m_parts))
 
-    # --- DALIBOR (LIŠEJNÍKY) ---
     has_dalibor_any = any("[DaLiBor]" in str(c) for c in active_cols)
     if has_dalibor_any:
         d_parts = []
@@ -2701,7 +3087,6 @@ def build_deck_attribution(active_cols):
         d_parts.append("<p style=\"font-size: 0.85em; color: #777;\">Zdroj: DaLiBor (dalib.cz) – Atlas českých lišejníků. Autorská práva k fotografiím a textům náleží autorům a správcům portálu DaLiBor. Použito pro nekomerční vzdělávací účely.</p>")
         sections.append("\n".join(d_parts))
 
-    # --- DIATOMBASE ---
     has_diatom_any = any("[DiatomBase]" in str(c) for c in active_cols)
     if has_diatom_any:
         dt_parts = []
@@ -2709,7 +3094,6 @@ def build_deck_attribution(active_cols):
         dt_parts.append("<p style=\"font-size: 0.85em; color: #777;\">Zdroj: DiatomBase. Použito pro nekomerční vzdělávací a studijní účely.</p>")
         sections.append("\n".join(dt_parts))
 
-    # --- ALGAEBASE ---
     has_algae_any = any("[AlgaeBase]" in str(c) for c in active_cols)
     if has_algae_any:
         a_parts = []
@@ -2717,7 +3101,6 @@ def build_deck_attribution(active_cols):
         a_parts.append("<p style=\"font-size: 0.85em; color: #777;\">Zdroj: AlgaeBase. World-wide electronic publication, National University of Ireland, Galway.</p>")
         sections.append("\n".join(a_parts))
 
-    # --- CREATIVE COMMONS & OTEVŘENÁ MULTIMÉDIA ---
     has_cc_media = any(
         "[iNat]" in str(c) or "[GBIF]" in str(c) or "[Wikimedia]" in str(c) or "[Zvuky]" in str(c)
         for c in active_cols
@@ -2728,7 +3111,6 @@ def build_deck_attribution(active_cols):
         cc_parts.append("<p>Fotografie a audio nahrávky z mezinárodních repozitářů <strong>iNaturalist</strong>, <strong>GBIF</strong>, <strong>Wikimedia Commons</strong> a <strong>Xeno-canto</strong> jsou použity v souladu s jejich licencemi Creative Commons (CC0, CC BY, CC BY-SA, CC BY-NC, CC BY-NC-SA) s uvedením konkrétních autorů, držitelů práv a licencí přímo u jednotlivých položek.</p>")
         sections.append("\n".join(cc_parts))
 
-    # --- ANIMAL DIVERSITY WEB (ADW) ---
     has_adw_any = any("[ADW]" in str(c) for c in active_cols)
     if has_adw_any:
         adw_parts = []
@@ -2736,7 +3118,6 @@ def build_deck_attribution(active_cols):
         adw_parts.append("<p style=\"font-size: 0.85em; color: #777;\">Zdroj: Myers, P., R. Espinosa, C. S. Parr, T. Jones, G. S. Hammond, and T. A. Dewey. 2024. The Animal Diversity Web (online). animaldiversity.org. Použito pro nekomerční vzdělávací účely.</p>")
         sections.append("\n".join(adw_parts))
 
-    # --- PLANTS OF THE WORLD ONLINE (POWO Kew) ---
     has_powo_any = any("[POWO Kew]" in str(c) for c in active_cols)
     if has_powo_any:
         powo_parts = []
@@ -2744,7 +3125,6 @@ def build_deck_attribution(active_cols):
         powo_parts.append("<p style=\"font-size: 0.85em; color: #777;\">Zdroj: POWO (2024). Plants of the World Online. Facilitated by the Royal Botanic Gardens, Kew. powo.science.kew.org. Použito pro nekomerční vzdělávací účely.</p>")
         sections.append("\n".join(powo_parts))
 
-    # --- ENCYCLOPEDIA OF LIFE (EOL) ---
     has_eol_any = any("[EOL]" in str(c) for c in active_cols)
     if has_eol_any:
         eol_parts = []
@@ -2755,41 +3135,38 @@ def build_deck_attribution(active_cols):
     return "\n<hr>\n".join(sections)
 
 def transcribe_latin_to_czech_phonetics(latin_name: str) -> str:
-    """
-    Převede vědecké (latinské) biologické jméno na fonetickou českou výslovnost
-    podle pravidel botanické a biologické výslovnosti latiny v ČR.
-    Např. 'Quercus robur' -> '[kverkus robur]', 'Gentiana asclepiadea' -> '[genciana asklepiadea]'.
-    """
+\
+\
+\
+\
+
     if not latin_name or pd.isna(latin_name):
         return ""
     text = str(latin_name).strip()
     if not text:
         return ""
-    
-    # Očištění od autorů a zkratek
+
     text = re.sub(r'\s*\(.*?\)\s*', ' ', text).strip()
     text = re.sub(r'\s+(subsp|ssp|var|f|agg|sect|nothosubsp)\.?(\s+.*|$)', '', text, flags=re.IGNORECASE).strip()
-    
+
     words = text.split()
     phonetic_words = []
-    
+
     for w in words:
         trail = ""
         m_trail = re.search(r'[^a-zA-ZáéíóúýčďěňřšťžůÁÉÍÓÚÝČĎĚŇŘŠŤŽŮ]+$', w)
         if m_trail:
             trail = m_trail.group(0)
             w = w[:-len(trail)]
-            
+
         if not w:
             continue
-            
+
         low = w.lower()
-        
-        # 1. TI pravidla: ti + samohláska -> ci (pokud před ním není s, t, x)
+
         vowels = "aeiouyéěáíóú"
         low = re.sub(rf'(?<![stx])ti(?=[{vowels}])', 'ci', low)
 
-        # 2. Spřežky a dvojhlásky
         low = re.sub(r'qu', 'kv', low)
         low = re.sub(r'gu(?=[aeiouyéěáíóú])', 'gv', low)
         low = re.sub(r'ph', 'f', low)
@@ -2797,33 +3174,30 @@ def transcribe_latin_to_czech_phonetics(latin_name: str) -> str:
         low = re.sub(r'rh', 'r', low)
         low = re.sub(r'ae', 'é', low)
         low = re.sub(r'oe', 'é', low)
-        
-        # 3. Pravidla pro C: c před e, i, y, é, ě -> c; c před h -> ch; jinak k
+
         low = re.sub(r'c(?![eiyéěh])', 'k', low)
-        
-        # 4. Znělé S (intervokalické s -> z, nebo s po samohlásce / znělé souhlásce před samohláskou)
+
         low = re.sub(rf'([{vowels}rlmn])s(?=[{vowels}mnlr])', r'\1z', low)
-        
-        # 5. Zdvojené souhlásky
+
         low = re.sub(r'cc(?=[eiyéě])', 'kc', low)
         low = re.sub(r'cc', 'k', low)
-        
-        # 6. 'x' na 'ks'
+
         low = re.sub(r'x', 'ks', low)
-        
+
         phonetic_words.append(f"[{low}]{trail}")
-        
+
     return " ".join(phonetic_words)
 
-def fetch_diatombase_data(species_name):
-    """
-    Vyhledá rozsivku / taxon v databázi DiatomBase (přes WoRMS / Aphia REST API) a vrátí:
-    - scientific_name: platné vědecké jméno
-    - authority: autorita a rok
-    - status: taxonomický status (accepted / unaccepted)
-    - url: přímý odkaz na profil na diatombase.org
-    - classification: vyšší taxonomie
-    """
+@functools.lru_cache(maxsize=4096)
+def _cached_diatombase_data(sp_clean: str):
+\
+\
+\
+\
+\
+\
+\
+
     res = {
         "scientific_name": "",
         "authority": "",
@@ -2839,7 +3213,7 @@ def fetch_diatombase_data(species_name):
     sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp_clean).strip()
     if not sp_clean:
         return res
-        
+
     headers = {'User-Agent': 'AnkiSpeciesGenerator/1.0 (educational use)'}
     api_url = f"https://www.marinespecies.org/rest/AphiaRecordsByName/{urllib.parse.quote(sp_clean)}?like=false&marine_only=false"
     try:
@@ -2849,7 +3223,7 @@ def fetch_diatombase_data(species_name):
             if records and isinstance(records, list):
                 rec = records[0]
                 rec_str = str(rec).lower()
-                # Ověření, že záznam skutečně patří mezi rozsivky / řasy (Bacillariophyta / Ochrophyta / Diatomea)
+
                 is_diatom = (
                     rec.get("class") in ["Bacillariophyceae", "Coscinodiscophyceae", "Fragilariophyceae", "Mediophyceae"]
                     or rec.get("phylum") in ["Bacillariophyta", "Ochrophyta"]
@@ -2872,14 +3246,31 @@ def fetch_diatombase_data(species_name):
         pass
     return res
 
-def fetch_dalibor_data(species_name, max_photos=3):
-    """
-    Vyhledá lišejník na portálu DaLiBor (dalib.cz - Atlas českých lišejníků) a vrátí:
-    - scientific_name: vědecké jméno
-    - description: odborný český popis a ekologie druhu
-    - photo_urls: seznam fotografií ve vysoké kvalitě (/image/web/)
-    - url: přímý odkaz na profil druhu na dalib.cz
-    """
+def fetch_diatombase_data(species_name):
+    if not species_name or pd.isna(species_name):
+        return {
+            "scientific_name": "", "authority": "", "status": "",
+            "url": "", "classification": "", "source": "Nenalezeno"
+        }
+    sp_clean = str(species_name).strip()
+    sp_clean = re.sub(r'\s*\(.*?\)\s*', ' ', sp_clean).strip()
+    sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp_clean).strip()
+    if not sp_clean:
+        return {
+            "scientific_name": "", "authority": "", "status": "",
+            "url": "", "classification": "", "source": "Nenalezeno"
+        }
+    return _cached_diatombase_data(sp_clean).copy()
+
+@functools.lru_cache(maxsize=4096)
+def _cached_dalibor_data(species_name: str, max_photos: int = 3):
+\
+\
+\
+\
+\
+\
+
     res = {
         "scientific_name": "",
         "czech_name": "",
@@ -2895,15 +3286,14 @@ def fetch_dalibor_data(species_name, max_photos=3):
     sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp_clean).strip()
     if not sp_clean:
         return res
-        
+
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'}
     dalib_url = f"https://dalib.cz/taxon/info/{urllib.parse.quote(sp_clean)}"
     try:
         r = requests.get(dalib_url, headers=headers, timeout=8)
         if r.status_code == 200:
             soup = BeautifulSoup(r.text, 'html.parser')
-            
-            # Fotografie lišejníku
+
             photos = []
             for img in soup.find_all('img'):
                 src = img.get('src', '')
@@ -2912,15 +3302,14 @@ def fetch_dalibor_data(species_name, max_photos=3):
                     full_img_url = urllib.parse.urljoin('https://dalib.cz', full_img)
                     if full_img_url not in photos:
                         photos.append(full_img_url)
-            
-            # Popis a ekologie lišejníku z DaLiBor (div.content)
+
             desc_parts = []
             content_div = soup.find('div', class_='content') or soup
             for p in content_div.find_all('p'):
                 p_text = p.get_text(separator=' ', strip=True)
                 if len(p_text) < 35:
                     continue
-                # Důkladně filtrovat navigaci, statistiky, taxonomický drobeček a patičku/copyright
+
                 if any(bad in p_text.lower() for bad in [
                     'botanick', 'copyright', 'počet záznamů', 'pocet zaznamu', 'poet zznam',
                     'kliknutím', 'menu', 'ascomycota', 'cookie', 'dalibor.cz',
@@ -2929,11 +3318,10 @@ def fetch_dalibor_data(species_name, max_photos=3):
                     continue
                 if p_text not in desc_parts:
                     desc_parts.append(p_text)
-                    
+
             title_elem = soup.find('h1') or soup.find('h2')
             found_title = title_elem.get_text(strip=True) if title_elem else ""
-            
-            # Lišejník je platně nalezen pouze pokud má fotky, popis nebo h1/h2 obsahující hledaný rod
+
             is_valid_dalibor = False
             if photos or desc_parts:
                 is_valid_dalibor = True
@@ -2941,7 +3329,7 @@ def fetch_dalibor_data(species_name, max_photos=3):
                 genus_name = sp_clean.split()[0].lower()
                 if genus_name in found_title.lower() and "atlas" not in found_title.lower():
                     is_valid_dalibor = True
-            
+
             if is_valid_dalibor:
                 res["scientific_name"] = found_title if found_title else sp_clean
                 res["url"] = dalib_url
@@ -2953,11 +3341,20 @@ def fetch_dalibor_data(species_name, max_photos=3):
         pass
     return res
 
+def fetch_dalibor_data(species_name, max_photos=3):
+    if not species_name or pd.isna(species_name):
+        return {'scientific_name': '', 'czech_name': '', 'description': '', 'photo_urls': [], 'url': '', 'source': 'Nenalezeno'}
+    sp = str(species_name).strip()
+    if not sp:
+        return {'scientific_name': '', 'czech_name': '', 'description': '', 'photo_urls': [], 'url': '', 'source': 'Nenalezeno'}
+    res = _cached_dalibor_data(sp, int(max_photos))
+    return {k: (v.copy() if isinstance(v, list) else v) for k, v in res.items()}
+
 def fetch_gbif_plant_photos(species_name, get_kvet=True, get_list=True, get_herbar=False):
-    """
-    Vyhledá fotografii květu, listu a/nebo herbářové položky z GBIF API.
-    Filtruje pouze položky s platnou Creative Commons licencí a přikládá metadata autora.
-    """
+\
+\
+\
+
     photos = {
         "kvet": "",
         "list": "",
@@ -2974,31 +3371,29 @@ def fetch_gbif_plant_photos(species_name, get_kvet=True, get_list=True, get_herb
     try:
         clean_name = re.sub(r'\s*\(.*\)\s*', '', species_name).strip()
         clean_name = re.sub(r'\s+sp(p)?\.?$', '', clean_name).strip()
-        
+
         match_url = "https://api.gbif.org/v1/species/match"
         match_params = {
             "name": clean_name,
             "kingdom": "Plantae",
             "strict": "true"
         }
-        
+
         r_match = requests.get(match_url, params=match_params, timeout=8)
         if r_match.status_code != 200:
             return photos
-            
+
         match_data = r_match.json()
         if match_data.get("matchType") == "NONE":
             return photos
-            
+
         usage_key = match_data.get("usageKey")
         if not usage_key:
             return photos
 
-        # Keywords pro detekci orgánů
         kvet_keywords = ["flower", "flos", "inflorescence", "fleur", "blüte"]
         list_keywords = ["leaf", "leaves", "folium", "feuille", "blatt"]
 
-        # Seznam dotazů na pozorování (prioritizujeme Pl@ntNet verified observations)
         queries = []
         if get_kvet or get_list:
             queries = [
@@ -3010,7 +3405,7 @@ def fetch_gbif_plant_photos(species_name, get_kvet=True, get_list=True, get_herb
         for params in queries:
             if (not get_kvet or photos["kvet"]) and (not get_list or photos["list"]):
                 break
-                
+
             try:
                 r_occ = requests.get("https://api.gbif.org/v1/occurrence/search", params=params, timeout=8)
                 if r_occ.status_code == 200:
@@ -3025,24 +3420,22 @@ def fetch_gbif_plant_photos(species_name, get_kvet=True, get_list=True, get_herb
                                 continue
                             if not is_cc_license(media.get("license")):
                                 continue
-                                
+
                             title = str(media.get("title", "")).lower()
                             desc = str(media.get("description", "")).lower()
                             attr_text = extract_gbif_attribution(media, occ)
-                            
-                            # Květ
+
                             if get_kvet and not photos["kvet"] and any(kw in title or kw in desc for kw in kvet_keywords):
                                 photos["kvet"] = f"{img_url}|{attr_text}"
                                 photos["source"] = "GBIF Occurrence"
-                            # List
+
                             elif get_list and not photos["list"] and any(kw in title or kw in desc for kw in list_keywords):
                                 photos["list"] = f"{img_url}|{attr_text}"
                                 photos["source"] = "GBIF Occurrence"
-                                    
+
             except Exception:
                 pass
 
-        # Herbářová položka (PRESERVED_SPECIMEN)
         if get_herbar and not photos["herbar"]:
             try:
                 r_herb = requests.get(
@@ -3072,10 +3465,10 @@ def fetch_gbif_plant_photos(species_name, get_kvet=True, get_list=True, get_herb
     return photos
 
 def fetch_gbif_zoo_photos(species_name, max_photos=3):
-    """
-    Vyhledá fotky živočichů z GBIF API (occurrence search) pro daný taxon.
-    Filtruje pouze Creative Commons licence a přikládá metadata autora.
-    """
+\
+\
+\
+
     photos = []
     if not species_name or pd.isna(species_name):
         return photos
@@ -3085,7 +3478,7 @@ def fetch_gbif_zoo_photos(species_name, max_photos=3):
     try:
         clean_name = re.sub(r'\s*\(.*\)\s*', '', species_name).strip()
         clean_name = re.sub(r'\s+sp(p)?\.?$', '', clean_name).strip()
-        
+
         match_url = "https://api.gbif.org/v1/species/match"
         match_params = {
             "name": clean_name,
@@ -3125,10 +3518,10 @@ def fetch_gbif_zoo_photos(species_name, max_photos=3):
     return photos
 
 def fetch_gbif_fungi_photos(species_name, max_photos=3):
-    """
-    Vyhledá fotky hub (říše Fungi / mykologie) z GBIF API (occurrence search) pro daný taxon.
-    Filtruje pouze Creative Commons licence a přikládá metadata autora.
-    """
+\
+\
+\
+
     photos = []
     if not species_name or pd.isna(species_name):
         return photos
@@ -3138,7 +3531,7 @@ def fetch_gbif_fungi_photos(species_name, max_photos=3):
     try:
         clean_name = re.sub(r'\s*\(.*\)\s*', '', species_name).strip()
         clean_name = re.sub(r'\s+sp(p)?\.?$', '', clean_name).strip()
-        
+
         match_url = "https://api.gbif.org/v1/species/match"
         match_params = {
             "name": clean_name,
@@ -3151,7 +3544,7 @@ def fetch_gbif_fungi_photos(species_name, max_photos=3):
             match_data = r_match.json()
             if match_data.get("matchType") not in ["NONE", "HIGHERRANK"] and match_data.get("rank") not in ["KINGDOM", "PHYLUM", "CLASS"] and match_data.get("kingdom") == "Fungi":
                 usage_key = match_data.get("usageKey")
-                
+
         if usage_key:
             occ_url = "https://api.gbif.org/v1/occurrence/search"
             occ_params = {
@@ -3179,15 +3572,16 @@ def fetch_gbif_fungi_photos(species_name, max_photos=3):
         pass
     return photos
 
-def fetch_mykologie_data(query, max_photos=4):
-    """
-    Vyhledá houbu na webu Mykologie.net a vrátí:
-    - photo_urls: seznam URL fotografií v plné kvalitě
-    - description: odborný český popis houby
-    - url: přímý odkaz na profil houby na Mykologie.net
-    - title: celý název (latinský + český)
-    - czech_name, latin_name
-    """
+@functools.lru_cache(maxsize=4096)
+def _cached_mykologie_data(query_str: str, max_photos: int = 4):
+\
+\
+\
+\
+\
+\
+\
+
     res = {
         'title': '',
         'czech_name': '',
@@ -3202,12 +3596,11 @@ def fetch_mykologie_data(query, max_photos=4):
     query_str = str(query).strip()
     if not query_str:
         return res
-        
+
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
     }
-    
-    # Odstranění závorek a zkratek pro vyhledávání
+
     clean_q = re.sub(r'\s*\(.*?\)\s*', ' ', query_str).strip()
     clean_q = re.sub(r'\s+sp(p)?\.?$', '', clean_q).strip()
     if not clean_q:
@@ -3236,8 +3629,7 @@ def fetch_mykologie_data(query, max_photos=4):
 
     try:
         found_items = _do_search(clean_q)
-        
-        # Pokud se napoprvé nic nenajde a dotaz obsahuje české znaky / mezery, zkusíme vyhledat vědecké jméno přes iNaturalist
+
         if not found_items and (any(ord(c) > 127 for c in clean_q) or len(clean_q.split()) != 2):
             try:
                 r_tax = requests.get(
@@ -3258,7 +3650,6 @@ def fetch_mykologie_data(query, max_photos=4):
         if not found_items:
             return res
 
-        # Nalezení nejvhodnější shody v nalezených položkách
         q_words = [w.lower() for w in clean_q.split() if len(w) > 2]
         best_item = None
         for text, href in found_items:
@@ -3269,32 +3660,30 @@ def fetch_mykologie_data(query, max_photos=4):
             if q_words and all(w in t_lower for w in q_words):
                 best_item = (text, href)
                 break
-                
+
         if not best_item and q_words:
             for text, href in found_items:
                 if q_words[0] in text.lower():
                     best_item = (text, href)
                     break
-                    
+
         if not best_item:
             best_item = found_items[0]
 
-        # Stažení detailu položky z Mykologie.net
         item_href = best_item[1]
         full_url = urllib.parse.urljoin('https://www.mykologie.net', item_href)
         r_item = requests.get(full_url, headers=headers, timeout=8)
         if r_item.status_code != 200:
             return res
-            
+
         item_soup = BeautifulSoup(r_item.text, 'html.parser')
-        
-        # Titulek a názvy
+
         title_elem = item_soup.find('h2', class_='itemTitle')
         full_title = title_elem.get_text(strip=True) if title_elem else best_item[0]
         res['title'] = full_title
         res['url'] = full_url
         res['source'] = 'Mykologie.net'
-        
+
         m_title = re.match(r'^(.*?)\s*\((.*?)\)$', full_title)
         if m_title:
             res['latin_name'] = m_title.group(1).strip()
@@ -3302,11 +3691,10 @@ def fetch_mykologie_data(query, max_photos=4):
         else:
             res['latin_name'] = full_title
 
-        # Extrakce popisu a fotek
         item_full_text = item_soup.find('div', class_='itemFullText') or item_soup.find('div', class_='itemIntroText')
         paragraphs = []
         images = []
-        
+
         if item_full_text:
             for p in item_full_text.find_all('p'):
                 for img in p.find_all('img'):
@@ -3315,12 +3703,12 @@ def fetch_mykologie_data(query, max_photos=4):
                         img_url = urllib.parse.urljoin('https://www.mykologie.net', src)
                         if img_url not in images:
                             images.append(img_url)
-                            
+
                 p_text = p.get_text(separator=' ', strip=True)
                 if p_text and '(c)' not in p_text and '©' not in p_text:
                     if len(p_text) > 40:
                         paragraphs.append(p_text)
-                        
+
             for img in item_full_text.find_all('img'):
                 src = img.get('src', '')
                 if src:
@@ -3343,11 +3731,11 @@ def fetch_mykologie_data(query, max_photos=4):
     return res
 
 def fetch_bird_sounds_xenocanto(species_name, sound_types=None, max_sounds=1, api_key=""):
-    """
-    Stáhne přímé MP3 URL hlasů ptáků z databáze Xeno-canto (API v3).
-    sound_types: list např. ["song", "call"] – stáhne nahrávky pro každý typ.
-    Vrátí seznam (url, sound_type) tuplů.
-    """
+\
+\
+\
+\
+
     if sound_types is None:
         sound_types = ["song"]
     results = []
@@ -3371,7 +3759,6 @@ def fetch_bird_sounds_xenocanto(species_name, sound_types=None, max_sounds=1, ap
 
     clean_name = _clean(species_name)
 
-    # Pokud název obsahuje české znaky nebo není binomický latinský, zkusíme zjistit vědecký název přes iNaturalist
     sci_name = clean_name
     parts = clean_name.split()
     is_likely_czech = any(ord(c) > 127 for c in clean_name)
@@ -3398,11 +3785,11 @@ def fetch_bird_sounds_xenocanto(species_name, sound_types=None, max_sounds=1, ap
         try:
             queries_to_try = []
             if len(sci_parts) >= 2:
-                # 1. Specifický druh s typem a kvalitou A
+
                 queries_to_try.append(f'sp:"{sci_parts[0]} {sci_parts[1]}" type:{stype} q:A')
-                # 2. Specifický druh s typem (jakákoliv kvalita)
+
                 queries_to_try.append(f'sp:"{sci_parts[0]} {sci_parts[1]}" type:{stype}')
-                # 3. Specifický druh obecně
+
                 queries_to_try.append(f'sp:"{sci_parts[0]} {sci_parts[1]}"')
             else:
                 queries_to_try.append(f'gen:{sci_parts[0]} type:{stype} q:A')
@@ -3456,8 +3843,6 @@ def fetch_bird_sounds_xenocanto(species_name, sound_types=None, max_sounds=1, ap
             pass
     return results
 
-
-# 3. UniProt Gene & Protein modul
 def fetch_uniprot_data(gene_name):
     res = {"protein_name": "", "function": "", "source": "Nenalezeno"}
     if not gene_name or pd.isna(gene_name):
@@ -3465,7 +3850,7 @@ def fetch_uniprot_data(gene_name):
     gene_name = str(gene_name).strip()
     if not gene_name:
         return res
-        
+
     url = f"https://rest.uniprot.org/uniprotkb/search?query=gene:{urllib.parse.quote(gene_name)}+AND+organism_id:9606&format=json&size=1"
     try:
         r = requests.get(url, timeout=5)
@@ -3480,7 +3865,7 @@ def fetch_uniprot_data(gene_name):
                     res["protein_name"] = rec_name.get("fullName", {}).get("value", "")
                 elif desc.get("submissionNames"):
                     res["protein_name"] = desc["submissionNames"][0].get("fullName", {}).get("value", "")
-                
+
                 comments = entry.get("comments", [])
                 for c in comments:
                     if c.get("commentType") == "FUNCTION":
@@ -3493,7 +3878,6 @@ def fetch_uniprot_data(gene_name):
         pass
     return res
 
-# 4. MKN-10 (ICD-10) Klinický vyhledávač
 def fetch_icd10_data(query):
     res = {"code": "", "name": "", "source": "Nenalezeno"}
     if not query or pd.isna(query):
@@ -3501,7 +3885,7 @@ def fetch_icd10_data(query):
     query = str(query).strip()
     if not query:
         return res
-        
+
     url = f"https://clinicaltables.nlm.nih.gov/api/icd10cm/v3/search?terms={urllib.parse.quote(query)}&sf=code,name"
     try:
         r = requests.get(url, timeout=5)
@@ -3515,18 +3899,17 @@ def fetch_icd10_data(query):
         pass
     return res
 
-# 5. Wikimedia Commons obrázkový modul
 def fetch_wikimedia_images(query, max_photos=4):
     if not query or pd.isna(query):
         return []
     query = str(query).strip()
     if not query:
         return []
-    
+
     headers = {'User-Agent': 'AnkiCardGen/1.0 (contact: adalb@example.com)'}
     search_query = f"filetype:bitmap|drawing {query}"
     url = f"https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch={urllib.parse.quote(search_query)}&gsrnamespace=6&gsrlimit={max_photos}&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=800&format=json"
-    
+
     photos = []
     try:
         r = requests.get(url, headers=headers, timeout=6)
@@ -3558,7 +3941,6 @@ def fetch_wikimedia_images(query, max_photos=4):
         pass
     return photos[:max_photos]
 
-# 6. MyMemory Překladač modul
 def translate_text(text, src="en", target="cs"):
     if not text or pd.isna(text):
         return ""
@@ -3575,7 +3957,6 @@ def translate_text(text, src="en", target="cs"):
         pass
     return ""
 
-# 7. English Dictionary API modul
 def fetch_dictionary_data(word):
     res = {"phonetic": "", "definition": "", "example": ""}
     if not word or pd.isna(word):
@@ -3583,7 +3964,7 @@ def fetch_dictionary_data(word):
     word = str(word).strip()
     if not word:
         return res
-    
+
     url = f"https://api.dictionaryapi.dev/api/v2/entries/en/{urllib.parse.quote(word)}"
     try:
         r = requests.get(url, timeout=5)
@@ -3597,7 +3978,7 @@ def fetch_dictionary_data(word):
                         if ph.get("text"):
                             res["phonetic"] = ph["text"]
                             break
-                
+
                 meanings = entry.get("meanings", [])
                 if meanings:
                     defs = meanings[0].get("definitions", [])
@@ -3608,7 +3989,6 @@ def fetch_dictionary_data(word):
         pass
     return res
 
-# 8. PubChem chemický modul
 def fetch_chemistry_data(compound_name):
     res = {"iupac": "", "weight": "", "img_url": ""}
     if not compound_name or pd.isna(compound_name):
@@ -3616,10 +3996,10 @@ def fetch_chemistry_data(compound_name):
     compound_name = str(compound_name).strip()
     if not compound_name:
         return res
-        
+
     encoded_name = urllib.parse.quote(compound_name)
     res["img_url"] = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{encoded_name}/PNG"
-    
+
     url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{encoded_name}/property/IUPACName,MolecularWeight/JSON"
     try:
         r = requests.get(url, timeout=5)
@@ -3633,17 +4013,16 @@ def fetch_chemistry_data(compound_name):
         pass
     return res
 
-# 9. Dějepisné kalendárium (On This Day)
 def fetch_on_this_day_events(date_str):
     res = {"events": "", "source": "Nenalezeno"}
     month, day = parse_date(date_str)
     if not month or not day:
         return res
-        
+
     headers = {'User-Agent': 'AnkiCardGen/1.0 (contact: adalb@example.com)'}
     m_str = f"{month:02d}"
     d_str = f"{day:02d}"
-    
+
     url = f"https://en.wikipedia.org/api/rest_v1/feed/onthisday/all/{m_str}/{d_str}"
     try:
         r = requests.get(url, headers=headers, timeout=5)
@@ -3661,7 +4040,6 @@ def fetch_on_this_day_events(date_str):
         pass
     return res
 
-# 10. Wikipedie obecný encyklopedický modul
 def fetch_wikipedia_general(concept, lang="cs"):
     res = {"title": "", "summary": "", "img_url": "", "source": "Nenalezeno"}
     if not concept or pd.isna(concept):
@@ -3669,11 +4047,11 @@ def fetch_wikipedia_general(concept, lang="cs"):
     concept = str(concept).strip()
     if not concept:
         return res
-        
+
     headers = {'User-Agent': 'AnkiCardGen/1.0 (contact: adalb@example.com)'}
     encoded_name = urllib.parse.quote(concept.replace(' ', '_'))
     url = f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/{encoded_name}"
-    
+
     try:
         r = requests.get(url, headers=headers, timeout=5)
         if r.status_code == 200:
@@ -3687,14 +4065,27 @@ def fetch_wikipedia_general(concept, lang="cs"):
         pass
     return res
 
-# 11. Zeměpisný modul (Stát, hlavní město, region, populace, vlajka)
-@st.cache_data
+def fetch_mykologie_data(query, max_photos=4):
+    if not query or pd.isna(query):
+        return {'title': '', 'czech_name': '', 'latin_name': '', 'description': '', 'photo_urls': [], 'url': '', 'source': 'Nenalezeno'}
+    q_str = str(query).strip()
+    if not q_str:
+        return {'title': '', 'czech_name': '', 'latin_name': '', 'description': '', 'photo_urls': [], 'url': '', 'source': 'Nenalezeno'}
+    res = _cached_mykologie_data(q_str, int(max_photos))
+    return {k: (v.copy() if isinstance(v, list) else v) for k, v in res.items()}
+
+_COUNTRIES_DB_CACHE = None
+
 def load_countries_db():
+    global _COUNTRIES_DB_CACHE
+    if _COUNTRIES_DB_CACHE is not None:
+        return _COUNTRIES_DB_CACHE
     try:
         url = "https://raw.githubusercontent.com/mledoze/countries/master/dist/countries.json"
         r = requests.get(url, timeout=10)
         if r.status_code == 200:
-            return r.json()
+            _COUNTRIES_DB_CACHE = r.json()
+            return _COUNTRIES_DB_CACHE
     except Exception:
         pass
     return []
@@ -3714,34 +4105,32 @@ def fetch_country_data(query, db):
     }
     if not query or not db:
         return res
-        
+
     q = str(query).strip().lower()
     match = None
-    
-    # Hledání shody (anglický název, oficiální název, národní názvy, překlady, ISO kódy)
+
     for c in db:
         names = []
         names.append(c.get('name', {}).get('common', '').lower())
         names.append(c.get('name', {}).get('official', '').lower())
-        
+
         native = c.get('name', {}).get('native', {})
         for l in native:
             names.append(native[l].get('common', '').lower())
             names.append(native[l].get('official', '').lower())
-            
+
         trans = c.get('translations', {})
         for l in trans:
             names.append(trans[l].get('common', '').lower())
             names.append(trans[l].get('official', '').lower())
-            
+
         names.append(c.get('cca2', '').lower())
         names.append(c.get('cca3', '').lower())
-        
+
         if q in names:
             match = c
             break
-            
-    # Pokud se nepodaří přesná shoda, zkusíme vyhledat jako podřetězec
+
     if not match:
         for c in db:
             common = c.get('name', {}).get('common', '').lower()
@@ -3750,26 +4139,25 @@ def fetch_country_data(query, db):
             if q in common or (cz_common and q in cz_common):
                 match = c
                 break
-                
+
     if match:
         trans = match.get('translations', {})
-        
-        # České common jméno, pokud existuje
+
         if 'ces' in trans:
             res["common_name"] = trans['ces'].get('common', match.get('name', {}).get('common', ''))
             res["official_name"] = trans['ces'].get('official', match.get('name', {}).get('official', ''))
         else:
             res["common_name"] = match.get('name', {}).get('common', '')
             res["official_name"] = match.get('name', {}).get('official', '')
-            
+
         cap = match.get('capital', [])
         res["capital"] = cap[0] if cap else ""
         res["region"] = match.get('region', '')
         res["subregion"] = match.get('subregion', '')
-        
+
         langs = match.get('languages', {})
         res["languages"] = ", ".join(langs.values())
-        
+
         curs = match.get('currencies', {})
         cur_list = []
         for code, details in curs.items():
@@ -3777,36 +4165,33 @@ def fetch_country_data(query, db):
             symbol = details.get('symbol', '')
             cur_list.append(f"{name} ({code}) {symbol}".strip())
         res["currencies"] = ", ".join(cur_list)
-        
+
         area = match.get('area')
         if area:
             res["area"] = f"{area:,} km²".replace(",", " ")
-            
+
         cca2 = match.get('cca2', '')
         if cca2:
             res["flag_url"] = f"https://flagsapi.com/{cca2.upper()}/flat/64.png"
-            
+
         res["source"] = "GitHub Countries Database"
-        
+
     return res
 
-
-# --- BRYOLOGICKÝ MODUL (MECHOROSTY: MECHY, JÁTROVKY, HLEVÍKY) ---
-
 def fetch_bryophyte_photos(species_name, max_photos=3):
-    """Stáhne vědecky určené fotografie mechorostů z GBIF a Wikimedia Commons."""
+
     if not species_name or pd.isna(species_name):
         return []
     sp = str(species_name).strip()
     if not sp:
         return []
-        
+
     headers = {'User-Agent': 'AnkiCardGen/1.0 (contact: adalb@example.com)'}
     photos = []
-    
+
     clean_sp = re.sub(r'\(.*?\)', '', sp)
     clean_sp = re.sub(r'\s+(subsp|ssp|var|f|agg)\.?(\s+.*|$)', '', clean_sp, flags=re.IGNORECASE).strip()
-    
+
     try:
         m_url = f"https://api.gbif.org/v1/species/match?name={urllib.parse.quote(clean_sp)}"
         r_m = requests.get(m_url, headers=headers, timeout=5)
@@ -3834,33 +4219,31 @@ def fetch_bryophyte_photos(species_name, max_photos=3):
                             break
     except Exception:
         pass
-        
+
     if len(photos) < max_photos:
         wiki_photos = fetch_wikimedia_images(clean_sp, max_photos=(max_photos - len(photos)))
         for wp in wiki_photos:
             if not any(p.split('|')[0] == wp.split('|')[0] for p in photos):
                 photos.append(wp)
-                
+
     return photos[:max_photos]
 
 def fetch_bryophyte_description(species_name):
-    """Získá odborný morfologický popis mechorostu."""
+
     return fetch_wiki_description(species_name)
 
 def get_bryophyte_link(species_name):
-    """Vrátí odkaz na mezinárodní bryologický portál CNABH / BryophytePortal."""
+
     if not species_name or pd.isna(species_name):
         return ""
     sp = str(species_name).strip()
     return f"https://bryophyteportal.org/portal/taxa/index.php?taxon={urllib.parse.quote(sp)}"
 
-# --- MEZINÁRODNÍ VĚDECKÉ DATABÁZE (ADW, GBIF TREATMENTS, POWO KEW, EOL) ---
-
 def fetch_adw_description(species_name, max_chars=800):
-    """
-    Získá strukturovaný zoologický účet z Animal Diversity Web (University of Michigan Museum of Zoology).
-    Extrahuje sekce: Physical Description, Habitat, Behavior, Food Habits, Reproduction, Lifespan.
-    """
+\
+\
+\
+
     if not species_name or pd.isna(species_name): return ""
     sp_clean = re.sub(r'\s*\(.*\)\s*', '', str(species_name)).strip()
     sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp_clean).strip()
@@ -3893,7 +4276,7 @@ def fetch_adw_description(species_name, max_chars=800):
     return ""
 
 def get_adw_link(species_name):
-    """Vrátí odkaz na profil taxonu v Animal Diversity Web (ADW)."""
+
     if not species_name or pd.isna(species_name): return ""
     sp_clean = re.sub(r'\s*\(.*\)\s*', '', str(species_name)).strip()
     sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp_clean).strip()
@@ -3903,9 +4286,9 @@ def get_adw_link(species_name):
     return f"https://animaldiversity.org/accounts/{account_name}/"
 
 def fetch_gbif_species_description(species_name, max_chars=800):
-    """
-    Získá odborný taxonomický popis, morfologickou diagnózu nebo biologický účet z GBIF Species Descriptions & TreatmentBank.
-    """
+\
+\
+
     if not species_name or pd.isna(species_name): return ""
     sp_clean = re.sub(r'\s*\(.*\)\s*', '', str(species_name)).strip()
     sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp_clean).strip()
@@ -3945,9 +4328,9 @@ def fetch_gbif_species_description(species_name, max_chars=800):
     return ""
 
 def fetch_powo_kew_description(species_name, max_chars=800):
-    """
-    Získá vědecký morfologický popis rostliny z Plants of the World Online (Royal Botanic Gardens, Kew).
-    """
+\
+\
+
     if not species_name or pd.isna(species_name): return ""
     sp_clean = re.sub(r'\s*\(.*\)\s*', '', str(species_name)).strip()
     sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp_clean).strip()
@@ -3985,43 +4368,46 @@ def fetch_powo_kew_description(species_name, max_chars=800):
     return ""
 
 def get_powo_kew_link(species_name):
-    """Vrátí odkaz na profil taxonu v Plants of the World Online (POWO Kew)."""
+
     if not species_name or pd.isna(species_name): return ""
     sp_clean = re.sub(r'\s*\(.*\)\s*', '', str(species_name)).strip()
     sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp_clean).strip()
     return f"https://powo.science.kew.org/search?q={urllib.parse.quote(sp_clean)}"
 
 def get_eol_link(species_name):
-    """Vrátí odkaz na vyhledávání / profil taxonu v Encyclopedia of Life (EOL)."""
+
     if not species_name or pd.isna(species_name): return ""
     sp_clean = re.sub(r'\s*\(.*\)\s*', '', str(species_name)).strip()
     sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp_clean).strip()
     return f"https://eol.org/search?q={urllib.parse.quote(sp_clean)}"
 
-# --- DETEKCE OBRÁZKOVÉHO SLOUPCE ---
-
 def is_image_col(col_name, sample_val=None):
-    """Určí, zda sloupec obsahuje obrázkové URL odkazy nebo soubory."""
+
     col_str = str(col_name).strip()
     col_low = col_str.lower()
-    
-    # 1. Jakýkoliv odkaz na web, popis, fonetika, audio nebo textové hodnoty NIKDY nejsou obrázky
-    if any(k in col_low for k in ["odkaz", "odka", "popis", "fonetic", "zvuk", "tts", "kategorie", "status", "taxonomie", "autorita", "hodnoty", "výskyt", "český název"]):
+
+    text_indicators = [
+        "odkaz", "odka", "popis", "fonetic", "zvuk", "tts", "kategorie", "status",
+        "taxonomie", "autorita", "hodnoty", "výskyt", "český název", "cesky nazev",
+        "říše", "rise", "kmen", "třída", "trida", "oddělení", "oddeleni",
+        "řád", "rad", "čeleď", "celed", "podčeleď", "rod", "druh", "poddruh",
+        "synonym", "areál", "areal", "synonyma"
+    ]
+    if any(k in col_low for k in text_indicators):
         return False
     if col_str.startswith(("[Pladias.cz] Odkaz", "[Pladias] Oddělení", "[Pladias] Třída", "[Pladias] Řád", "[Pladias] Čeleď", "[Pladias] Rod",
                            "[Mykologie.net] Odkaz", "[DaLiBor] Odkaz", "[Mechorosty] Odkaz",
                            "[DiatomBase] Odkaz", "[AlgaeBase] Odkaz", "[ADW] Odkaz", "[POWO Kew] Odkaz", "[EOL] Odkaz",
                            "[ADW] Biologický popis", "[GBIF] Vědecký popis", "[POWO Kew] Popis flóry",
+                           "[GBIF] Říše", "[GBIF] Kmen", "[GBIF] Třída", "[GBIF] Řád", "[GBIF] Čeleď", "[GBIF] Rod", "[GBIF] Taxonomie",
                            "[Wikipedie]", "[Klíč 2019]", "[Nepůvodní flóra]", "[Biotopy]", "[Ekologie]", "[Červený seznam]", "[Květena ČR]")):
         return False
-        
-    # 2. Pladias mapa rozšíření a mapové sloupce
+
     if col_str in ["[Pladias] Mapa rozšíření", "[Pladias.cz] Mapa rozšíření"] or "mapa" in col_low or "mapy" in col_low:
         return True
-        
-    # 3. Explicitní klíčová slova obrázkových sloupců a biologických foto modulů
+
     img_keywords = [
-        'photo', 'obrázk', 'obrazk', 'image', 'fotk', 'molekula', 'náhled',
+        'photo', 'foto', 'obrázk', 'obrazk', 'image', 'fotk', 'molekula', 'náhled',
         'květ', 'kvet', 'list', 'herbar', 'herbář', 'vlastní', 'vlastni', 'vlajka',
         'houb', 'hřib', 'zoolog', 'zvíř', 'živoč', 'ptác', 'pták', 'hmyz', 'motýl',
         'habitus', 'plod', 'šišk', 'výtrus', 'spora', 'podzemn'
@@ -4029,13 +4415,15 @@ def is_image_col(col_name, sample_val=None):
     if any(k in col_low for k in img_keywords):
         return True
 
-    # 4. Známé foto moduly
-    if col_str.startswith(("[GBIF] ", "[iNaturalist] ", "[Pladias] ", "[Mykologie.net] ", "[DaLiBor] ", "[Mechorosty] ", "[AlgaeBase] ", "[DiatomBase] ")):
+    if col_str.startswith(("[GBIF] Habitus", "[GBIF] Květ", "[GBIF] List", "[GBIF] Plod", "[GBIF] Herbář",
+                           "[GBIF Zoologie] Foto", "[GBIF Houby] Foto", "[iNaturalist] Foto",
+                           "[Pladias] Foto", "[Mykologie.net] Foto", "[DaLiBor] Foto",
+                           "[Mechorosty] Foto", "[AlgaeBase] Foto", "[DiatomBase] Foto")):
         return True
-        
-    # 5. Kontrola hodnoty buňky (pokud obsahuje URL končící na obrázkovou příponu)
+
     if isinstance(sample_val, str):
         first_part = sample_val.split(';')[0].split('|')[0].strip().lower()
+        if any(first_part.endswith(x) for x in ['.jpg', '.jpeg', '.png', '.webp', '.gif']): return True
         if first_part.startswith(('http://', 'https://')):
             if any(ext in first_part for ext in ['.jpg', '.jpeg', '.png', '.webp', '.gif', 'images', 'upload', 'photos', 'wikimedia']):
                 if not any(bad in first_part for bad in ['.mp3', '.wav', '.ogg', 'xeno-canto', 'translate_tts']):
@@ -4043,7 +4431,7 @@ def is_image_col(col_name, sample_val=None):
     return False
 
 def check_col_is_image(col, df=None):
-    """Bezpečně ověří, zda sloupec obsahuje obrázky nebo mapy v kontextu tabulky."""
+
     sample_val = ""
     if df is not None and not df.empty and col in df.columns:
         try:
@@ -4056,18 +4444,29 @@ def check_col_is_image(col, df=None):
     return is_image_col(col, sample_val)
 
 def format_img_src_for_html(src_str: str) -> str:
-    """Vrátí webové URL nebo data URI v base64 pro lokální obrázek pro spolehlivé zobrazení v HTML."""
+
     if not src_str:
         return ""
     src_str = str(src_str).strip()
+    if "<img" in src_str:
+        m = re.search(r'src=["\']([^"\']+)["\']', src_str)
+        if m:
+            src_str = m.group(1).strip()
     if src_str.startswith("http://") or src_str.startswith("https://") or src_str.startswith("data:image"):
         return src_str
-    # Kontrola lokálního souboru na absolutní i relativní cestě
+
+    clean_p = src_str
+    if clean_p.startswith("file:///"):
+        clean_p = urllib.parse.unquote(clean_p[8:])
+    elif clean_p.startswith("file://"):
+        clean_p = urllib.parse.unquote(clean_p[7:])
     local_candidates = [
-        src_str,
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), src_str),
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "custom_media", os.path.basename(src_str)),
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_media", os.path.basename(src_str))
+        clean_p,
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), clean_p),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "custom_media", os.path.basename(clean_p)),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_media", os.path.basename(clean_p)),
+        os.path.join("custom_media", os.path.basename(clean_p)),
+        os.path.join("test_media", os.path.basename(clean_p))
     ]
     for cand in local_candidates:
         if os.path.isfile(cand):
@@ -4081,22 +4480,440 @@ def format_img_src_for_html(src_str: str) -> str:
                 pass
     return src_str
 
-# --- EXTRAKCE A EDITACE EXISTUJÍCÍCH ANKI BALÍČKŮ (.APKG) ---
+def normalize_match_key(val):
+
+    import re, html
+    if not val or pd.isna(val):
+        return ""
+    txt = str(val).strip()
+    txt = html.unescape(txt)
+    txt = re.sub(r'<[^>]+>', ' ', txt)
+    txt = re.sub(r'\[sound:[^\]]+\]', '', txt)
+    txt = re.sub(r'\[\[.*?\]\]', '', txt)
+    txt = re.sub(r'\s+', ' ', txt).strip().lower()
+    words = txt.split()
+    if len(words) >= 2:
+        return f"{words[0]} {words[1]}"
+    return txt
+
+def unpack_anki_card_fields(note_raw_dict, media_target_dir="custom_media"):
+\
+\
+\
+\
+\
+
+    import os, re
+    from bs4 import BeautifulSoup
+
+    sys_cols = {k: v for k, v in note_raw_dict.items() if k.startswith('_anki_') or k == '[Anki] Štítky'}
+    data_cols = {k: v for k, v in note_raw_dict.items() if not k.startswith('_anki_') and k != '[Anki] Štítky'}
+
+    col_names_low = [c.lower() for c in data_cols.keys()]
+    if len(data_cols) > 2 and 'front' not in col_names_low and 'back' not in col_names_low:
+        return note_raw_dict
+
+    front_val = ""
+    back_val = ""
+    for k, v in data_cols.items():
+        if k.lower() in ['front', 'líc', 'lic', 'otázka', 'otazka']:
+            front_val = str(v)
+        elif k.lower() in ['back', 'rub', 'odpověď', 'odpoved']:
+            back_val = str(v)
+        elif not front_val:
+            front_val = str(v)
+        elif not back_val:
+            back_val = str(v)
+
+    if not ('<' in front_val or '<' in back_val or 'card-field' in back_val):
+        out_dict = dict(sys_cols)
+        first = True
+        for k, v in data_cols.items():
+            if first and k.lower() in ['front', 'líc']:
+                out_dict['Pojem'] = v
+            elif k.lower() in ['back', 'rub']:
+                out_dict['Popis'] = v
+            else:
+                out_dict[k] = v
+            first = False
+        return out_dict
+
+    def _is_copyright_or_attribution(text: str) -> bool:
+        if not text:
+            return False
+        t = str(text).strip()
+        t_lower = t.lower()
+        if t.startswith('©') or '©' in t:
+            return True
+        if '(c)' in t_lower or 'copyright' in t_lower:
+            return True
+        if 'cc by' in t_lower or 'cc-by' in t_lower or 'creative commons' in t_lower:
+            return True
+        if 'via inaturalist' in t_lower or 'uploaded by' in t_lower or ('inaturalist' in t_lower and ('via' in t_lower or 'by' in t_lower)):
+            return True
+        if t_lower.startswith(('autor:', 'foto:', 'fotografie:', 'licence:', 'zdroj:')):
+            return True
+        return False
+
+    unpacked = {}
+
+    soup_front = BeautifulSoup(front_val or "", "html.parser")
+
+    for cap in soup_front.find_all(class_=re.compile(r'(photo-caption|audio-caption|caption)')):
+        cap.decompose()
+    for small in soup_front.find_all(['small', 'figcaption']):
+        if _is_copyright_or_attribution(small.get_text()):
+            small.decompose()
+
+    front_imgs = []
+    for img in soup_front.find_all('img'):
+        src = img.get('src', '').strip()
+        if src:
+            if media_target_dir and os.path.exists(os.path.join(media_target_dir, src)):
+                front_imgs.append(os.path.join(media_target_dir, src).replace('\\', '/'))
+            else:
+                front_imgs.append(src)
+        img.decompose()
+    if front_imgs:
+        unpacked['Fotografie'] = "; ".join(front_imgs)
+
+    front_text = soup_front.get_text(separator=' ', strip=True)
+    if front_text and not _is_copyright_or_attribution(front_text):
+        unpacked['Pojem'] = front_text
+
+    soup_back = BeautifulSoup(back_val or "", "html.parser")
+    for cap in soup_back.find_all(class_=re.compile(r'(photo-caption|audio-caption|caption)')):
+        cap.decompose()
+    for small in soup_back.find_all(['small', 'figcaption']):
+        if _is_copyright_or_attribution(small.get_text()):
+            small.decompose()
+
+    card_fields = soup_back.find_all('div', class_=re.compile(r'card-field'))
+    if card_fields:
+        for cf in card_fields:
+            lbl_el = cf.find(class_=re.compile(r'field-label'))
+            val_el = cf.find(class_=re.compile(r'field-value'))
+            label_text = lbl_el.get_text(strip=True) if lbl_el else ""
+
+            link_el = cf.find('a')
+            if link_el and link_el.get('href'):
+                href = link_el['href']
+                col_name = label_text or "Odkaz"
+                if "mykologie.net" in href: col_name = "[Mykologie.net] Odkaz"
+                elif "pladias.cz" in href: col_name = "[Pladias.cz] Odkaz"
+                elif "wikipedia.org" in href: col_name = "[Wikipedie] Odkaz"
+                elif "inaturalist.org" in href: col_name = "[iNaturalist] Odkaz"
+                elif "biolib.cz" in href: col_name = "[BioLib] Odkaz"
+                unpacked[col_name] = href
+                continue
+
+            back_cf_imgs = []
+            for img in cf.find_all('img'):
+                src = img.get('src', '').strip()
+                if src:
+                    if media_target_dir and os.path.exists(os.path.join(media_target_dir, src)):
+                        back_cf_imgs.append(os.path.join(media_target_dir, src).replace('\\', '/'))
+                    else:
+                        back_cf_imgs.append(src)
+            if back_cf_imgs:
+                img_col = label_text if label_text else "Fotografie"
+                if img_col in unpacked:
+                    unpacked[img_col] += "; " + "; ".join(back_cf_imgs)
+                else:
+                    unpacked[img_col] = "; ".join(back_cf_imgs)
+                continue
+
+            audio_el = cf.find('audio')
+            if audio_el and audio_el.get('src'):
+                audio_src = audio_el['src']
+                unpacked['[Zvuky] Nahrávka'] = audio_src
+                continue
+
+            if val_el:
+                val_text = val_el.get_text(separator=' ', strip=True)
+                if not _is_copyright_or_attribution(val_text):
+                    col_name = label_text or "Popis"
+                    unpacked[col_name] = val_text
+            elif label_text:
+                cf_text = cf.get_text(separator=' ', strip=True)
+                val_text = cf_text.replace(label_text, '', 1).strip()
+                if not _is_copyright_or_attribution(val_text):
+                    unpacked[label_text] = val_text
+    else:
+
+        lines = soup_back.get_text(separator='\n').splitlines()
+        current_field = "Popis"
+        for line in lines:
+            line_str = line.strip()
+            if not line_str or _is_copyright_or_attribution(line_str): continue
+            if ':' in line_str and len(line_str.split(':')[0]) < 30:
+                parts = line_str.split(':', 1)
+                col_name = parts[0].strip()
+                val_text = parts[1].strip()
+                if not _is_copyright_or_attribution(val_text):
+                    unpacked[col_name] = val_text
+                    current_field = col_name
+            else:
+                if current_field in unpacked:
+                    unpacked[current_field] += " " + line_str
+                else:
+                    unpacked[current_field] = line_str
+
+    is_pojem_bad = (
+        'Pojem' not in unpacked
+        or not str(unpacked['Pojem']).strip()
+        or str(unpacked['Pojem']).strip().startswith('<')
+        or _is_copyright_or_attribution(unpacked['Pojem'])
+    )
+
+    scientific_keys = [
+        'Vědecké jméno', 'Vedecke jmeno', 'Vědecký název', 'Taxon', 'Druh',
+        'Latinské jméno', 'Latinský název', 'scientific_name', 'Species'
+    ]
+    czech_keys = [
+        'České jméno', 'Český název', 'ceske_jmeno', 'Czech name'
+    ]
+
+    for k in scientific_keys:
+        if k in unpacked:
+            val_p = unpacked[k]
+            if is_pojem_bad:
+                if val_p and not _is_copyright_or_attribution(val_p):
+                    unpacked['Pojem'] = val_p
+                    unpacked.pop(k, None)
+                    is_pojem_bad = False
+                    break
+            else:
+                if str(val_p).strip().lower() == str(unpacked.get('Pojem', '')).strip().lower():
+                    unpacked.pop(k, None)
+                break
+
+    if is_pojem_bad:
+        for k in czech_keys:
+            if k in unpacked:
+                val_p = unpacked[k]
+                if val_p and not _is_copyright_or_attribution(val_p):
+                    unpacked['Pojem'] = val_p
+                    unpacked.pop(k, None)
+                    is_pojem_bad = False
+                    break
+
+    if 'Pojem' in unpacked and (_is_copyright_or_attribution(unpacked['Pojem']) or not str(unpacked['Pojem']).strip()):
+        del unpacked['Pojem']
+
+    final_dict = dict(sys_cols)
+    if 'Pojem' in unpacked:
+        final_dict['Pojem'] = unpacked.pop('Pojem')
+    for k, v in unpacked.items():
+        final_dict[k] = v
+
+    return final_dict
+
+def normalize_col_key(s):
+
+    if not s or pd.isna(s):
+        return ""
+    import unicodedata
+    s = str(s).strip().lower()
+    s = unicodedata.normalize('NFKD', s).encode('ASCII', 'ignore').decode('utf-8')
+    s = re.sub(r'\[.*?\]', '', s)
+    s = re.sub(r'[^a-z0-9]', '', s)
+    return s
+
+SYNONYM_GROUPS = [
+    {"pojem", "vedeckejmeno", "taxon", "druh", "latina", "latinsky", "nazev", "species", "scientificname"},
+    {"ceskejmeno", "ceskynazev", "cesky", "czechname"},
+    {"popis", "poznamky", "poznamka", "charakteristika", "text", "description", "notes", "vlastnipoznamky"},
+    {"fotografie", "foto", "fotka", "fotky", "obrazek", "obrazky", "image", "images", "photo", "photos"},
+    {"odkaz", "url", "link", "web", "profil"},
+    {"celed", "family"},
+    {"rad", "order"},
+    {"trida", "class"},
+    {"kmen", "phylum"},
+    {"rise", "kingdom"}
+]
+
+def auto_match_columns(table_cols, apkg_cols):
+\
+\
+\
+\
+\
+
+    mapping = {}
+    used_apkg = set()
+    clean_apkg = [c for c in apkg_cols if not str(c).startswith('_anki_')]
+
+    for tc in table_cols:
+        norm_tc = normalize_col_key(tc)
+        if not norm_tc: continue
+        for ac in clean_apkg:
+            if ac in used_apkg: continue
+            norm_ac = normalize_col_key(ac)
+            if norm_tc == norm_ac:
+                mapping[tc] = ac
+                used_apkg.add(ac)
+                break
+
+    for tc in table_cols:
+        if tc in mapping: continue
+        norm_tc = normalize_col_key(tc)
+        if not norm_tc: continue
+
+        matched_group = None
+        for group in SYNONYM_GROUPS:
+            if norm_tc in group:
+                matched_group = group
+                break
+
+        if matched_group:
+            for ac in clean_apkg:
+                if ac in used_apkg: continue
+                norm_ac = normalize_col_key(ac)
+                if norm_ac in matched_group:
+                    mapping[tc] = ac
+                    used_apkg.add(ac)
+                    break
+
+    return mapping
+
+def smart_merge_apkg_and_excel(
+    apkg_df,
+    table_df,
+    col_mapping=None,
+    source_priority="table",
+    keep_only_table=False
+):
+\
+\
+\
+\
+\
+\
+\
+\
+\
+\
+
+    if col_mapping is None:
+        col_mapping = auto_match_columns(table_df.columns, apkg_df.columns)
+
+    excel_key_col = table_df.columns[0]
+
+    if excel_key_col in col_mapping and col_mapping[excel_key_col] in apkg_df.columns:
+        apkg_key_col = col_mapping[excel_key_col]
+    elif 'Pojem' in apkg_df.columns:
+        apkg_key_col = 'Pojem'
+    else:
+        non_sys = [c for c in apkg_df.columns if not str(c).startswith('_anki_')]
+        apkg_key_col = non_sys[0] if non_sys else apkg_df.columns[0]
+
+    inv_mapping = {ac: tc for tc, ac in col_mapping.items()}
+
+    def is_empty(val):
+        return pd.isna(val) or str(val).strip() == "" or str(val).lower() == "nan"
+
+    apkg_map = {}
+    for idx, row in apkg_df.iterrows():
+        k = normalize_match_key(row.get(apkg_key_col))
+        if k and k not in apkg_map:
+            apkg_map[k] = row
+
+    matched_count = 0
+    matched_keys = set()
+    new_rows = []
+
+    for idx, row in table_df.iterrows():
+        k = normalize_match_key(row.get(excel_key_col))
+        row_dict = row.to_dict()
+
+        if k in apkg_map:
+            apkg_row = apkg_map[k]
+            matched_keys.add(k)
+            matched_count += 1
+
+            row_dict['_anki_guid'] = apkg_row.get('_anki_guid')
+            row_dict['_anki_id'] = apkg_row.get('_anki_id')
+            row_dict['_anki_mid'] = apkg_row.get('_anki_mid')
+
+            for tc, ac in col_mapping.items():
+                if tc in row_dict and ac in apkg_row:
+                    t_val = row_dict.get(tc)
+                    a_val = apkg_row.get(ac)
+
+                    prio = source_priority.get(tc, "table") if isinstance(source_priority, dict) else source_priority
+                    if prio == "anki":
+
+                        if not is_empty(a_val):
+                            row_dict[tc] = a_val
+                        elif not is_empty(t_val):
+                            row_dict[tc] = t_val
+                    else:
+
+                        if not is_empty(t_val):
+                            row_dict[tc] = t_val
+                        elif not is_empty(a_val):
+                            row_dict[tc] = a_val
+
+            for ac, av in apkg_row.items():
+                if str(ac).startswith('_anki_'): continue
+                if ac not in inv_mapping:
+                    if ac not in row_dict or is_empty(row_dict[ac]):
+                        row_dict[ac] = av
+
+        new_rows.append(row_dict)
+
+    merged_df = pd.DataFrame(new_rows)
+
+    unmatched_apkg_count = 0
+    if not keep_only_table:
+        extra_apkg_rows = []
+        for idx, row in apkg_df.iterrows():
+            k = normalize_match_key(row.get(apkg_key_col))
+            if k and k not in matched_keys:
+                row_dict = {}
+                row_dict['_anki_guid'] = row.get('_anki_guid')
+                row_dict['_anki_id'] = row.get('_anki_id')
+                row_dict['_anki_mid'] = row.get('_anki_mid')
+
+                for tc, ac in col_mapping.items():
+                    if ac in row:
+                        row_dict[tc] = row.get(ac)
+
+                for ac, av in row.items():
+                    if str(ac).startswith('_anki_'): continue
+                    if ac not in inv_mapping:
+                        row_dict[ac] = av
+
+                for tc in table_df.columns:
+                    if tc not in row_dict:
+                        row_dict[tc] = ""
+
+                extra_apkg_rows.append(row_dict)
+                unmatched_apkg_count += 1
+
+        if extra_apkg_rows:
+            extra_df = pd.DataFrame(extra_apkg_rows)
+            merged_df = pd.concat([merged_df, extra_df], ignore_index=True)
+
+    return merged_df, matched_count, len(table_df) - matched_count, unmatched_apkg_count
 
 def extract_apkg_to_dataframe(apkg_file_or_bytes, media_target_dir=None):
-    """
-    Rozbalí existující balíček Anki (.apkg), extrahuje z něj SQLite databázi,
-    převede karty a jejich pole do pandas DataFrame a uloží GUID karet pro zachování postupu učení.
-    Veškerá přiložená média rozbalí do složky custom_media.
-    """
-    import zipfile, sqlite3, json, tempfile
-    
+\
+\
+\
+\
+\
+
+    import zipfile, sqlite3, json, tempfile, os, io
+    import zstandard as zstd
+
     if media_target_dir is None:
         media_target_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "custom_media")
     os.makedirs(media_target_dir, exist_ok=True)
-    
+
     temp_dir = tempfile.mkdtemp()
-    
+
     if hasattr(apkg_file_or_bytes, 'read'):
         apkg_path = os.path.join(temp_dir, "temp_uploaded.apkg")
         with open(apkg_path, "wb") as f_out:
@@ -4108,11 +4925,10 @@ def extract_apkg_to_dataframe(apkg_file_or_bytes, media_target_dir=None):
             f_out.write(apkg_file_or_bytes)
     else:
         apkg_path = str(apkg_file_or_bytes)
-        
+
     with zipfile.ZipFile(apkg_path, 'r') as zf:
         file_list = zf.namelist()
-        
-        # 1. Zpracování médií
+
         if 'media' in file_list:
             try:
                 media_json = zf.read('media').decode('utf-8', errors='ignore')
@@ -4124,172 +4940,190 @@ def extract_apkg_to_dataframe(apkg_file_or_bytes, media_target_dir=None):
                             mf.write(zf.read(num_key))
             except Exception:
                 pass
-                
-        # 2. Extrakce SQLite databáze
-        db_file = 'collection.anki21' if 'collection.anki21' in file_list else 'collection.anki2'
-        if db_file not in file_list:
-            raise ValueError("Soubor .apkg neobsahuje platnou Anki databázi (collection.anki2).")
-            
-        db_path = zf.extract(db_file, temp_dir)
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        
-        # 3. Načtení modelů a názvů polí
-        cursor.execute("SELECT models FROM col")
-        col_row = cursor.fetchone()
-        models = json.loads(col_row[0]) if col_row else {}
-        
-        model_fields_map = {}
-        for mid_str, m_data in models.items():
-            mid = int(mid_str)
-            f_names = [fld['name'] for fld in m_data.get('flds', [])]
-            model_fields_map[mid] = f_names
-            
-        # 4. Načtení názvu balíčku
-        deck_name = "Importovaný balíček"
-        try:
-            cursor.execute("SELECT decks FROM col")
-            deck_row = cursor.fetchone()
-            decks = json.loads(deck_row[0]) if deck_row else {}
-            for did_str, d_data in decks.items():
-                if d_data.get('name') and d_data.get('name') != 'Default':
-                    deck_name = d_data.get('name')
-                    break
-        except Exception:
-            pass
 
-        # 5. Načtení poznámek
-        cursor.execute("SELECT id, guid, mid, flds, tags FROM notes")
-        notes_rows = cursor.fetchall()
-        
+        db_candidates = ['collection.anki21b', 'collection.anki21', 'collection.anki2']
+        available_dbs = [c for c in db_candidates if c in file_list]
+
+        if not available_dbs:
+            raise ValueError("Soubor balíčku neobsahuje platnou Anki databázi (collection.anki21b / collection.anki2).")
+
         parsed_notes = []
-        for n_id, n_guid, n_mid, flds_str, tags_str in notes_rows:
-            fld_values = flds_str.split('\x1f')
-            fld_names = model_fields_map.get(n_mid, [f"Pole_{i+1}" for i in range(len(fld_values))])
-            
-            note_row = {
-                '_anki_id': n_id,
-                '_anki_guid': n_guid,
-                '_anki_mid': n_mid
-            }
-            for i, fname in enumerate(fld_names):
-                val = fld_values[i] if i < len(fld_values) else ""
-                note_row[fname] = val
-                
-            if tags_str and tags_str.strip():
-                note_row['[Anki] Štítky'] = tags_str.strip()
-                
-            parsed_notes.append(note_row)
-            
-        conn.close()
-        
-        if not parsed_notes:
-            raise ValueError("Balíček .apkg neobsahuje žádné karty.")
-            
-        res_df = pd.DataFrame(parsed_notes)
-        return res_df, deck_name
+        deck_name = "Importovaný balíček"
 
-# --- GENERÁTOR STUDIJNÍ BROŽURY / ATLASU V PDF (.PDF) ---
+        for candidate in available_dbs:
+            raw_db_bytes = zf.read(candidate)
+            extracted_db_path = os.path.join(temp_dir, f"extracted_{candidate}.sqlite")
 
-def register_pdf_fonts():
-    """Registruje TrueType fonty s plnou podporou české diakritiky."""
-    font_candidates = [
-        ("C:/Windows/Fonts/arial.ttf", "C:/Windows/Fonts/arialbd.ttf", "C:/Windows/Fonts/ariali.ttf"),
-        ("C:/Windows/Fonts/calibri.ttf", "C:/Windows/Fonts/calibrib.ttf", "C:/Windows/Fonts/calibrii.ttf"),
-        ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/segoeuib.ttf", "C:/Windows/Fonts/segoeuii.ttf"),
-        ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf"),
-        ("/usr/share/fonts/truetype/freefont/FreeSans.ttf", "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf", "/usr/share/fonts/truetype/freefont/FreeSansOblique.ttf"),
-    ]
-    fn_normal, fn_bold, fn_italic = "Helvetica", "Helvetica-Bold", "Helvetica-Oblique"
-    for norm_path, bold_path, ital_path in font_candidates:
-        if os.path.exists(norm_path):
+            if raw_db_bytes.startswith(b"\x28\xb5\x2f\xfd"):
+                try:
+                    dctx = zstd.ZstdDecompressor()
+                    with open(extracted_db_path, "wb") as out_f:
+                        dctx.copy_stream(io.BytesIO(raw_db_bytes), out_f)
+                except Exception as e:
+                    continue
+            else:
+                with open(extracted_db_path, "wb") as out_f:
+                    out_f.write(raw_db_bytes)
+
             try:
-                pdfmetrics.registerFont(TTFont("CustomSans", norm_path))
-                fn_normal = "CustomSans"
-                if os.path.exists(bold_path):
-                    pdfmetrics.registerFont(TTFont("CustomSans-Bold", bold_path))
-                    fn_bold = "CustomSans-Bold"
-                else:
-                    fn_bold = fn_normal
-                if os.path.exists(ital_path):
-                    pdfmetrics.registerFont(TTFont("CustomSans-Italic", ital_path))
-                    fn_italic = "CustomSans-Italic"
-                else:
-                    fn_italic = fn_normal
-                break
+                conn = sqlite3.connect(extracted_db_path)
+                try:
+                    conn.create_collation("unicase", lambda s1, s2: (s1.lower() > s2.lower()) - (s1.lower() < s2.lower()))
+                except Exception:
+                    pass
+                cursor = conn.cursor()
+
+                model_fields_map = {}
+                try:
+                    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='fields'")
+                    if cursor.fetchone():
+                        cursor.execute("SELECT ntid, name FROM fields ORDER BY ntid, ord")
+                        for ntid, f_name in cursor.fetchall():
+                            model_fields_map.setdefault(ntid, []).append(f_name)
+                except Exception:
+                    pass
+
+                if not model_fields_map:
+                    try:
+                        cursor.execute("SELECT models FROM col")
+                        col_row = cursor.fetchone()
+                        if col_row and col_row[0]:
+                            models = json.loads(col_row[0])
+                            for mid_str, m_data in models.items():
+                                mid = int(mid_str)
+                                f_names = [fld['name'] for fld in m_data.get('flds', [])]
+                                model_fields_map[mid] = f_names
+                    except Exception:
+                        pass
+
+                try:
+                    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='decks'")
+                    if cursor.fetchone():
+                        cursor.execute("SELECT name FROM decks WHERE name != 'Default' LIMIT 1")
+                        drow = cursor.fetchone()
+                        if drow and drow[0]:
+                            deck_name = drow[0]
+                except Exception:
+                    pass
+
+                if deck_name == "Importovaný balíček":
+                    try:
+                        cursor.execute("SELECT decks FROM col")
+                        deck_row = cursor.fetchone()
+                        if deck_row and deck_row[0]:
+                            decks = json.loads(deck_row[0])
+                            for did_str, d_data in decks.items():
+                                if d_data.get('name') and d_data.get('name') != 'Default':
+                                    deck_name = d_data.get('name')
+                                    break
+                    except Exception:
+                        pass
+
+                cursor.execute("SELECT id, guid, mid, flds, tags FROM notes")
+                notes_rows = cursor.fetchall()
+
+                cand_parsed = []
+                for n_id, n_guid, n_mid, flds_str, tags_str in notes_rows:
+
+                    if "aktualizujte na nejnovější verzi Anki" in flds_str or "update to the latest Anki version" in flds_str:
+                        continue
+                    fld_values = flds_str.split('\x1f')
+                    fld_names = model_fields_map.get(n_mid, [f"Pole_{i+1}" for i in range(len(fld_values))])
+
+                    note_row = {
+                        '_anki_id': n_id,
+                        '_anki_guid': n_guid,
+                        '_anki_mid': n_mid
+                    }
+                    for i, fname in enumerate(fld_names):
+                        val = fld_values[i] if i < len(fld_values) else ""
+                        note_row[fname] = val
+                    if tags_str and tags_str.strip():
+                        note_row['[Anki] Štítky'] = tags_str.strip()
+
+                    unpacked_row = unpack_anki_card_fields(note_row, media_target_dir=media_target_dir)
+                    cand_parsed.append(unpacked_row)
+
+                conn.close()
+
+                if cand_parsed:
+                    parsed_notes = cand_parsed
+                    break
             except Exception:
-                pass
-    return fn_normal, fn_bold, fn_italic
+                continue
+
+    if not parsed_notes:
+        raise ValueError("Balíček neobsahuje žádné platné karty (nebo obsahuje pouze kompatibilní zástupný text).")
+
+    res_df = pd.DataFrame(parsed_notes)
+    return res_df, deck_name
 
 def impose_booklet_pdf(input_pdf_path: str, output_pdf_path: str, sheets_per_signature: int = 0) -> bool:
-    """
-    Převede jednostranné PDF na tiskový arch sešitové nebo knižní vazby (A4/A3 na šířku / 2 stránky na list).
-    sheets_per_signature:
-      - 0: celá publikace jako jeden sešit (saddle-stitch brožura pro sešití na hřbetu)
-      - 6: knižní vazba po složkách (6 listů = 24 stran na složku)
-      - 8: knižní vazba po složkách (8 listů = 32 stran na složku)
-    """
+\
+\
+\
+\
+\
+\
+
     try:
         reader = pypdf.PdfReader(input_pdf_path)
         num_orig_pages = len(reader.pages)
         if num_orig_pages == 0:
             return False
-            
+
         orig_p0 = reader.pages[0]
         p_w = float(orig_p0.mediabox.width)
         p_h = float(orig_p0.mediabox.height)
-        
+
         sheet_w = 2.0 * p_w
         sheet_h = p_h
-        
+
         pages_per_sig = sheets_per_signature * 4 if sheets_per_signature > 0 else 0
         all_pages = list(reader.pages)
-        
+
         writer = pypdf.PdfWriter()
-        
+
         if pages_per_sig == 0:
             sig_chunks = [all_pages]
         else:
             sig_chunks = []
             for i in range(0, len(all_pages), pages_per_sig):
                 sig_chunks.append(all_pages[i:i + pages_per_sig])
-                
+
         for sig in sig_chunks:
-            # Doplnit do násobku 4 prázdnými stranami
+
             rem = len(sig) % 4
             if rem != 0:
                 pad = 4 - rem
                 for _ in range(pad):
                     sig.append(None)
-                    
+
             sig_len = len(sig)
             num_sheets = sig_len // 4
-            
+
             for s in range(num_sheets):
-                # Lícový arch (Front): [Poslední, První]
+
                 left_idx = sig_len - 1 - (s * 2)
                 right_idx = s * 2
-                
-                # Rubový arch (Back): [Druhý, Předposlední]
+
                 back_left_idx = s * 2 + 1
                 back_right_idx = sig_len - 2 - (s * 2)
-                
-                # Vytvořit lícový list
+
                 sheet_front = pypdf.PageObject.create_blank_page(width=sheet_w, height=sheet_h)
                 if sig[left_idx] is not None:
                     sheet_front.merge_transformed_page(sig[left_idx], pypdf.Transformation().translate(tx=0, ty=0))
                 if sig[right_idx] is not None:
                     sheet_front.merge_transformed_page(sig[right_idx], pypdf.Transformation().translate(tx=p_w, ty=0))
                 writer.add_page(sheet_front)
-                
-                # Vytvořit rubový list
+
                 sheet_back = pypdf.PageObject.create_blank_page(width=sheet_w, height=sheet_h)
                 if sig[back_left_idx] is not None:
                     sheet_back.merge_transformed_page(sig[back_left_idx], pypdf.Transformation().translate(tx=0, ty=0))
                 if sig[back_right_idx] is not None:
                     sheet_back.merge_transformed_page(sig[back_right_idx], pypdf.Transformation().translate(tx=p_w, ty=0))
                 writer.add_page(sheet_back)
-                
+
         with open(output_pdf_path, "wb") as f_out:
             writer.write(f_out)
         return True
@@ -4297,7 +5131,7 @@ def impose_booklet_pdf(input_pdf_path: str, output_pdf_path: str, sheets_per_sig
         return False
 
 class NumberedCanvas(canvas.Canvas):
-    """Dvouprůchodový canvas pro automatické číslování stran (Strana X z Y) a záhlaví pro libovolný formát (A4/A5)."""
+
     def __init__(self, *args, **kwargs):
         self.doc_title = kwargs.pop('doc_title', '') if 'doc_title' in kwargs else ''
         super(NumberedCanvas, self).__init__(*args, **kwargs)
@@ -4320,20 +5154,17 @@ class NumberedCanvas(canvas.Canvas):
         font_name = "CustomSans" if "CustomSans" in pdfmetrics.getRegisteredFontNames() else "Helvetica"
         self.setFont(font_name, 7.5)
         self.setFillColor(colors.HexColor("#64748b"))
-        
-        # Dynamické rozměry podle skutečného rozměru stránky (A4 / A5)
+
         page_w, page_h = self._pagesize
         margin_x = 1.2 * cm if page_w < 16 * cm else 1.8 * cm
-        
-        # Záhlaví (od strany 2 dále)
+
         if self._pageNumber > 1:
             header_text = getattr(self, 'doc_title', '') or "Studijní atlas a brožura"
             self.drawString(margin_x, page_h - 1.15 * cm, header_text[:70])
             self.setStrokeColor(colors.HexColor("#cbd5e1"))
             self.setLineWidth(0.5)
             self.line(margin_x, page_h - 1.3 * cm, page_w - margin_x, page_h - 1.3 * cm)
-            
-        # Zápatí (všechny strany)
+
         footer_text = f"Strana {self._pageNumber} z {page_count}"
         self.drawRightString(page_w - margin_x, 0.85 * cm, footer_text)
         self.drawString(margin_x, 0.85 * cm, "Generátor výukových materiálů a kartiček")
@@ -4343,7 +5174,7 @@ class NumberedCanvas(canvas.Canvas):
         self.restoreState()
 
 def html_to_reportlab(html_text: str) -> str:
-    """Převede základní HTML značky na formát podporovaný ReportLab Paragraph."""
+
     if not html_text:
         return ""
     txt = str(html_text)
@@ -4357,9 +5188,8 @@ def html_to_reportlab(html_text: str) -> str:
     txt = re.sub(r'<br\s*/?>', '<br/>', txt)
     return txt.strip()
 
-
 def create_pdf_qr_drawing(url: str, size: float = 48):
-    """Vytvoří vektorový QR kód s přesnou velikostí (v bodech) pro ReportLab PDF."""
+
     try:
         if not url or not url.startswith("http"):
             return None
@@ -4375,7 +5205,7 @@ def create_pdf_qr_drawing(url: str, size: float = 48):
         return None
 
 class TrackPage(Flowable):
-    """Pomocný Flowable prvek pro přesné zachycení reálného čísla stránky položky v ReportLab."""
+
     def __init__(self, item_id, tracker_dict):
         super().__init__()
         self.item_id = item_id
@@ -4387,14 +5217,27 @@ class TrackPage(Flowable):
     def draw(self):
         self.tracker_dict[self.item_id] = self.canv._pageNumber
 
+_img_dim_cache = {}
+
+def _get_image_dims(lpath):
+    if lpath in _img_dim_cache:
+        return _img_dim_cache[lpath]
+    try:
+        with Image.open(lpath) as im:
+            dims = im.size
+            _img_dim_cache[lpath] = dims
+            return dims
+    except Exception:
+        return 0, 0
+
 def generate_pdf_booklet(
     df: pd.DataFrame,
     output_pdf_path: str,
     title: str = "Studijní atlas a brožura",
     subtitle: str = "",
     active_cols: list = None,
-    layout_mode: str = "compact",  # "compact", "page_per_species", "split_images_text"
-    page_format: str = "A4",       # "A4" or "A5"
+    layout_mode: str = "compact",
+    page_format: str = "A4",
     imposition_mode: str = "Standardní (postupné stránky pro čtení)",
     font_scale: float = 1.0,
     include_toc: bool = True,
@@ -4405,13 +5248,15 @@ def generate_pdf_booklet(
     include_media_attribution: bool = True,
     col_styles: dict = None,
     include_qr_codes: bool = True,
-    image_size_mode: str = "Standardní (vyvážená)"
+    image_size_mode: str = "Standardní (vyvážená)",
+    max_images_mode: str = "Až 6 (doporučeno: 4 fotky + 2 mapy)"
 ) -> bool:
-    """
-    Vygeneruje kompletní profesionálně formátovanou studijní brožuru v PDF (.pdf).
-    V režimu 1 druh na stránku (Atlasový list) automaticky zvětšuje fotografie a
-    využívá celou plochu stránky bez prázdných míst. Rejstřík na začátku obsahuje přesná čísla stránek.
-    """
+\
+\
+\
+\
+\
+
     if active_cols is None:
         active_cols = list(df.columns)
     if media_attributions is None:
@@ -4420,27 +5265,34 @@ def generate_pdf_booklet(
         media_tasks = {}
     if col_styles is None:
         col_styles = {}
-        
+
     fn_normal, fn_bold, fn_italic = register_pdf_fonts()
-    
-    # Volba rozměrů stránky a okrajů
+
     if page_format == "A5":
         target_pagesize = A5
         margin_x = 1.3 * cm
         margin_top = 1.8 * cm
         margin_bot = 1.6 * cm
+        page_h = 21.0 * cm
         available_width = 14.8 * cm - (2 * margin_x)
     else:
         target_pagesize = A4
         margin_x = 1.8 * cm
         margin_top = 2.0 * cm
         margin_bot = 1.8 * cm
+        page_h = 29.7 * cm
         available_width = 21.0 * cm - (2 * margin_x)
-        
+
+    avail_page_h = page_h - margin_top - margin_bot
+
+    avail_photo_budget = avail_page_h - 1.8 * cm
+
     styles = getSampleStyleSheet()
+    styles['Normal'].fontName = fn_normal
+    styles['BodyText'].fontName = fn_normal
     fs = float(font_scale)
     is_atlas_page = (layout_mode in ["page_per_species", "split_images_text"])
-    
+
     title_style = ParagraphStyle(
         'DocTitle',
         parent=styles['Normal'],
@@ -4450,7 +5302,7 @@ def generate_pdf_booklet(
         textColor=colors.HexColor('#1b4332'),
         spaceAfter=3
     )
-    
+
     subtitle_style = ParagraphStyle(
         'DocSubtitle',
         parent=styles['Normal'],
@@ -4460,7 +5312,7 @@ def generate_pdf_booklet(
         textColor=colors.HexColor('#475569'),
         spaceAfter=10
     )
-    
+
     sp_title_style = ParagraphStyle(
         'SpeciesTitle',
         parent=styles['Normal'],
@@ -4471,7 +5323,7 @@ def generate_pdf_booklet(
         spaceBefore=2,
         spaceAfter=2
     )
-    
+
     sp_phonetic_style = ParagraphStyle(
         'SpeciesPhonetic',
         parent=styles['Normal'],
@@ -4479,9 +5331,9 @@ def generate_pdf_booklet(
         fontSize=9.5 * fs if is_atlas_page else 9 * fs,
         leading=12 * fs if is_atlas_page else 11.5 * fs,
         textColor=colors.HexColor('#2d6a4f'),
-        spaceAfter=6 if is_atlas_page else 4
+        spaceAfter=5 if is_atlas_page else 4
     )
-    
+
     body_style = ParagraphStyle(
         'Body',
         parent=styles['Normal'],
@@ -4490,7 +5342,7 @@ def generate_pdf_booklet(
         leading=12.5 * fs if (is_atlas_page and page_format == "A4") else (11.5 * fs if page_format == "A4" else 10.5 * fs),
         textColor=colors.HexColor('#1e293b')
     )
-    
+
     label_style = ParagraphStyle(
         'FieldLabel',
         parent=styles['Normal'],
@@ -4499,27 +5351,27 @@ def generate_pdf_booklet(
         leading=12 * fs if (is_atlas_page and page_format == "A4") else (11 * fs if page_format == "A4" else 10 * fs),
         textColor=colors.HexColor('#334155')
     )
-    
+
     desc_title_style = ParagraphStyle(
         'DescTitle',
         parent=styles['Normal'],
         fontName=fn_bold,
-        fontSize=10 * fs if (is_atlas_page and page_format == "A4") else (9.5 * fs if page_format == "A4" else 8.5 * fs),
-        leading=13 * fs if (is_atlas_page and page_format == "A4") else (12 * fs if page_format == "A4" else 11 * fs),
+        fontSize=9.5 * fs if (is_atlas_page and page_format == "A4") else (9.0 * fs if page_format == "A4" else 8.0 * fs),
+        leading=12.5 * fs if (is_atlas_page and page_format == "A4") else (11.5 * fs if page_format == "A4" else 10.5 * fs),
         textColor=colors.HexColor('#166534'),
-        spaceBefore=5 if is_atlas_page else 3,
+        spaceBefore=4 if is_atlas_page else 3,
         spaceAfter=2
     )
-    
+
     desc_body_style = ParagraphStyle(
         'DescBody',
         parent=styles['Normal'],
         fontName=fn_normal,
-        fontSize=9 * fs if (is_atlas_page and page_format == "A4") else (8.5 * fs if page_format == "A4" else 7.8 * fs),
-        leading=13 * fs if (is_atlas_page and page_format == "A4") else (12 * fs if page_format == "A4" else 10.5 * fs),
+        fontSize=8.5 * fs if (is_atlas_page and page_format == "A4") else (8.0 * fs if page_format == "A4" else 7.5 * fs),
+        leading=11.8 * fs if (is_atlas_page and page_format == "A4") else (11.0 * fs if page_format == "A4" else 10.0 * fs),
         textColor=colors.HexColor('#1e293b')
     )
-    
+
     caption_style = ParagraphStyle(
         'PhotoCaption',
         parent=styles['Normal'],
@@ -4529,7 +5381,7 @@ def generate_pdf_booklet(
         textColor=colors.HexColor('#64748b'),
         alignment=1
     )
-    
+
     biblio_title_style = ParagraphStyle(
         'BiblioTitle',
         parent=styles['Normal'],
@@ -4539,7 +5391,7 @@ def generate_pdf_booklet(
         textColor=colors.HexColor('#1b4332'),
         spaceAfter=6
     )
-    
+
     biblio_body_style = ParagraphStyle(
         'BiblioBody',
         parent=styles['Normal'],
@@ -4550,48 +5402,49 @@ def generate_pdf_booklet(
         spaceAfter=3
     )
 
-    def assemble_story(page_tracker=None):
+    def assemble_story(page_tracker=None, is_dummy=False):
         story = []
         clean_title = title.strip() or "Studijní atlas a brožura"
         story.append(Paragraph(clean_title, title_style))
-        
+
         count_str = f"Počet zpracovaných položek: {len(df)}"
         desc_str = subtitle.strip() if subtitle else "Výukový materiál a studijní atlas vygenerovaný z databáze"
         story.append(Paragraph(f"{desc_str} • {count_str}", subtitle_style))
         story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#1b4332"), spaceBefore=0, spaceAfter=8))
 
-        # Obsah / Rejstřík položek na začátku
         if include_toc and len(df) >= 2:
             story.append(Paragraph("Obsah a rejstřík položek", desc_title_style))
             story.append(HRFlowable(width="100%", thickness=0.8, color=colors.HexColor("#2d6a4f"), spaceBefore=1, spaceAfter=6))
-            
+
             toc_items = []
             for idx_t, r_t in df.iterrows():
                 item_n = str(r_t.iloc[0]).strip() if len(r_t) > 0 else f"Položka {idx_t+1}"
                 cz_n = ""
                 if "[Zeměpis] Český název" in r_t and pd.notna(r_t["[Zeměpis] Český název"]):
                     cz_n = f" ({str(r_t['[Zeměpis] Český název']).strip()})"
+                elif "[Pladias] České jméno" in r_t and pd.notna(r_t["[Pladias] České jméno"]):
+                    cz_n = f" ({str(r_t['[Pladias] České jméno']).strip()})"
                 elif "[Taxonomie] Český název" in r_t and pd.notna(r_t["[Taxonomie] Český název"]):
                     cz_n = f" ({str(r_t['[Taxonomie] Český název']).strip()})"
-                
+
                 p_num_str = ""
                 if page_tracker and idx_t in page_tracker:
                     p_num_str = f" <font color='#64748b'>— str. {page_tracker[idx_t]}</font>"
                 elif is_atlas_page:
                     p_num_str = f" <font color='#64748b'>— str. {idx_t + 2}</font>"
-                    
+
                 toc_items.append(f"<b>{idx_t+1}.</b> {item_n}{cz_n}{p_num_str}")
-                
+
             half = (len(toc_items) + 1) // 2
             toc_col1 = toc_items[:half]
             toc_col2 = toc_items[half:]
-            
+
             toc_table_rows = []
             for i_row in range(max(len(toc_col1), len(toc_col2))):
                 t1 = Paragraph(toc_col1[i_row], body_style) if i_row < len(toc_col1) else Paragraph("", body_style)
                 t2 = Paragraph(toc_col2[i_row], body_style) if i_row < len(toc_col2) else Paragraph("", body_style)
                 toc_table_rows.append([t1, t2])
-                
+
             t_toc = Table(toc_table_rows, colWidths=[available_width / 2.0, available_width / 2.0])
             t_toc.setStyle(TableStyle([
                 ('VALIGN', (0,0), (-1,-1), 'TOP'),
@@ -4607,111 +5460,132 @@ def generate_pdf_booklet(
             else:
                 story.append(HRFlowable(width="100%", thickness=1.2, color=colors.HexColor("#1b4332"), spaceBefore=4, spaceAfter=10))
 
-        # Iterace přes druhy
         for idx, row in df.iterrows():
-            species_elements = []
-            
+            species_header = []
             if page_tracker is not None:
-                species_elements.append(TrackPage(idx, page_tracker))
-                
+                species_header.append(TrackPage(idx, page_tracker))
+
             primary_name = str(row.iloc[0]).strip() if len(row) > 0 else f"Položka {idx + 1}"
             sp_pronun = ""
             czech_name = ""
-            
+
             if "[Latina] Fonetická výslovnost" in row and pd.notna(row["[Latina] Fonetická výslovnost"]):
                 sp_pronun = str(row["[Latina] Fonetická výslovnost"]).strip()
             if "[Zeměpis] Český název" in row and pd.notna(row["[Zeměpis] Český název"]):
                 czech_name = str(row["[Zeměpis] Český název"]).strip()
+            elif "[Pladias] České jméno" in row and pd.notna(row["[Pladias] České jméno"]):
+                czech_name = str(row["[Pladias] České jméno"]).strip()
             elif "[Taxonomie] Český název" in row and pd.notna(row["[Taxonomie] Český název"]):
                 czech_name = str(row["[Taxonomie] Český název"]).strip()
-                
+
             title_text = f"{idx + 1}. {primary_name}"
             if czech_name and czech_name.lower() not in primary_name.lower():
                 title_text += f" ({czech_name})"
-                
-            species_elements.append(Paragraph(title_text, sp_title_style))
+
+            species_header.append(Paragraph(title_text, sp_title_style))
             if sp_pronun:
-                species_elements.append(Paragraph(sp_pronun, sp_phonetic_style))
-                
-            # Sběr fotografií pro tuto položku
-            found_images = []
+                species_header.append(Paragraph(sp_pronun, sp_phonetic_style))
+
+            gathered_photos = []
+            gathered_maps = []
             for col in active_cols:
                 val = row.get(col)
                 if pd.isna(val) or str(val).strip() == "":
                     continue
-                if is_image_col(col, val):
+                clean_sp = slugify_species_name(str(row.iloc[0])) if len(row) > 0 else f"druh_{idx}"
+
+                if col in ["[Pladias] Mapa rozšíření", "[Pladias.cz] Mapa rozšíření"]:
+                    safe_fn = f"{clean_sp}_pladias_map_{idx}.jpg"
+                    lpath = os.path.join(media_dir, safe_fn)
+                    if os.path.exists(lpath) and os.path.getsize(lpath) > 0:
+                        _w, _h = _get_image_dims(lpath)
+                        if _w > 0 and _h > 0 and not any(img[0] == lpath for img in gathered_maps):
+                            gathered_maps.append((lpath, "Mapa rozšíření ČR", "Pladias.cz"))
+
+                elif col in ["[iNaturalist] Mapa nálezů", "[iNaturalist] Mapa pozorování", "[iNat] Mapa pozorování"] or ("inat" in str(col).lower() and "map" in str(col).lower()):
+                    safe_fn = f"{clean_sp}_inat_map_{idx}.jpg"
+                    lpath = os.path.join(media_dir, safe_fn)
+                    if os.path.exists(lpath) and os.path.getsize(lpath) > 0:
+                        _w, _h = _get_image_dims(lpath)
+                        if _w > 0 and _h > 0 and not any(img[0] == lpath for img in gathered_maps):
+                            gathered_maps.append((lpath, "Mapa pozorování", "iNaturalist.org"))
+
+                elif col in ["[GBIF] Habitus", "[GBIF] Květ", "[GBIF] List", "[GBIF] Plod", "[GBIF] Herbář"] and is_image_col(col, val):
+                    organ_map = {"[GBIF] Habitus": "habitus", "[GBIF] Květ": "kvet", "[GBIF] List": "list", "[GBIF] Plod": "plod", "[GBIF] Herbář": "herbar"}
+                    organ = organ_map.get(col, "foto")
                     raw_entries = [u.strip() for u in str(val).split(';') if u.strip()]
-                    clean_sp = slugify_species_name(str(row.iloc[0])) if len(row) > 0 else f"druh_{idx}"
-                    
-                    if col in ["[GBIF] Habitus", "[GBIF] Květ", "[GBIF] List", "[GBIF] Plod", "[GBIF] Herbář"]:
-                        organ_map = {"[GBIF] Habitus": "habitus", "[GBIF] Květ": "kvet", "[GBIF] List": "list", "[GBIF] Plod": "plod", "[GBIF] Herbář": "herbar"}
-                        organ = organ_map.get(col, "foto")
-                        for u_idx, entry in enumerate(raw_entries):
-                            url = entry.split('|', 1)[0].strip()
+                    for u_idx, entry in enumerate(raw_entries):
+                        url = entry.split('|', 1)[0].strip()
+                        ext = ".jpg"
+                        if ".png" in url.lower(): ext = ".png"
+                        elif ".jpeg" in url.lower(): ext = ".jpeg"
+                        safe_fn = f"{clean_sp}_{organ}{ext}" if u_idx == 0 else f"{clean_sp}_{organ}_{u_idx}{ext}"
+                        lpath = os.path.join(media_dir, safe_fn)
+                        if os.path.exists(lpath) and os.path.getsize(lpath) > 0:
+                            attr = media_attributions.get(safe_fn, "")
+                            if not any(img[0] == lpath for img in gathered_photos):
+                                gathered_photos.append((lpath, col.replace("[GBIF] ", ""), attr))
+
+                elif is_image_col(col, val):
+                    raw_entries = [u.strip() for u in str(val).split(';') if u.strip()]
+                    for img_idx, entry in enumerate(raw_entries):
+                        if '|' in entry:
+                            u_parts = entry.split('|', 1)
+                            url = u_parts[0].strip()
+                            attr_item = u_parts[1].strip()
+                        else:
+                            url = entry.strip()
+                            attr_item = ""
+
+                        if os.path.isfile(url):
+                            lpath = url
+                            attr = attr_item or media_attributions.get(url, "")
+                            _w, _h = _get_image_dims(lpath)
+                            if _w > 0 and _h > 0 and not any(img[0] == lpath for img in gathered_photos):
+                                gathered_photos.append((lpath, col, attr))
+                        elif url.startswith('http://') or url.startswith('https://'):
                             ext = ".jpg"
                             if ".png" in url.lower(): ext = ".png"
                             elif ".jpeg" in url.lower(): ext = ".jpeg"
-                            safe_fn = f"{clean_sp}_{organ}{ext}" if u_idx == 0 else f"{clean_sp}_{organ}_{u_idx}{ext}"
+                            elif ".webp" in url.lower(): ext = ".webp"
+                            safe_col = slugify(col)[:12]
+                            url_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()[:6]
+                            safe_fn = f"{clean_sp}_{safe_col}_{idx}_{img_idx}_{url_hash}{ext}"
                             lpath = os.path.join(media_dir, safe_fn)
                             if os.path.exists(lpath) and os.path.getsize(lpath) > 0:
-                                attr = media_attributions.get(safe_fn, "")
-                                if not any(img[0] == lpath for img in found_images):
-                                    found_images.append((lpath, col.replace("[GBIF] ", ""), attr))
-                    elif col in ["[Pladias] Mapa rozšíření", "[Pladias.cz] Mapa rozšíření"]:
-                        safe_fn = f"{clean_sp}_pladias_map_{idx}.jpg"
-                        lpath = os.path.join(media_dir, safe_fn)
-                        if os.path.exists(lpath) and os.path.getsize(lpath) > 0:
-                            try:
-                                with Image.open(lpath) as _chk_im:
-                                    _w, _h = _chk_im.size
-                                    if _w > 0 and _h > 0 and not any(img[0] == lpath for img in found_images):
-                                        found_images.append((lpath, "Mapa rozšíření", "Pladias.cz"))
-                            except Exception:
-                                pass
-                    else:
-                        for img_idx, entry in enumerate(raw_entries):
-                            if '|' in entry:
-                                u_parts = entry.split('|', 1)
-                                url = u_parts[0].strip()
-                                attr_item = u_parts[1].strip()
-                            else:
-                                url = entry.strip()
-                                attr_item = ""
-                            
-                            if os.path.isfile(url):
-                                lpath = url
-                                attr = attr_item or media_attributions.get(url, "")
-                                try:
-                                    with Image.open(lpath) as _chk_im:
-                                        _w, _h = _chk_im.size
-                                        if _w > 0 and _h > 0 and not any(img[0] == lpath for img in found_images):
-                                            found_images.append((lpath, col, attr))
-                                except Exception:
-                                    pass
-                            elif url.startswith('http://') or url.startswith('https://'):
-                                ext = ".jpg"
-                                if ".png" in url.lower(): ext = ".png"
-                                elif ".jpeg" in url.lower(): ext = ".jpeg"
-                                elif ".webp" in url.lower(): ext = ".webp"
-                                safe_col = slugify(col)[:12]
-                                url_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()[:6]
-                                safe_fn = f"{clean_sp}_{safe_col}_{idx}_{img_idx}_{url_hash}{ext}"
-                                lpath = os.path.join(media_dir, safe_fn)
-                                if os.path.exists(lpath) and os.path.getsize(lpath) > 0:
-                                    attr = media_attributions.get(safe_fn, "") or attr_item
-                                    try:
-                                        with Image.open(lpath) as _chk_im:
-                                            _w, _h = _chk_im.size
-                                            if _w > 0 and _h > 0 and not any(img[0] == lpath for img in found_images):
-                                                found_images.append((lpath, col, attr))
-                                    except Exception:
-                                        pass
+                                attr = media_attributions.get(safe_fn, "") or attr_item
+                                _w, _h = _get_image_dims(lpath)
+                                if _w > 0 and _h > 0 and not any(img[0] == lpath for img in gathered_photos):
+                                    gathered_photos.append((lpath, col, attr))
 
-            # Vykreslení galerie fotografií – v atlasovém režimu velkorysé rozměry
-            if found_images:
-                display_imgs = found_images[:4]
+            limit = 6 if "6" in str(max_images_mode) else (2 if "2" in str(max_images_mode) else (1 if "1" in str(max_images_mode) else 4))
+
+            display_imgs = []
+            if gathered_maps and limit >= 4:
+                num_maps = min(len(gathered_maps), 2)
+                num_photos = min(len(gathered_photos), limit - num_maps)
+                display_imgs = gathered_photos[:num_photos] + gathered_maps[:num_maps]
+                if len(display_imgs) < limit:
+                    for p in gathered_photos[num_photos:]:
+                        if len(display_imgs) >= limit: break
+                        if p not in display_imgs: display_imgs.append(p)
+                    for m in gathered_maps[num_maps:]:
+                        if len(display_imgs) >= limit: break
+                        if m not in display_imgs: display_imgs.append(m)
+            elif gathered_maps and limit == 2:
+                if gathered_photos:
+                    display_imgs = [gathered_photos[0], gathered_maps[0]]
+                else:
+                    display_imgs = gathered_maps[:2]
+            elif gathered_maps and not gathered_photos:
+                display_imgs = gathered_maps[:limit]
+            else:
+                display_imgs = gathered_photos[:limit]
+
+            photo_flowables = []
+            if display_imgs:
                 num_imgs = len(display_imgs)
-                
+
                 img_scale = 1.0
                 if "Velká" in image_size_mode:
                     img_scale = 1.25
@@ -4720,45 +5594,235 @@ def generate_pdf_booklet(
                 elif "Kompaktní" in image_size_mode or "Menší" in image_size_mode:
                     img_scale = 0.75
 
+                def _make_img_or_spacer(lpath, tw, th):
+                    if is_dummy:
+                        return Spacer(tw, th)
+                    return RLImage(lpath, width=tw, height=th)
+
                 if layout_mode == "split_images_text":
-                    # Na samostatné fotostránce mají fotografie maximální prostor
-                    if page_format == "A5":
-                        max_img_h = (10.0 * cm if num_imgs == 1 else (7.2 * cm if num_imgs == 2 else 5.4 * cm)) * img_scale
-                    else:
-                        max_img_h = (15.0 * cm if num_imgs == 1 else (11.0 * cm if num_imgs == 2 else (8.4 * cm if num_imgs == 3 else 7.0 * cm))) * img_scale
-                elif is_atlas_page:
-                    if page_format == "A5":
-                        max_img_h = (7.0 * cm if num_imgs == 1 else (5.8 * cm if num_imgs == 2 else 4.2 * cm)) * img_scale
-                    else:
-                        max_img_h = (9.8 * cm if num_imgs == 1 else (8.2 * cm if num_imgs == 2 else (6.6 * cm if num_imgs == 3 else 5.2 * cm))) * img_scale
-                else:
-                    if page_format == "A5":
-                        max_img_h = (4.8 * cm if num_imgs <= 2 else (3.8 * cm if num_imgs == 3 else 3.0 * cm)) * img_scale
-                    else:
-                        max_img_h = (6.4 * cm if num_imgs <= 2 else (5.2 * cm if num_imgs == 3 else 4.2 * cm)) * img_scale
-                
-                # U 4 fotografií v atlasovém režimu použijeme přehlednou mřížku 2x2
-                if is_atlas_page and num_imgs == 4:
+
+                    if num_imgs == 1:
+                        max_h = min(avail_photo_budget - 1.0 * cm, (19.0 * cm if page_format == "A4" else 12.5 * cm) * img_scale)
+                        lpath, col_lbl, attr = display_imgs[0]
+                        iw, ih = _get_image_dims(lpath)
+                        aspect = ih / float(iw) if iw > 0 else 0.75
+                        tw = available_width - 0.2 * cm
+                        th = tw * aspect
+                        if th > max_h:
+                            th = max_h
+                            tw = th / aspect
+                        rl_img = _make_img_or_spacer(lpath, tw, th)
+                        cap_text = (attr if include_media_attribution and attr else col_lbl) or ""
+                        t_imgs = Table([[rl_img], [Paragraph(cap_text, caption_style)]], colWidths=[available_width])
+                        t_imgs.setStyle(TableStyle([
+                            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                            ('TOPPADDING', (0, 0), (-1, -1), 2),
+                            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+                        ]))
+                        photo_flowables.append(t_imgs)
+
+                    elif num_imgs == 2:
+                        max_h = min((avail_photo_budget - 2.0 * cm) / 2.0, (10.5 * cm if page_format == "A4" else 6.8 * cm) * img_scale)
+                        row_cells = []
+                        for lpath, col_lbl, attr in display_imgs:
+                            iw, ih = _get_image_dims(lpath)
+                            aspect = ih / float(iw) if iw > 0 else 0.75
+                            tw = available_width - 0.2 * cm
+                            th = tw * aspect
+                            if th > max_h:
+                                th = max_h
+                                tw = th / aspect
+                            rl_img = _make_img_or_spacer(lpath, tw, th)
+                            cap_text = (attr if include_media_attribution and attr else col_lbl) or ""
+                            row_cells.append([rl_img])
+                            row_cells.append([Paragraph(cap_text, caption_style)])
+                            row_cells.append([Spacer(1, 3)])
+                        if row_cells:
+                            t_imgs = Table(row_cells, colWidths=[available_width])
+                            t_imgs.setStyle(TableStyle([
+                                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                                ('TOPPADDING', (0, 0), (-1, -1), 1.5),
+                                ('BOTTOMPADDING', (0, 0), (-1, -1), 1.5),
+                            ]))
+                            photo_flowables.append(t_imgs)
+
+                    elif num_imgs == 3:
+                        rem_h = avail_photo_budget - 2.2 * cm
+                        max_h_top = min(rem_h * 0.53, (10.0 * cm if page_format == "A4" else 6.5 * cm) * img_scale)
+                        max_h_bot = min(rem_h * 0.43, (8.5 * cm if page_format == "A4" else 5.5 * cm) * img_scale)
+                        half_w = available_width / 2.0
+
+                        lpath1, col_lbl1, attr1 = display_imgs[0]
+                        iw1, ih1 = _get_image_dims(lpath1)
+                        aspect1 = ih1 / float(iw1) if iw1 > 0 else 0.75
+                        tw1 = available_width - 0.2 * cm
+                        th1 = tw1 * aspect1
+                        if th1 > max_h_top:
+                            th1 = max_h_top
+                            tw1 = th1 / aspect1
+                        rl_img1 = _make_img_or_spacer(lpath1, tw1, th1)
+                        cap_text1 = (attr1 if include_media_attribution and attr1 else col_lbl1) or ""
+
+                        bot_imgs = []
+                        bot_caps = []
+                        for lpath, col_lbl, attr in display_imgs[1:]:
+                            iw, ih = _get_image_dims(lpath)
+                            aspect = ih / float(iw) if iw > 0 else 0.75
+                            tw = half_w - 0.2 * cm
+                            th = tw * aspect
+                            if th > max_h_bot:
+                                th = max_h_bot
+                                tw = th / aspect
+                            bot_imgs.append(_make_img_or_spacer(lpath, tw, th))
+                            cap_text = (attr if include_media_attribution and attr else col_lbl) or ""
+                            bot_caps.append(Paragraph(cap_text, caption_style))
+
+                        t_grid_data = [
+                            [rl_img1, ''],
+                            [Paragraph(cap_text1, caption_style), ''],
+                            [Spacer(1, 2), ''],
+                            [bot_imgs[0], bot_imgs[1]],
+                            [bot_caps[0], bot_caps[1]]
+                        ]
+                        t_imgs = Table(t_grid_data, colWidths=[half_w, half_w])
+                        t_imgs.setStyle(TableStyle([
+                            ('SPAN', (0, 0), (1, 0)),
+                            ('SPAN', (0, 1), (1, 1)),
+                            ('SPAN', (0, 2), (1, 2)),
+                            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                            ('TOPPADDING', (0, 0), (-1, -1), 1.5),
+                            ('BOTTOMPADDING', (0, 0), (-1, -1), 1.5),
+                        ]))
+                        photo_flowables.append(t_imgs)
+
+                    elif num_imgs == 4:
+                        half_w = available_width / 2.0
+                        max_h = min((avail_photo_budget - 2.2 * cm) / 2.0, (9.2 * cm if page_format == "A4" else 6.0 * cm) * img_scale)
+                        img_objs = []
+                        cap_objs = []
+                        for lpath, col_lbl, attr in display_imgs:
+                            iw, ih = _get_image_dims(lpath)
+                            aspect = ih / float(iw) if iw > 0 else 0.75
+                            tw = half_w - 0.2 * cm
+                            th = tw * aspect
+                            if th > max_h:
+                                th = max_h
+                                tw = th / aspect
+                            img_objs.append(_make_img_or_spacer(lpath, tw, th))
+                            cap_text = (attr if include_media_attribution and attr else col_lbl) or ""
+                            cap_objs.append(Paragraph(cap_text, caption_style))
+                        if len(img_objs) == 4:
+                            t_grid_data = [
+                                [img_objs[0], img_objs[1]],
+                                [cap_objs[0], cap_objs[1]],
+                                [Spacer(1, 2), Spacer(1, 2)],
+                                [img_objs[2], img_objs[3]],
+                                [cap_objs[2], cap_objs[3]]
+                            ]
+                            t_imgs = Table(t_grid_data, colWidths=[half_w, half_w])
+                            t_imgs.setStyle(TableStyle([
+                                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                                ('TOPPADDING', (0, 0), (-1, -1), 1.5),
+                                ('BOTTOMPADDING', (0, 0), (-1, -1), 1.5),
+                            ]))
+                            photo_flowables.append(t_imgs)
+
+                    elif num_imgs in (5, 6):
+                        half_w = available_width / 2.0
+                        max_h = min((avail_photo_budget - 2.8 * cm) / 3.0, (5.8 * cm if page_format == "A4" else 3.8 * cm) * img_scale)
+                        img_objs = []
+                        cap_objs = []
+                        for lpath, col_lbl, attr in display_imgs:
+                            iw, ih = _get_image_dims(lpath)
+                            aspect = ih / float(iw) if iw > 0 else 0.75
+                            tw = half_w - 0.2 * cm
+                            th = tw * aspect
+                            if th > max_h:
+                                th = max_h
+                                tw = th / aspect
+                            img_objs.append(_make_img_or_spacer(lpath, tw, th))
+                            cap_text = (attr if include_media_attribution and attr else col_lbl) or ""
+                            cap_objs.append(Paragraph(cap_text, caption_style))
+                        if len(img_objs) == 5:
+                            img_objs.append(Spacer(half_w - 0.2 * cm, 1))
+                            cap_objs.append(Paragraph("", caption_style))
+                        t_grid_data = [
+                            [img_objs[0], img_objs[1]],
+                            [cap_objs[0], cap_objs[1]],
+                            [Spacer(1, 1.5), Spacer(1, 1.5)],
+                            [img_objs[2], img_objs[3]],
+                            [cap_objs[2], cap_objs[3]],
+                            [Spacer(1, 1.5), Spacer(1, 1.5)],
+                            [img_objs[4], img_objs[5]],
+                            [cap_objs[4], cap_objs[5]]
+                        ]
+                        t_imgs = Table(t_grid_data, colWidths=[half_w, half_w])
+                        t_imgs.setStyle(TableStyle([
+                            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                            ('TOPPADDING', (0, 0), (-1, -1), 1.0),
+                            ('BOTTOMPADDING', (0, 0), (-1, -1), 1.0),
+                        ]))
+                        photo_flowables.append(t_imgs)
+
+                elif is_atlas_page and num_imgs in (5, 6):
                     grid_w = available_width / 2.0
                     cell_w = grid_w - 0.3 * cm
+                    max_img_h = min(avail_photo_budget * 0.40 / 3.0, (3.8 * cm if page_format == "A4" else 2.6 * cm) * img_scale)
                     img_objs = []
                     cap_objs = []
                     for lpath, col_lbl, attr in display_imgs:
-                        try:
-                            with Image.open(lpath) as pim:
-                                iw, ih = pim.size
-                                aspect = ih / float(iw) if iw > 0 else 1.0
-                            t_w = cell_w
-                            t_h = t_w * aspect
-                            if t_h > max_img_h:
-                                t_h = max_img_h
-                                t_w = t_h / aspect
-                            rl_img = RLImage(lpath, width=t_w, height=t_h)
-                            img_objs.append(rl_img)
-                            cap_text = (attr if include_media_attribution and attr else col_lbl) or ""
-                            cap_objs.append(Paragraph(cap_text, caption_style))
-                        except Exception:
-                            pass
+                        iw, ih = _get_image_dims(lpath)
+                        aspect = ih / float(iw) if iw > 0 else 0.75
+                        t_w = cell_w
+                        t_h = t_w * aspect
+                        if t_h > max_img_h:
+                            t_h = max_img_h
+                            t_w = t_h / aspect
+                        img_objs.append(_make_img_or_spacer(lpath, t_w, t_h))
+                        cap_text = (attr if include_media_attribution and attr else col_lbl) or ""
+                        cap_objs.append(Paragraph(cap_text, caption_style))
+                    if len(img_objs) == 5:
+                        img_objs.append(Spacer(cell_w, 1))
+                        cap_objs.append(Paragraph("", caption_style))
+                    t_grid_data = [
+                        [img_objs[0], img_objs[1]],
+                        [cap_objs[0], cap_objs[1]],
+                        [img_objs[2], img_objs[3]],
+                        [cap_objs[2], cap_objs[3]],
+                        [img_objs[4], img_objs[5]],
+                        [cap_objs[4], cap_objs[5]]
+                    ]
+                    t_imgs = Table(t_grid_data, colWidths=[grid_w, grid_w])
+                    t_imgs.setStyle(TableStyle([
+                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                        ('TOPPADDING', (0, 0), (-1, -1), 1),
+                        ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+                    ]))
+                    photo_flowables.append(t_imgs)
+                    photo_flowables.append(Spacer(1, 3))
+                elif is_atlas_page and num_imgs == 4:
+                    grid_w = available_width / 2.0
+                    cell_w = grid_w - 0.3 * cm
+                    max_img_h = min(avail_photo_budget * 0.45, (6.0 * cm if page_format == "A4" else 4.2 * cm) * img_scale)
+                    img_objs = []
+                    cap_objs = []
+                    for lpath, col_lbl, attr in display_imgs:
+                        iw, ih = _get_image_dims(lpath)
+                        aspect = ih / float(iw) if iw > 0 else 0.75
+                        t_w = cell_w
+                        t_h = t_w * aspect
+                        if t_h > max_img_h:
+                            t_h = max_img_h
+                            t_w = t_h / aspect
+                        img_objs.append(_make_img_or_spacer(lpath, t_w, t_h))
+                        cap_text = (attr if include_media_attribution and attr else col_lbl) or ""
+                        cap_objs.append(Paragraph(cap_text, caption_style))
                     if len(img_objs) == 4:
                         t_grid_data = [
                             [img_objs[0], img_objs[1]],
@@ -4773,30 +5837,39 @@ def generate_pdf_booklet(
                             ('TOPPADDING', (0, 0), (-1, -1), 2),
                             ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
                         ]))
-                        species_elements.append(t_imgs)
-                        species_elements.append(Spacer(1, 6))
+                        photo_flowables.append(t_imgs)
+                        photo_flowables.append(Spacer(1, 4))
                 else:
+
+                    if is_atlas_page:
+                        if page_format == "A5":
+                            max_img_h = (8.0 * cm if num_imgs == 1 else (6.0 * cm if num_imgs == 2 else 4.5 * cm)) * img_scale
+                        else:
+                            max_img_h = (11.0 * cm if num_imgs == 1 else (8.5 * cm if num_imgs == 2 else (7.0 * cm if num_imgs == 3 else 5.5 * cm))) * img_scale
+
+                        max_img_h = min(avail_photo_budget * 0.45, max_img_h)
+                    else:
+                        if page_format == "A5":
+                            max_img_h = (4.8 * cm if num_imgs <= 2 else (3.8 * cm if num_imgs == 3 else 3.0 * cm)) * img_scale
+                        else:
+                            max_img_h = (6.4 * cm if num_imgs <= 2 else (5.2 * cm if num_imgs == 3 else 4.2 * cm)) * img_scale
+
                     cell_width = available_width / float(num_imgs)
                     img_cells = []
                     caption_cells = []
                     for lpath, col_lbl, attr in display_imgs:
-                        try:
-                            with Image.open(lpath) as pim:
-                                iw, ih = pim.size
-                                if iw <= 0 or ih <= 0:
-                                    continue
-                                aspect = ih / float(iw)
-                            target_w = cell_width - 0.3 * cm
-                            target_h = target_w * aspect
-                            if target_h > max_img_h:
-                                target_h = max_img_h
-                                target_w = target_h / aspect
-                            rl_img = RLImage(lpath, width=target_w, height=target_h)
-                            img_cells.append(rl_img)
-                            cap_text = (attr if include_media_attribution and attr else col_lbl) or ""
-                            caption_cells.append(Paragraph(cap_text, caption_style))
-                        except Exception:
+                        iw, ih = _get_image_dims(lpath)
+                        if iw <= 0 or ih <= 0:
                             continue
+                        aspect = ih / float(iw)
+                        target_w = cell_width - 0.3 * cm
+                        target_h = target_w * aspect
+                        if target_h > max_img_h:
+                            target_h = max_img_h
+                            target_w = target_h / aspect
+                        img_cells.append(_make_img_or_spacer(lpath, target_w, target_h))
+                        cap_text = (attr if include_media_attribution and attr else col_lbl) or ""
+                        caption_cells.append(Paragraph(cap_text, caption_style))
                     if img_cells:
                         actual_num = len(img_cells)
                         actual_cell_w = available_width / float(actual_num)
@@ -4809,15 +5882,14 @@ def generate_pdf_booklet(
                             ('LEFTPADDING', (0, 0), (-1, -1), 2),
                             ('RIGHTPADDING', (0, 0), (-1, -1), 2),
                         ]))
-                        species_elements.append(t_imgs)
-                        species_elements.append(Spacer(1, 6 if is_atlas_page else 4))
-                
-            # Třídění textových vlastností a popisů
+                        photo_flowables.append(t_imgs)
+                        photo_flowables.append(Spacer(1, 4))
+
             short_props = []
             long_descriptions = []
             links = []
             raw_links_data = []
-            
+
             for col in active_cols:
                 val = row.get(col)
                 if pd.isna(val) or str(val).strip() == "" or str(val).lower() == "nan":
@@ -4828,13 +5900,15 @@ def generate_pdf_booklet(
                     continue
                 if col == df.columns[0] and str(val).strip() == primary_name:
                     continue
-                    
+
                 val_str = str(val).strip()
-                label_text = col_styles.get(col, {}).get("custom_label", col) if col in col_styles else col
-                
-                # Odkazy
+                col_cfg = col_styles.get(col, {}) if col_styles else {}
+                custom_lbl = col_cfg.get("custom_label", "").strip() or col_cfg.get("label", "").strip() or col
+                display_mode = col_cfg.get("display", "auto")
+                text_style = col_cfg.get("style", "normal")
+
                 if val_str.startswith("http://") or val_str.startswith("https://"):
-                    link_label = "Odkaz"
+                    link_label = custom_lbl if custom_lbl != col else "Odkaz"
                     if "pladias.cz" in val_str: link_label = "Pladias.cz (profil taxonu)"
                     elif "inaturalist.org" in val_str: link_label = "iNaturalist (mapa pozorování)"
                     elif "mushroomcoloratlas.com" in val_str: link_label = "Mushroom Color Atlas (pigmenty)"
@@ -4846,19 +5920,32 @@ def generate_pdf_booklet(
                     links.append(f'<a href="{val_str}" color="#166534"><u>{link_label}</u></a>')
                     raw_links_data.append((val_str, link_label))
                     continue
-                    
-                # Dlouhé popisy
-                if col in ["[Květena ČR] Popis", "[Popis] Vědecký popis (Wikipedia)", "[Mykologie.net] Popis", "[DaLiBor] Popis",
-                           "[ADW] Biologický popis", "[GBIF] Vědecký popis", "[POWO Kew] Popis flóry", "[Mechorosty] Popis"] or len(val_str) > 120:
-                    clean_desc = html_to_reportlab(val_str)
-                    long_descriptions.append((label_text, clean_desc))
+
+                clean_val = html_to_reportlab(val_str)
+
+                if text_style == "bold" or col_cfg.get("bold"):
+                    clean_val = f"<b>{clean_val}</b>"
+                elif text_style == "italic" or col_cfg.get("italic"):
+                    clean_val = f"<i>{clean_val}</i>"
+                elif text_style == "bold_italic":
+                    clean_val = f"<b><i>{clean_val}</i></b>"
+
+                is_known_desc = col in [
+                    "[Květena ČR] Popis", "[Popis] Vědecký popis (Wikipedia)", "[Mykologie.net] Popis", "[DaLiBor] Popis",
+                    "[ADW] Biologický popis", "[GBIF] Vědecký popis", "[POWO Kew] Popis flóry", "[Mechorosty] Popis"
+                ]
+
+                if display_mode == "table":
+                    short_props.append((custom_lbl, clean_val))
+                elif display_mode == "text":
+                    long_descriptions.append((custom_lbl, clean_val))
                 else:
-                    clean_val = html_to_reportlab(val_str)
-                    short_props.append((label_text, clean_val))
+                    if is_known_desc or len(val_str) > 120:
+                        long_descriptions.append((custom_lbl, clean_val))
+                    else:
+                        short_props.append((custom_lbl, clean_val))
 
-            # Odkazy jsou zahrnuty pouze ze zvolených sloupců
-
-            # Vykreslení krátkých vlastností do elegantní tabulky
+            property_flowables = []
             if short_props:
                 kv_table_rows = []
                 lbl_w = available_width * 0.28
@@ -4869,27 +5956,27 @@ def generate_pdf_booklet(
                         Paragraph(v, body_style)
                     ])
                 t_kv = Table(kv_table_rows, colWidths=[lbl_w, val_w])
-                pad_v = 4.0 if is_atlas_page else 2.5
+                pad_v = 2.2 if is_atlas_page else 2.0
                 t_kv.setStyle(TableStyle([
                     ('VALIGN', (0, 0), (-1, -1), 'TOP'),
                     ('TOPPADDING', (0, 0), (-1, -1), pad_v),
                     ('BOTTOMPADDING', (0, 0), (-1, -1), pad_v),
-                    ('LEFTPADDING', (0, 0), (-1, -1), 4),
-                    ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 3),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 3),
                     ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f8fafc')),
-                    ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+                    ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
                     ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#f1f5f9')),
                 ]))
-                species_elements.append(t_kv)
-                species_elements.append(Spacer(1, 6 if is_atlas_page else 4))
-                
-            # Vykreslení dlouhých popisů
+                property_flowables.append(t_kv)
+                property_flowables.append(Spacer(1, 4))
+
+            description_flowables = []
             for d_lbl, d_text in long_descriptions:
-                species_elements.append(Paragraph(d_lbl, desc_title_style))
-                species_elements.append(Paragraph(d_text, desc_body_style))
-                species_elements.append(Spacer(1, 4 if is_atlas_page else 3))
-                
-            # Vykreslení zvuků a odkazů s QR kódy
+                description_flowables.append(Paragraph(d_lbl, desc_title_style))
+                description_flowables.append(Paragraph(d_text, desc_body_style))
+                description_flowables.append(Spacer(1, 3))
+
+            media_flowables = []
             sound_col_val = row.get("[Zvuky] Hlasy ptáků")
             if sound_col_val and pd.notna(sound_col_val) and str(sound_col_val).strip():
                 sound_entries = [e.strip() for e in str(sound_col_val).split(';') if e.strip()]
@@ -4899,39 +5986,42 @@ def generate_pdf_booklet(
                     s_type = parts[1].strip() if len(parts) > 1 else "song"
                     s_attr = parts[2].strip() if len(parts) > 2 else ""
                     if s_url.startswith('http'):
-                        qr_d = create_pdf_qr_drawing(s_url, size=48) if include_qr_codes else None
+                        qr_size_snd = 32 if is_atlas_page else 40
+                        qr_d = create_pdf_qr_drawing(s_url, size=qr_size_snd) if include_qr_codes else None
                         t_lbl = "Zpěv" if s_type == "song" else "Hlas"
-                        attr_sub = f"<br/><font size=\"6.5\" color=\"#64748b\">Autor nahrávky: {s_attr}</font>" if (include_media_attribution and s_attr) else ""
+                        attr_sub = f'<br/><font size="6.5" color="#64748b">Autor nahrávky: {s_attr}</font>' if (include_media_attribution and s_attr) else ""
                         if include_qr_codes and qr_d:
-                            desc_p = Paragraph(f"<b>Poslechnout nahrávku ({t_lbl}) – naskenujte QR kód:</b><br/><font size=\"7.5\" color=\"#166534\"><a href=\"{s_url}\">{s_url[:45]}...</a></font>{attr_sub}", body_style)
-                            t_snd = Table([[qr_d, desc_p]], colWidths=[2.0 * cm, available_width - 2.0 * cm])
+                            desc_p = Paragraph(f'<b>Poslechnout nahrávku ({t_lbl}) – QR kód:</b><br/><font size="7.0" color="#166534"><a href="{s_url}">{s_url[:42]}...</a></font>{attr_sub}', body_style)
+                            snd_w = (qr_size_snd / 28.35) * cm + 0.4 * cm
+                            t_snd = Table([[qr_d, desc_p]], colWidths=[snd_w, available_width - snd_w])
                             t_snd.setStyle(TableStyle([
                                 ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
                                 ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f1f5f9')),
                                 ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
-                                ('TOPPADDING', (0,0), (-1,-1), 3),
-                                ('BOTTOMPADDING', (0,0), (-1,-1), 3),
-                                ('LEFTPADDING', (0,0), (-1,-1), 5),
-                                ('RIGHTPADDING', (0,0), (-1,-1), 5),
+                                ('TOPPADDING', (0,0), (-1,-1), 2),
+                                ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+                                ('LEFTPADDING', (0,0), (-1,-1), 4),
+                                ('RIGHTPADDING', (0,0), (-1,-1), 4),
                             ]))
-                            species_elements.append(t_snd)
-                            species_elements.append(Spacer(1, 4))
+                            media_flowables.append(t_snd)
+                            media_flowables.append(Spacer(1, 3))
                         else:
-                            desc_p = Paragraph(f"<b>Nahrávka ({t_lbl}):</b> <font size=\"7.5\" color=\"#166534\"><a href=\"{s_url}\">{s_url}</a></font>{attr_sub}", body_style)
-                            species_elements.append(desc_p)
-                            species_elements.append(Spacer(1, 4))
+                            desc_p = Paragraph(f'<b>Nahrávka ({t_lbl}):</b> <font size="7.5" color="#166534"><a href="{s_url}">{s_url}</a></font>{attr_sub}', body_style)
+                            media_flowables.append(desc_p)
+                            media_flowables.append(Spacer(1, 3))
 
             if include_qr_codes and raw_links_data:
                 qr_link_cells = []
+                qr_sz = 28 if is_atlas_page else 36
                 for l_url, l_name in raw_links_data:
-                    l_qr = create_pdf_qr_drawing(l_url, size=40)
-                    action_txt = "Otevřít mapu pozorování" if "inaturalist.org" in l_url else "Otevřít odkaz"
-                    l_p = Paragraph(f"<b>{l_name}</b><br/><font size=\"6.5\" color=\"#166534\"><a href=\"{l_url}\">{action_txt} &rarr;</a></font>", body_style)
+                    l_qr = create_pdf_qr_drawing(l_url, size=qr_sz)
+                    action_txt = "Otevřít mapu" if "inaturalist.org" in l_url else "Otevřít odkaz"
+                    l_p = Paragraph(f'<b>{l_name}</b><br/><font size="6.5" color="#166534"><a href="{l_url}">{action_txt} &rarr;</a></font>', body_style)
                     if l_qr:
                         qr_link_cells.append([l_qr, l_p])
                     else:
                         qr_link_cells.append(["", l_p])
-                
+
                 if qr_link_cells:
                     grid_rows = []
                     for idx_k in range(0, len(qr_link_cells), 2):
@@ -4941,78 +6031,74 @@ def generate_pdf_booklet(
                         else:
                             grid_rows.append([pair[0][0], pair[0][1], "", ""])
                     half_w = available_width / 2.0
-                    qr_w = 1.6 * cm
+                    qr_w = (qr_sz / 28.35) * cm + 0.3 * cm
                     desc_w = half_w - qr_w
                     t_links_grid = Table(grid_rows, colWidths=[qr_w, desc_w, qr_w, desc_w])
                     t_links_grid.setStyle(TableStyle([
                         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-                        ('TOPPADDING', (0,0), (-1,-1), 2.5),
-                        ('BOTTOMPADDING', (0,0), (-1,-1), 2.5),
-                        ('LEFTPADDING', (0,0), (-1,-1), 2.5),
-                        ('RIGHTPADDING', (0,0), (-1,-1), 2.5),
+                        ('TOPPADDING', (0,0), (-1,-1), 1.5),
+                        ('BOTTOMPADDING', (0,0), (-1,-1), 1.5),
+                        ('LEFTPADDING', (0,0), (-1,-1), 2),
+                        ('RIGHTPADDING', (0,0), (-1,-1), 2),
                     ]))
-                    species_elements.append(Paragraph("<b>Interaktivní odkazy (QR kódy):</b>", label_style))
-                    species_elements.append(t_links_grid)
-                    species_elements.append(Spacer(1, 4))
+                    media_flowables.append(Paragraph("<b>Interaktivní odkazy (QR kódy):</b>", label_style))
+                    media_flowables.append(t_links_grid)
+                    media_flowables.append(Spacer(1, 3))
             elif links:
                 links_html = " • ".join(links)
-                species_elements.append(Paragraph(f"<b>Odkazy:</b> {links_html}", body_style))
-                species_elements.append(Spacer(1, 4))
+                media_flowables.append(Paragraph(f"<b>Odkazy:</b> {links_html}", body_style))
+                media_flowables.append(Spacer(1, 3))
 
             if layout_mode == "split_images_text":
-                # Režim dvojstrana: Strana 1 = výhradně velká fotogalerie, Strana 2 = popis, vlastnosti a QR kódy
-                page_header_items = species_elements[:2] if len(species_elements) >= 2 else species_elements
-                body_items = species_elements[2:] if len(species_elements) >= 2 else []
-                
-                img_flowables = []
-                text_flowables = []
-                for elem in body_items:
-                    # Rozlišení tabulek s fotografiemi
-                    if isinstance(elem, Table) and getattr(elem, '_is_photo_table', False):
-                        img_flowables.append(elem)
-                    elif isinstance(elem, Table) and len(elem._cellvalues) > 0 and any(hasattr(c, 'draw') or hasattr(c, 'drawOn') or hasattr(c, 'image') for c in elem._cellvalues[0] if c):
-                        img_flowables.append(elem)
-                    else:
-                        text_flowables.append(elem)
-                
-                # Pokud se automaticky nerozdělilo podle typů, vezmeme první prvky jako foto
-                if not img_flowables and found_images and body_items:
-                    img_flowables.append(body_items[0])
-                    text_flowables = body_items[1:]
-                
-                # 1. Strana: Fotogalerie
-                story.extend(page_header_items)
-                if img_flowables:
-                    story.extend(img_flowables)
-                else:
-                    story.append(Paragraph("<font color=\"#64748b\"><i>Pro tento taxon není k dispozici žádná fotografie.</i></font>", body_style))
-                story.append(PageBreak())
-                
-                # 2. Strana: Textový popis a vlastnosti
-                story.append(Paragraph(f"{title_text} – Popis a vlastnosti", sp_title_style))
-                story.append(HRFlowable(width="100%", thickness=1.2, color=colors.HexColor("#1b4332"), spaceBefore=1, spaceAfter=6))
-                story.extend(text_flowables)
-                if idx < len(df) - 1:
-                    story.append(PageBreak())
-            elif is_atlas_page:
-                story.extend(species_elements)
-                if idx < len(df) - 1:
-                    story.append(PageBreak())
-            else:
-                if len(species_elements) > 2:
-                    story.append(KeepTogether(species_elements[:2]))
-                    story.extend(species_elements[2:])
-                else:
-                    story.extend(species_elements)
-                if idx < len(df) - 1:
-                    story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#cbd5e1"), spaceBefore=5, spaceAfter=8))
 
-        # Závěrečná bibliografie a citace
+                story.extend(species_header)
+                if photo_flowables:
+                    story.extend(photo_flowables)
+                else:
+                    story.append(Paragraph("<font color='#64748b'><i>Pro tento taxon není k dispozici žádná fotografie.</i></font>", body_style))
+                story.append(PageBreak())
+
+                story.append(Paragraph(f"{title_text} – Popis a vlastnosti", sp_title_style))
+                story.append(HRFlowable(width="100%", thickness=1.2, color=colors.HexColor("#1b4332"), spaceBefore=1, spaceAfter=5))
+                if property_flowables:
+                    story.extend(property_flowables)
+                if description_flowables:
+                    story.extend(description_flowables)
+                if media_flowables:
+                    story.extend(media_flowables)
+                if idx < len(df) - 1:
+                    story.append(PageBreak())
+
+            elif is_atlas_page:
+
+                story.extend(species_header)
+                if photo_flowables:
+                    story.extend(photo_flowables)
+                if property_flowables:
+                    story.extend(property_flowables)
+                if description_flowables:
+                    story.extend(description_flowables)
+                if media_flowables:
+                    story.extend(media_flowables)
+                if idx < len(df) - 1:
+                    story.append(PageBreak())
+
+            else:
+
+                c_items = species_header + photo_flowables + property_flowables + description_flowables + media_flowables
+                if len(c_items) > 2:
+                    story.append(KeepTogether(c_items[:2]))
+                    story.extend(c_items[2:])
+                else:
+                    story.extend(c_items)
+                if idx < len(df) - 1:
+                    story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#cbd5e1"), spaceBefore=4, spaceAfter=6))
+
         if include_citations:
             story.append(PageBreak())
             story.append(Paragraph("Použitá literatura, zdroje dat a licence", biblio_title_style))
             story.append(HRFlowable(width="100%", thickness=1.0, color=colors.HexColor("#2d6a4f"), spaceBefore=2, spaceAfter=6))
-            
+
             citations_data = [
                 ("Pladias.cz", "Pladias.cz – Databáze české flóry a vegetace. Botanický ústav AV ČR, Průhonice. (pladias.cz)"),
                 ("Klíč 2019", "Kaplan Z. et al. (2019): Klíč ke květeně České republiky. Academia, Praha, 1168 s."),
@@ -5025,7 +6111,7 @@ def generate_pdf_booklet(
             ]
             for src_title, src_text in citations_data:
                 story.append(Paragraph(f"<b>{src_title}:</b> {src_text}", biblio_body_style))
-                
+
         return story
 
     def _canvas_factory(filename, **kwargs):
@@ -5033,27 +6119,35 @@ def generate_pdf_booklet(
         c.doc_title = title.strip() or "Studijní atlas a brožura"
         return c
 
-    # Fáze 1: Pre-pass pro přesné zjištění reálných čísel stránek pro rejstřík
     page_tracker = {}
     if include_toc and len(df) >= 2:
-        try:
-            pre_story = assemble_story(page_tracker=page_tracker)
-            dummy_buf = io.BytesIO()
-            doc_dummy = SimpleDocTemplate(
-                dummy_buf,
-                pagesize=target_pagesize,
-                leftMargin=margin_x,
-                rightMargin=margin_x,
-                topMargin=margin_top,
-                bottomMargin=margin_bot
-            )
-            doc_dummy.build(pre_story, canvasmaker=_canvas_factory)
-        except Exception:
-            page_tracker = {}
-            
-    # Fáze 2: Sestavení finálního dokumentu s přesnými čísly stránek v rejstříku
-    story = assemble_story(page_tracker=page_tracker)
-    
+        if is_atlas_page:
+            n_items = len(df)
+            if n_items <= 80:
+                toc_pages = 1
+            else:
+                toc_pages = 1 + math.ceil((n_items - 80) / 90)
+            pages_per_species = 2 if layout_mode == "split_images_text" else 1
+            for idx_t in range(n_items):
+                page_tracker[idx_t] = 1 + toc_pages + (idx_t * pages_per_species)
+        else:
+            try:
+                pre_story = assemble_story(page_tracker=page_tracker, is_dummy=True)
+                dummy_buf = io.BytesIO()
+                doc_dummy = SimpleDocTemplate(
+                    dummy_buf,
+                    pagesize=target_pagesize,
+                    leftMargin=margin_x,
+                    rightMargin=margin_x,
+                    topMargin=margin_top,
+                    bottomMargin=margin_bot
+                )
+                doc_dummy.build(pre_story, canvasmaker=_canvas_factory)
+            except Exception:
+                page_tracker = {}
+
+    story = assemble_story(page_tracker=page_tracker, is_dummy=False)
+
     is_imposition = "Standardní" not in imposition_mode
     if is_imposition:
         temp_single_path = output_pdf_path.replace(".pdf", "_raw_pages.pdf")
@@ -5066,13 +6160,13 @@ def generate_pdf_booklet(
             bottomMargin=margin_bot
         )
         doc_raw.build(story, canvasmaker=_canvas_factory)
-        
+
         sheets_sig = 0
         if "6 listů" in imposition_mode:
             sheets_sig = 6
         elif "8 listů" in imposition_mode:
             sheets_sig = 8
-            
+
         ok = impose_booklet_pdf(temp_single_path, output_pdf_path, sheets_per_signature=sheets_sig)
         if not ok or not os.path.exists(output_pdf_path) or os.path.getsize(output_pdf_path) == 0:
             shutil.copy2(temp_single_path, output_pdf_path)
@@ -5091,9 +6185,8 @@ def generate_pdf_booklet(
             bottomMargin=margin_bot
         )
         doc.build(story, canvasmaker=_canvas_factory)
-        
-    return True
 
+    return True
 
 def generate_docx_booklet(
     df: pd.DataFrame,
@@ -5101,7 +6194,7 @@ def generate_docx_booklet(
     title: str = "Studijní atlas a brožura",
     subtitle: str = "",
     active_cols: list = None,
-    layout_mode: str = "page_per_species",  # "page_per_species" or "compact"
+    layout_mode: str = "page_per_species",
     include_toc: bool = True,
     media_dir: str = "",
     media_attributions: dict = None,
@@ -5109,11 +6202,11 @@ def generate_docx_booklet(
     include_media_attribution: bool = True,
     col_styles: dict = None
 ) -> bool:
-    """
-    Vygeneruje kompletní studijní brožuru ve formátu Microsoft Word (.docx).
-    Podporuje režim 1 druh na stránku (s koncem stránky), rejstřík položek na začátku,
-    vkládání fotografií ve vysoké kvalitě, tabulky vlastností a závěrečnou bibliografii.
-    """
+\
+\
+\
+\
+
     import docx
     from docx.shared import Inches, Pt, RGBColor
     from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -5127,15 +6220,13 @@ def generate_docx_booklet(
         col_styles = {}
 
     doc = docx.Document()
-    
-    # Okraje stránky (2 cm)
+
     for section in doc.sections:
         section.top_margin = Inches(0.8)
         section.bottom_margin = Inches(0.8)
         section.left_margin = Inches(0.8)
         section.right_margin = Inches(0.8)
 
-    # 1. Titulní záhlaví dokumentu
     clean_title = title.strip() or "Studijní atlas a brožura"
     p_title = doc.add_paragraph()
     p_title.paragraph_format.space_after = Pt(2)
@@ -5153,7 +6244,6 @@ def generate_docx_booklet(
     r_sub.font.size = Pt(10)
     r_sub.font.color.rgb = RGBColor(71, 85, 105)
 
-    # 2. Obsah / Rejstřík položek na začátku
     if include_toc and len(df) >= 2:
         p_toc_head = doc.add_paragraph()
         p_toc_head.paragraph_format.space_before = Pt(8)
@@ -5180,7 +6270,7 @@ def generate_docx_booklet(
         table_toc = doc.add_table(rows=max(len(col1_items), len(col2_items)), cols=2)
         table_toc.alignment = WD_TABLE_ALIGNMENT.CENTER
         table_toc.autofit = True
-        
+
         for r_idx in range(len(table_toc.rows)):
             row_cells = table_toc.rows[r_idx].cells
             if r_idx < len(col1_items):
@@ -5202,7 +6292,6 @@ def generate_docx_booklet(
             p_div = doc.add_paragraph()
             p_div.paragraph_format.space_after = Pt(12)
 
-    # 3. Iterace přes položky
     for idx, row in df.iterrows():
         primary_name = str(row.iloc[0]).strip() if len(row) > 0 else f"Položka {idx + 1}"
         sp_pronun = ""
@@ -5234,7 +6323,6 @@ def generate_docx_booklet(
             r_pr.font.size = Pt(10)
             r_pr.font.color.rgb = RGBColor(45, 106, 79)
 
-        # Sběr obrázků
         found_images = []
         for col in active_cols:
             val = row.get(col)
@@ -5255,7 +6343,6 @@ def generate_docx_booklet(
                                 found_images.append((os.path.join(media_dir, f_cand), col, attr_txt))
                                 break
 
-        # Vložení fotografií do Wordu
         if found_images:
             display_imgs = found_images[:4]
             num = len(display_imgs)
@@ -5309,7 +6396,6 @@ def generate_docx_booklet(
                         except Exception:
                             pass
 
-        # Textové vlastnosti a popisy
         short_props = []
         long_descriptions = []
         links = []
@@ -5324,7 +6410,7 @@ def generate_docx_booklet(
             if col.startswith(("[TTS]", "[Zvuky]", "[Latina] Fonetická")):
                 continue
             lbl = col_styles.get(col, {}).get("custom_label", col) if col in col_styles else col
-            
+
             if val_s.startswith("http://") or val_s.startswith("https://"):
                 links.append((lbl, val_s))
             elif len(val_s) > 120 or "popis" in col.lower():
@@ -5334,7 +6420,6 @@ def generate_docx_booklet(
                 clean_v = re.sub(r'<[^>]+>', '', val_s)
                 short_props.append((lbl, clean_v))
 
-        # Automatické začlenění mapy pozorování iNaturalist
         inat_map_url = ""
         for c in row.index:
             if "inaturalist" in str(c).lower() and ("mapa" in str(c).lower() or "odkaz" in str(c).lower()):
@@ -5352,7 +6437,6 @@ def generate_docx_booklet(
         if inat_map_url and not any("inaturalist.org" in x[1] for x in links):
             links.append(("iNaturalist (mapa pozorování)", inat_map_url))
 
-        # Tabulka vlastností
         if short_props:
             t_props = doc.add_table(rows=len(short_props), cols=2)
             t_props.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -5376,7 +6460,6 @@ def generate_docx_booklet(
                 r1.font.size = Pt(9.5)
                 r1.font.color.rgb = RGBColor(30, 41, 59)
 
-        # Dlouhé popisy
         for d_lbl, d_txt in long_descriptions:
             p_dl = doc.add_paragraph()
             p_dl.paragraph_format.space_before = Pt(6)
@@ -5392,7 +6475,6 @@ def generate_docx_booklet(
             rd_t.font.size = Pt(9.5)
             rd_t.font.color.rgb = RGBColor(30, 41, 59)
 
-        # Odkazy
         if links:
             p_lk = doc.add_paragraph()
             p_lk.paragraph_format.space_before = Pt(4)
@@ -5414,7 +6496,6 @@ def generate_docx_booklet(
             r_sep = p_sep.add_run("—" * 35)
             r_sep.font.color.rgb = RGBColor(203, 213, 225)
 
-    # 4. Závěrečná bibliografie
     if include_citations:
         doc.add_page_break()
         p_cit_h = doc.add_paragraph()
@@ -5449,10 +6530,6 @@ def generate_docx_booklet(
     doc.save(output_docx_path)
     return os.path.exists(output_docx_path) and os.path.getsize(output_docx_path) > 0
 
-
-# --- STREAMLIT ROZHRANÍ ---
-
-# Načtení databáze států pro zeměpisný modul
 countries_db = load_countries_db()
 
 st.set_page_config(
@@ -5499,7 +6576,7 @@ st.markdown(f"""
     [data-testid="stSidebar"], [data-testid="collapsedControl"] {{
         display: none !important;
     }}
-    
+
     :root {{
         --bio-bg: {css_bg};
         --bio-fg: {css_fg};
@@ -5519,7 +6596,7 @@ st.markdown(f"""
         color-scheme: {"light" if st.session_state.app_ui_theme == "Světlý" else "dark"} !important;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
     }}
-    
+
     /* Horní lišta Streamlit */
     header[data-testid="stHeader"],
     [data-testid="stHeader"],
@@ -5531,7 +6608,7 @@ st.markdown(f"""
     [data-testid="stToolbar"] * {{
         color: {css_fg} !important;
     }}
-    
+
     .main-title {{
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         color: {css_title_color} !important;
@@ -5546,21 +6623,21 @@ st.markdown(f"""
         margin-bottom: 1.5rem;
         font-weight: 500;
     }}
-    
+
     /* Nadpisy, odstavce a texty */
     h1, h2, h3, h4, h5, h6 {{
         color: {css_title_color} !important;
         font-weight: 600 !important;
     }}
-    
+
     p, span, label, li, small, caption, th, td {{
         color: {css_fg} !important;
     }}
-    
+
     hr {{
         border-color: {css_border} !important;
     }}
-    
+
     /* Tlačítka formulářů a akcí - výrazná, jasně klikatelná tlačítka */
     .stButton > button,
     .stDownloadButton > button,
@@ -5595,7 +6672,7 @@ st.markdown(f"""
         transform: translateY(1px) !important;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
     }}
-    
+
     /* Tlačítka nápovědy a ikony (?) - resetovat aby nebyly gigantické zelené */
     button[data-testid="stHelpPopover"],
     [data-testid="stHelpPopover"] button,
@@ -5615,7 +6692,7 @@ st.markdown(f"""
         background: transparent !important;
         color: #389c62 !important;
     }}
-    
+
     /* Vstupy a formuláře */
     .stTextInput input,
     .stTextArea textarea,
@@ -5632,7 +6709,7 @@ st.markdown(f"""
         border-color: #389c62 !important;
         outline: none !important;
     }}
-    
+
     .stSelectbox > div > div,
     div[data-baseweb="select"] > div {{
         background-color: {css_input_bg} !important;
@@ -5646,7 +6723,7 @@ st.markdown(f"""
     div[data-baseweb="select"] > div:hover {{
         border-color: #389c62 !important;
     }}
-    
+
     /* Placeholder text */
     ::placeholder,
     input::placeholder,
@@ -5687,7 +6764,7 @@ st.markdown(f"""
     li[role="option"][aria-selected="true"] * {{
         color: {"#0d381e" if is_light_ui else "#ffffff"} !important;
     }}
-    
+
     /* Decentní menší tlačítka pro hromadné volby */
     .stButton button[kind="secondary"],
     .compact-btn button {{
@@ -5705,7 +6782,7 @@ st.markdown(f"""
         color: {"#165030" if is_light_ui else "#c4ebd2"} !important;
         border-color: #389c62 !important;
     }}
-    
+
     /* File uploader */
     [data-testid="stFileUploader"] section {{
         background-color: {css_card_bg} !important;
@@ -5796,7 +6873,7 @@ st.markdown(f"""
         box-shadow: 0 6px 18px rgba(40, 136, 77, 0.5) !important;
         transform: translateY(-1.5px) !important;
     }}
-    
+
     [data-testid="stBaseButton-secondary"],
     .stDownloadButton > button {{
         background-color: transparent !important;
@@ -5881,7 +6958,7 @@ st.markdown(f"""
         border: 1px solid {css_border} !important;
         padding: 4px 8px !important;
     }}
-    
+
     /* Taby */
     .stTabs [data-baseweb="tab-list"] {{
         gap: 6px;
@@ -5913,7 +6990,7 @@ st.markdown(f"""
         font-weight: 600 !important;
         border-radius: 6px !important;
     }}
-    
+
     /* Radio a zaškrtávací pole */
     .stCheckbox span, .stRadio span,
     .stCheckbox label p, .stRadio label p {{
@@ -5927,7 +7004,7 @@ st.markdown(f"""
         background-color: #216a40 !important;
         border-color: #389c62 !important;
     }}
-    
+
     /* Notifikace a hlášení */
     div[data-testid="stAlert"] {{
         border-radius: 6px !important;
@@ -5935,7 +7012,7 @@ st.markdown(f"""
         background-color: {css_card_bg} !important;
         color: {css_fg} !important;
     }}
-    
+
     /* Výjimka pro náhled kartičky (řídí se vybraným tématem) */
     .card-preview-container,
     .card-preview-container *,
@@ -5987,7 +7064,6 @@ obs.observe(window.parent.document.body, { childList: true, subtree: true });
 </script>
 """, height=0)
 
-
 col_head1, col_head2 = st.columns([4.2, 1.8])
 with col_head1:
     st.markdown('<div class="main-title">Generátor kartiček Anki</div>', unsafe_allow_html=True)
@@ -6006,6 +7082,30 @@ with col_head2:
         st.session_state.app_ui_theme = new_theme
         st.rerun()
 
+@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False)
+def _read_batch_replacer_html():
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "BatchReplacer.html")
+    if os.path.exists(p):
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                return f.read()
+        except Exception:
+            pass
+    return ""
+
+@st.cache_data(show_spinner=False)
+def _read_karty_html_bytes():
+    karty_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Karty.html")
+    if os.path.exists(karty_path):
+        try:
+            with open(karty_path, "rb") as f_k:
+                return f_k.read()
+        except Exception:
+            pass
+    return b""
+
+@st.cache_data(show_spinner=False)
 def _read_pdf_data(file_candidates):
     for f in file_candidates:
         if os.path.exists(f):
@@ -6027,10 +7127,8 @@ def _compat_width():
 
 pdf_gen_data = _read_pdf_data(["O_generatoru.pdf", "O generátoru.pdf", "MANUAL_GENERATOR.pdf"])
 pdf_anki_data = _read_pdf_data(["O_Anki.pdf", "O Anki.pdf", "MANUAL_ANKI.pdf"])
+pdf_karty_data = _read_pdf_data(["O_Karty_html.pdf", "O_karty.pdf", "MANUAL_KARTY.pdf"])
 
-# Návody v PDF přesunuty na konec stránky
-
-# Inicializace stavu
 if 'df' not in st.session_state:
     st.session_state.df = None
 if 'enhancements_applied' not in st.session_state:
@@ -6039,6 +7137,10 @@ if 'unfound_list' not in st.session_state:
     st.session_state.unfound_list = []
 if 'generated_apkg_data' not in st.session_state:
     st.session_state.generated_apkg_data = None
+if 'generated_obsidian_data' not in st.session_state:
+    st.session_state.generated_obsidian_data = None
+if 'generated_obsidian_filename' not in st.session_state:
+    st.session_state.generated_obsidian_filename = "Studijni_Karticky_Obsidian.zip"
 if 'generated_apkg_filename' not in st.session_state:
     st.session_state.generated_apkg_filename = ""
 if 'generated_pdf_data' not in st.session_state:
@@ -6081,47 +7183,176 @@ with col_custom_card:
 
         if input_method == "Nahrát soubor (Excel, CSV, TXT, APKG)":
             uploaded_files = st.file_uploader(
-                "Nahrajte jeden nebo více souborů (Excel .xlsx, CSV, TXT nebo existující balíček Anki .apkg):", 
-                type=["csv", "xlsx", "xls", "txt", "apkg"],
+                "Nahrajte jeden nebo více souborů (Excel .xlsx, CSV, TXT nebo balíček Anki .apkg / .colpkg):",
+                type=["csv", "xlsx", "xls", "txt", "apkg", "colpkg"],
                 accept_multiple_files=True,
-                help="Můžete vybrat i více souborů nebo existující balíček .apkg (karty se načtou a historie učení zůstane zachována!)."
+                help="Můžete nahrát tabulku i balíček Anki současně. Program je inteligentně sloučí a zachová historii učení!"
             )
 
+            merge_anki_policy = "merge_all"
+            merge_source_prio = "table"
+            custom_col_mapping = {}
+            custom_col_prio = {}
+
             if uploaded_files:
+                has_apkg_file = any(f.name.lower().endswith(('.apkg', '.colpkg')) for f in uploaded_files)
+                has_table_file = any(f.name.lower().endswith(('.xlsx', '.xls', '.csv', '.txt')) for f in uploaded_files)
+                is_mixed = has_apkg_file and (has_table_file or st.session_state.df is not None)
+
+                if is_mixed:
+
+                    peek_table_cols = []
+                    peek_apkg_cols = []
+                    for up_f in uploaded_files:
+                        f_low = up_f.name.lower()
+                        if f_low.endswith(('.xlsx', '.xls')):
+                            try:
+                                up_f.seek(0)
+                                _p_df = pd.read_excel(up_f, nrows=1)
+                                up_f.seek(0)
+                                peek_table_cols.extend([str(c) for c in _p_df.columns if str(c).strip()])
+                            except Exception: pass
+                        elif f_low.endswith('.csv'):
+                            try:
+                                up_f.seek(0)
+                                _p_df = pd.read_csv(up_f, nrows=1)
+                                if len(_p_df.columns) <= 1:
+                                    up_f.seek(0)
+                                    _p_df = pd.read_csv(up_f, sep=';', nrows=1)
+                                up_f.seek(0)
+                                peek_table_cols.extend([str(c) for c in _p_df.columns if str(c).strip()])
+                            except Exception: pass
+                        elif f_low.endswith(('.apkg', '.colpkg')):
+                            try:
+                                up_f.seek(0)
+                                _sub_apkg, _ = extract_apkg_to_dataframe(up_f)
+                                up_f.seek(0)
+                                peek_apkg_cols.extend([str(c) for c in _sub_apkg.columns if not str(c).startswith('_anki_')])
+                            except Exception: pass
+
+                    t_cols_avail = list(dict.fromkeys(peek_table_cols)) if peek_table_cols else (list(st.session_state.df.columns) if st.session_state.df is not None else [])
+                    t_cols_clean = [c for c in t_cols_avail if not str(c).startswith('_anki_')]
+                    a_cols_clean = list(dict.fromkeys(peek_apkg_cols))
+                    auto_defaults = auto_match_columns(t_cols_clean, a_cols_clean)
+
+                    with st.container(border=True):
+                        st.markdown("##### 🔄 Detekován balíček Anki + tabulka Excel/CSV (Inteligentní sloučení se zachováním historie učení)")
+
+                        col_m1, col_m2 = st.columns(2)
+                        with col_m1:
+                            merge_choice = st.radio(
+                                "Jak naložit se seznamem druhů?",
+                                [
+                                    "Sloučit a doplnit (Zachovat historii učení pro existující druhy a přidat nové druhy z tabulky)",
+                                    "Pouze druhy z tabulky (Ponechat pouze druhy z tabulky a z Anki přenést historii učení)"
+                                ],
+                                index=0,
+                                key="merge_anki_policy_radio"
+                            )
+                            merge_anki_policy = "merge_all" if "Sloučit a doplnit" in merge_choice else "table_only"
+
+                        with col_m2:
+                            prio_choice = st.radio(
+                                "Při nalezení druhu v obou zdrojích upřednostnit data z:",
+                                [
+                                    "🟢 Tabulky (Excel/CSV) – texty a poznámky z tabulky přepíší Anki (doporučeno)",
+                                    "🔵 Balíčku Anki – zachovat původní texty a data z Anki",
+                                    "⚙️ Vlastní výběr zdroje pro každý sloupec zvlášť"
+                                ],
+                                index=0,
+                                key="merge_source_prio_radio"
+                            )
+                            if "Tabulky" in prio_choice:
+                                merge_source_prio = "table"
+                            elif "Balíčku Anki" in prio_choice:
+                                merge_source_prio = "anki"
+                            else:
+                                merge_source_prio = "custom"
+
+                        col_pair_mode = st.radio(
+                            "Způsob párování sloupců mezi tabulkou a balíčkem Anki:",
+                            [
+                                "⚡ Automaticky spárovat sloupce (např. Popis ↔ Poznámky, České jméno ↔ Český název, Fotografie ↔ Obrázek)",
+                                "🎯 Vlastní propojení sloupců (ruční přiřazení)"
+                            ],
+                            index=0 if merge_source_prio != "custom" else 1,
+                            key="merge_col_pair_mode_radio"
+                        )
+
+                        show_manual_mapping = ("Vlastní propojení" in col_pair_mode) or (merge_source_prio == "custom")
+
+                        if show_manual_mapping and t_cols_clean and a_cols_clean:
+                            st.markdown("###### 🔗 Propojení sloupců a priorita zdroje:")
+                            st.caption("Pro každý sloupec z tabulky zvolte odpovídající pole z Anki. Pokud mají oba zdroje hodnotu, zvolte který zdroj má přednost:")
+                            for tc in t_cols_clean:
+                                c_map1, c_map2 = st.columns([1.5, 1.0])
+                                def_partner = auto_defaults.get(tc, "[Nespárovat / Ponechat samostatně]")
+                                partner_opts = ["[Nespárovat / Ponechat samostatně]"] + a_cols_clean
+                                p_idx = partner_opts.index(def_partner) if def_partner in partner_opts else 0
+
+                                with c_map1:
+                                    chosen_partner = st.selectbox(
+                                        f"Sloupec z tabulky: **{tc}** ➔ Pole v Anki:",
+                                        options=partner_opts,
+                                        index=p_idx,
+                                        key=f"col_map_sel_{slugify(tc)}"
+                                    )
+                                    if chosen_partner != "[Nespárovat / Ponechat samostatně]":
+                                        custom_col_mapping[tc] = chosen_partner
+
+                                with c_map2:
+                                    if merge_source_prio == "custom" and chosen_partner != "[Nespárovat / Ponechat samostatně]":
+                                        chosen_p = st.selectbox(
+                                            f"Přednost pro **{tc}**:",
+                                            options=["Tabulka (Excel/CSV)", "Balíček Anki"],
+                                            index=0,
+                                            key=f"col_prio_sel_{slugify(tc)}"
+                                        )
+                                        custom_col_prio[tc] = "table" if "Tabulka" in chosen_p else "anki"
+                                    else:
+                                        p_txt = "Tabulka (Excel)" if merge_source_prio == "table" else "Balíček Anki"
+                                        st.markdown(f"<div style='padding-top: 28px; font-size: 0.85rem; color: #94a3b8;'>Přednost: <b>{p_txt}</b></div>", unsafe_allow_html=True)
+                        else:
+                            custom_col_mapping = auto_defaults
+
                 c_mode, c_btn_r = st.columns([1.5, 1.2])
                 with c_mode:
                     mode_upload = st.radio(
-                        "Způsob načtení:",
-                        ["Nahradit tabulku", "Připojit k existující"],
+                        "Způsob načtení souborů:",
+                        ["Nahradit stávající data", "Připojit k existující tabulce"],
                         horizontal=True,
                         key="radio_upload_mode"
                     )
                 with c_btn_r:
                     st.markdown("<div style='height: 25px;'></div>", unsafe_allow_html=True)
-                    reload_clicked = st.button("Zpracovat soubory", key="btn_reload_files", use_container_width=True)
+                    reload_clicked = st.button("Zpracovat soubory", key="btn_reload_files", use_container_width=True, type="primary")
             else:
                 reload_clicked = False
-                mode_upload = "Nahradit tabulku"
+                mode_upload = "Nahradit stávající data"
 
             if uploaded_files and (st.session_state.df is None or reload_clicked):
                 try:
-                    dfs_to_combine = []
+                    apkg_dfs = []
+                    table_dfs = []
                     apkg_loaded_info = []
+
                     for up_f in uploaded_files:
                         f_low = up_f.name.lower()
-                        if f_low.endswith('.apkg'):
+                        if f_low.endswith(('.apkg', '.colpkg')):
                             sub_df, imported_deck = extract_apkg_to_dataframe(up_f)
+                            apkg_dfs.append(sub_df)
                             apkg_loaded_info.append((up_f.name, len(sub_df), imported_deck))
                         elif f_low.endswith('.csv'):
                             sub_df = pd.read_csv(up_f)
                             if len(sub_df.columns) <= 1:
                                 up_f.seek(0)
                                 sub_df = pd.read_csv(up_f, sep=';')
+                            table_dfs.append(sub_df)
                         elif f_low.endswith('.txt'):
                             content = up_f.read().decode('utf-8', errors='replace')
                             lines = content.splitlines()
                             species_list = [line.strip() for line in lines if line.strip()]
-                            sub_df = pd.DataFrame(species_list, columns=["Pojem"])
+                            table_dfs.append(pd.DataFrame(species_list, columns=["Pojem"]))
                         else:
                             try:
                                 xl_obj = pd.ExcelFile(up_f)
@@ -6143,66 +7374,102 @@ with col_custom_card:
                                                     sub_s["Kategorie"] = s_name
                                             sheets_dfs.append(sub_s)
                                     if sheets_dfs:
-                                        sub_df = pd.concat(sheets_dfs, ignore_index=True)
+                                        table_dfs.append(pd.concat(sheets_dfs, ignore_index=True))
                                     else:
-                                        sub_df = pd.read_excel(up_f)
+                                        table_dfs.append(pd.read_excel(up_f))
                                 else:
                                     raw_s = pd.read_excel(up_f, header=None)
                                     if not raw_s.empty and len(raw_s.columns) == 1:
                                         first_cell = str(raw_s.iloc[0, 0]).strip()
                                         first_col_is_header = any(h in first_cell.lower() for h in ["jméno", "jmeno", "název", "nazev", "druh", "taxon", "species", "name", "id", "kategorie"])
                                         if not first_col_is_header and len(first_cell.split()) >= 1:
-                                            sub_df = pd.DataFrame(raw_s[0].dropna().astype(str).str.strip().tolist(), columns=["Pojem"])
+                                            table_dfs.append(pd.DataFrame(raw_s[0].dropna().astype(str).str.strip().tolist(), columns=["Pojem"]))
                                         else:
-                                            sub_df = pd.read_excel(up_f)
+                                            table_dfs.append(pd.read_excel(up_f))
                                     else:
-                                        sub_df = pd.read_excel(up_f)
+                                        table_dfs.append(pd.read_excel(up_f))
                             except Exception:
-                                sub_df = pd.read_excel(up_f)
-                        dfs_to_combine.append(sub_df)
+                                table_dfs.append(pd.read_excel(up_f))
 
-                    if dfs_to_combine:
-                        merged_new_df = pd.concat(dfs_to_combine, ignore_index=True)
+                    combined_table_df = pd.concat(table_dfs, ignore_index=True) if table_dfs else None
+                    combined_apkg_df = pd.concat(apkg_dfs, ignore_index=True) if apkg_dfs else None
 
-                        if mode_upload == "Připojit k existující" and st.session_state.df is not None:
-                            final_df = pd.concat([st.session_state.df, merged_new_df], ignore_index=True)
+                    if "Připojit" in mode_upload and st.session_state.df is not None:
+                        if combined_table_df is not None:
+                            combined_table_df = pd.concat([st.session_state.df, combined_table_df], ignore_index=True)
                         else:
-                            final_df = merged_new_df
+                            combined_table_df = st.session_state.df.copy()
 
-                        # Automatická deduplikace
-                        dedup_col = '_anki_guid' if '_anki_guid' in final_df.columns else final_df.columns[0]
+                    merge_msg = ""
+                    if combined_apkg_df is not None and combined_table_df is not None:
+                        keep_only = (merge_anki_policy == "table_only")
+                        effective_prio = custom_col_prio if merge_source_prio == "custom" else merge_source_prio
+                        final_df, matched_cnt, new_cnt, kept_cnt = smart_merge_apkg_and_excel(
+                            combined_apkg_df, combined_table_df,
+                            col_mapping=custom_col_mapping if custom_col_mapping else None,
+                            source_priority=effective_prio,
+                            keep_only_table=keep_only
+                        )
+                        prio_desc = "Tabulka (Excel)" if merge_source_prio == "table" else ("Balíček Anki" if merge_source_prio == "anki" else "Vlastní per sloupec")
+                        pairs_desc = f" (spárováno {len(custom_col_mapping)} sloupců, přednost: {prio_desc})" if custom_col_mapping else ""
+                        merge_msg = f" Sloučeno s balíčkem Anki{pairs_desc}: **{matched_cnt}** existujícím druhům byla zachována historie učení a GUID. Přidáno **{new_cnt}** nových druhů."
+                        if kept_cnt > 0:
+                            merge_msg += f" Ponecháno **{kept_cnt}** původních druhů z balíčku."
+                    elif combined_table_df is not None:
+                        final_df = combined_table_df
+                    elif combined_apkg_df is not None:
+                        final_df = combined_apkg_df
+                    else:
+                        final_df = pd.DataFrame()
+
+                    if not final_df.empty:
                         orig_cnt = len(final_df)
-                        final_df = final_df.drop_duplicates(subset=[dedup_col]).reset_index(drop=True)
+                        key_col = final_df.columns[0]
+
+                        norm_keys = final_df[key_col].apply(normalize_match_key)
+
+                        if '_anki_guid' in final_df.columns:
+                            final_df['__has_guid'] = final_df['_anki_guid'].notna() & (final_df['_anki_guid'].astype(str).str.strip() != '')
+                            final_df = final_df.sort_values(by='__has_guid', ascending=False)
+                            final_df['__norm_k'] = norm_keys
+                            final_df = final_df.drop_duplicates(subset=['__norm_k']).drop(columns=['__has_guid', '__norm_k']).reset_index(drop=True)
+                        else:
+                            final_df['__norm_k'] = norm_keys
+                            final_df = final_df.drop_duplicates(subset=['__norm_k']).drop(columns=['__norm_k']).reset_index(drop=True)
                         dups_cnt = orig_cnt - len(final_df)
+                    else:
+                        dups_cnt = 0
 
-                        if apkg_loaded_info:
-                            st.session_state.imported_apkg_deck_name = apkg_loaded_info[0][2]
+                    if apkg_loaded_info:
+                        st.session_state.imported_apkg_deck_name = apkg_loaded_info[0][2]
 
-                        st.session_state.df = final_df
-                        st.session_state.enhancements_applied = False
-                        st.session_state.unfound_list = []
-                        st.session_state.generated_apkg_data = None
-                        st.session_state.generated_apkg_filename = ""
-                        st.session_state.generated_pdf_data = None
-                        st.session_state.generated_pdf_filename = ""
-                        st.session_state.unfound_csv_data = None
-                        st.session_state.col_styles = {}
-                        st.session_state.api_config = {}
+                    st.session_state.df = final_df
+                    st.session_state.enhancements_applied = False
+                    st.session_state.unfound_list = []
+                    st.session_state.generated_apkg_data = None
+                    st.session_state.generated_apkg_filename = ""
+                    st.session_state.generated_pdf_data = None
+                    st.session_state.generated_pdf_filename = ""
+                    st.session_state.unfound_csv_data = None
+                    st.session_state.col_styles = {}
+                    st.session_state.api_config = {}
 
-                        msg = f"Úspěšně načteno {len(final_df)} unikátních položek z {len(uploaded_files)} souborů."
-                        if apkg_loaded_info:
-                            msg += f" Z balíčku Anki '{apkg_loaded_info[0][2]}' načteno {apkg_loaded_info[0][1]} karet. Historie učení a GUID karet zůstanou při exportu 100% zachovány!"
-                        if dups_cnt > 0:
-                            msg += f" (Odstraněno {dups_cnt} duplicit)."
-                        st.success(msg)
-                        st.rerun()
+                    msg = f"Úspěšně načteno **{len(final_df)}** položek."
+                    if merge_msg:
+                        msg += merge_msg
+                    elif apkg_loaded_info:
+                        msg += f" Z balíčku Anki '{apkg_loaded_info[0][2]}' načteno {apkg_loaded_info[0][1]} karet. Historie učení a GUID karet zůstanou při exportu 100% zachovány!"
+                    if dups_cnt > 0:
+                        msg += f" (Odstraněno {dups_cnt} duplicit)."
+                    st.success(msg)
+                    st.rerun()
                 except Exception as e:
                     st.error(f"Nepodařilo se načíst soubory: {e}")
         else:
             text_input_value = st.text_area(
-                "Vložte seznam položek (jeden na každý řádek):", 
-                height=130, 
-                placeholder="Např.:\nPlantago lanceolata\nBellis perennis\nTaraxacum officinale", 
+                "Vložte seznam položek (jeden na každý řádek):",
+                height=130,
+                placeholder="Např.:\nPlantago lanceolata\nBellis perennis\nTaraxacum officinale",
                 key="manual_species_input"
             )
 
@@ -6245,8 +7512,6 @@ with col_custom_card:
                 else:
                     st.error("Seznam položek je prázdný.")
 
-
-
 with col_sep_card:
     st.markdown('''
     <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; min-height:280px;">
@@ -6255,7 +7520,6 @@ with col_sep_card:
         <div style="flex:1; width:1px; background:var(--bio-border, #283a2e); opacity:0.6;"></div>
     </div>
     ''', unsafe_allow_html=True)
-
 
 with col_test_card:
     with st.container(border=True):
@@ -6352,7 +7616,7 @@ with col_test_card:
 if st.session_state.df is not None:
     df = st.session_state.df
     columns = [c for c in df.columns if not c.startswith('_anki_')]
-    
+
     with st.expander("2. Náhled tabulky", expanded=False):
         c_th_title, c_th_badge = st.columns([3, 1.2])
         with c_th_title:
@@ -6377,13 +7641,16 @@ if st.session_state.df is not None:
         """
         st.markdown(tbl_html, unsafe_allow_html=True)
 
+        @st.cache_data(show_spinner=False)
+        def _get_cached_table_exports(dataframe_obj):
+            import io
+            c_data = dataframe_obj.to_csv(index=False, encoding='utf-8-sig')
+            e_buf = io.BytesIO()
+            with pd.ExcelWriter(e_buf, engine='openpyxl') as writer:
+                dataframe_obj.to_excel(writer, index=False)
+            return c_data, e_buf.getvalue()
 
-
-        import io
-        csv_data = df.to_csv(index=False, encoding='utf-8-sig')
-        excel_buffer = io.BytesIO()
-        with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-            df.to_excel(writer, index=False)
+        csv_data, excel_data = _get_cached_table_exports(df)
 
         col_dummy, col_dl_right = st.columns([2.5, 1.5])
         with col_dl_right:
@@ -6400,7 +7667,7 @@ if st.session_state.df is not None:
             with c_xlsx:
                 st.download_button(
                     "Stáhnout (Excel)",
-                    data=excel_buffer.getvalue(),
+                    data=excel_data,
                     file_name="tabulka_dat.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     key="dl_table_preview_xlsx",
@@ -6408,7 +7675,7 @@ if st.session_state.df is not None:
                 )
 
         with st.expander("Nástroje pro úpravu dat", expanded=False):
-            # 1. Odstranění duplicit a 2. Smazání konkrétního řádku (otevřené přímo v panelu)
+
             c_dedup_box, c_del_box = st.columns(2, gap="medium")
             with c_dedup_box:
                 st.markdown("**1. Odstranění duplicitních řádků**")
@@ -6439,7 +7706,6 @@ if st.session_state.df is not None:
 
             st.markdown("<hr style='margin: 14px 0; border: none; border-top: 1px solid rgba(120, 150, 130, 0.25);'>", unsafe_allow_html=True)
 
-            # 3. Převedení na druhovou úroveň (otevřené přímo v panelu)
             st.markdown("**3. Převedení na druhovou úroveň**")
             st.caption("Odstraní ze jmen taxonů poddruhy, variety a agregáty (subsp., var., agg.) a automaticky sloučí vzniklé duplicity.")
             col_clean1, col_clean2, col_clean3 = st.columns([3.2, 2.2, 0.6], gap="small")
@@ -6482,7 +7748,6 @@ if st.session_state.df is not None:
 
             st.markdown("<hr style='margin: 14px 0; border: none; border-top: 1px solid rgba(120, 150, 130, 0.25);'>", unsafe_allow_html=True)
 
-            # 4. Sjednocení a převod nomenklatury (zůstává v rozbalovací roletě)
             with st.expander("Sjednocení a převod nomenklatury (Synonymika / Pladias.cz / iNaturalist / Vlastní převodník)", expanded=False):
                 st.markdown(
                     "Umožňuje sjednotit nebo převést vědecká jména na platnou nomenklaturu (např. Pladias $\\leftrightarrow$ iNaturalist, stará synonyma na platná jména) "
@@ -6573,7 +7838,6 @@ if st.session_state.df is not None:
                     st.markdown("##### Nastavení mapování sloupců převodníku:")
                     m_col1, m_col2, m_col3 = st.columns([1.5, 1.5, 1.5])
 
-                    # Možnosti výběru sloupců s podporou chytrého párování
                     if "NameLatKey2019" in map_cols or "NameLatDanihelka2012" in map_cols:
                         src_col_options = ["Chytré párování (všechna synonyma: Klíč 2019, Danihelka 2012 i Final)"] + map_cols
                     else:
@@ -6617,7 +7881,6 @@ if st.session_state.df is not None:
                             key="nom_new_col_name"
                         )
 
-                    # Volby párování & uložení do knihovny
                     opt_col1, opt_col2 = st.columns([2, 2])
                     with opt_col1:
                         nom_case_ins = st.checkbox(
@@ -6658,7 +7921,6 @@ if st.session_state.df is not None:
                         help="Pokud název není nalezen v lokálním checklistu, vyhledá jeho platný mezinárodní status v taxonomických databázích."
                     )
 
-                    # Tlačítko spuštění převodu
                     if st.button("Provést převod a sjednocení nomenklatury", key="btn_run_nomenclature_conversion"):
                         def _norm_k(s, strip_a):
                             if not s or pd.isna(s):
@@ -6672,7 +7934,6 @@ if st.session_state.df is not None:
                                     st_str = f"{parts[0]} {parts[1]}"
                             return re.sub(r'\s+', ' ', st_str).strip().lower()
 
-                        # Build dictionary
                         mapping_exact = {}
                         mapping_lower = {}
                         mapping_norm = {}
@@ -6699,7 +7960,6 @@ if st.session_state.df is not None:
                                         if nk:
                                             mapping_norm[nk] = t_val
 
-                        # Built-in synonymic dictionary for well-known Czech flora synonyms
                         builtin_cz_synonyms = {
                             "lychnis viscaria": "Viscaria vulgaris",
                             "stipa calamagrostis": "Achnatherum calamagrostis",
@@ -6764,7 +8024,6 @@ if st.session_state.df is not None:
                                 })
                             converted_values.append(res_val)
 
-                        # Aplikovat změny
                         if dest_mode == "Nahradit hodnoty ve stávajícím sloupci":
                             st.session_state.df[nom_target_col] = converted_values
                         else:
@@ -6779,7 +8038,6 @@ if st.session_state.df is not None:
                         st.success(f"Převod dokončen! Úspěšně sjednoceno/nahrazeno: **{len(change_log)}** z **{len(target_series)}** položek.")
                         st.rerun()
 
-                # Zobrazení posledního reportu převodu
                 if "nom_last_report" in st.session_state and st.session_state.nom_last_report:
                     rep = st.session_state.nom_last_report
                     st.markdown(f"**Výsledek posledního převodu:** Sjednoceno {rep['changed_count']} položek z celkových {rep['total']} řádků.")
@@ -6787,7 +8045,6 @@ if st.session_state.df is not None:
                         rep_df = pd.DataFrame(rep["changes"])
                         st.dataframe(rep_df, **_compat_width())
 
-            # --- VLASTNÍ FOTOGRAFIE A OBRÁZKY (LOKÁLNÍ NAHRÁVÁNÍ) ---
             with st.expander("Vlastní fotografie a multimédia", expanded=False):
                 if st.session_state.get("custom_photo_pairing_msg"):
                     st.success(f"{st.session_state['custom_photo_pairing_msg']}")
@@ -6816,7 +8073,6 @@ if st.session_state.df is not None:
                             key="custom_photo_caption_input"
                         )
 
-                        # Zobrazení stávajících přiřazených fotografií pro vybraný druh
                         if "[Vlastní] Fotografie" in st.session_state.df.columns:
                             sp_match_mask = st.session_state.df[columns[0]].astype(str).str.strip() == str(selected_target_species).strip()
                             existing_entries_str = ""
@@ -6869,7 +8125,6 @@ if st.session_state.df is not None:
                             if "[Vlastní] Fotografie" not in st.session_state.df.columns:
                                 st.session_state.df["[Vlastní] Fotografie"] = ""
 
-                            # Update row in DataFrame (připojení k existujícím)
                             sp_match_mask = st.session_state.df[columns[0]].astype(str).str.strip() == str(selected_target_species).strip()
                             for idx_m in st.session_state.df[sp_match_mask].index:
                                 curr_val = str(st.session_state.df.at[idx_m, "[Vlastní] Fotografie"]).strip()
@@ -6899,7 +8154,7 @@ if st.session_state.df is not None:
                             st.session_state.df["[Vlastní] Fotografie"] = ""
 
                         for up_f in uploaded_batch_photos:
-                            # Clean filename for matching
+
                             f_stem = os.path.splitext(up_f.name)[0]
                             f_clean = re.sub(r'[^a-zA-Z0-9]', ' ', f_stem).strip().lower()
 
@@ -6925,13 +8180,8 @@ if st.session_state.df is not None:
                         st.toast(f"{succ_msg}")
                         st.rerun()
 
-
-        # --- KROK 2: OBOHACENÍ DAT ---
         st.markdown("---")
 
-        # Trvalé zobrazení informace o dokončení obohacení (přesunuto přímo pod tlačítko Spustit obohacení)
-
-        # Seznam všech klíčů modulů podle skupin
         ALL_BIO_KEYS = [
             "enable_inat", "enable_inat_map", "enable_desc", "enable_gbif", "enable_wiki_img", "enable_wiki_link",
             "enable_pladias_photos", "enable_pladias_map", "enable_pladias", "enable_pladias_tax",
@@ -6948,7 +8198,6 @@ if st.session_state.df is not None:
         ALL_GEO_KEYS = ["enable_country"]
         ALL_MODULE_KEYS = ALL_BIO_KEYS + ALL_LANG_KEYS + ALL_GEO_KEYS
 
-        # Inicializace persistentního konfigurátoru v session_state
         if "api_config" not in st.session_state or not st.session_state.api_config:
             st.session_state.api_config = {
                 "selected_api_topic": "Biologie",
@@ -6967,6 +8216,7 @@ if st.session_state.df is not None:
                 "enable_pladias": False,
                 "pladias_col": columns[0] if columns else "",
                 "enable_pladias_tax": False,
+                "enable_pladias_czech_name": True,
                 "pladias_tax_col": columns[0] if columns else "",
                 "enable_pladias_photos": False,
                 "pladias_photos_col": columns[0] if columns else "",
@@ -7054,7 +8304,7 @@ if st.session_state.df is not None:
         cfg = st.session_state.api_config
 
     with st.expander("3. Výběr modulů pro obohacení dat", expanded=False):
-        # Rychlé nastavení profilů kategorií a hromadný počet fotek (Horní pás filtrů)
+
         with st.container(border=True):
             col_p_sel, col_p_photos = st.columns([3.5, 2.5], gap="large")
         with col_p_sel:
@@ -7080,15 +8330,14 @@ if st.session_state.df is not None:
                 key="w_category_preset_select",
                 help="Jednoduchý mód zapne fotografie na líci a základní identifikační údaje s odkazem na rubu. Pokročilý mód aktivuje veškeré dostupné odborné registry a popisy pro danou kategorii."
             )
-            
-            # Reakce na výběr profilu
+
             if chosen_preset != st.session_state.get("_prev_applied_preset", ""):
                 if chosen_preset != "-- Vlastní výběr nástrojů --":
-                    # Nejprve resetujeme bio moduly na False
+
                     for k_rst in ALL_BIO_KEYS:
                         cfg[k_rst] = False
                         st.session_state[f"w_{k_rst}"] = False
-                    
+
                     if "Kytky" in chosen_preset:
                         if "Jednoduchý" in chosen_preset:
                             cfg["enable_pladias_photos"] = True
@@ -7168,7 +8417,7 @@ if st.session_state.df is not None:
                             for k_adv in ["enable_gbif_zoo", "enable_bird_sounds", "enable_cerveny_seznam", "enable_gbif", "enable_desc", "enable_adw_desc", "enable_inat_map"]:
                                 cfg[k_adv] = True
                                 st.session_state[f"w_{k_adv}"] = True
-                                
+
                     st.session_state["_prev_applied_preset"] = chosen_preset
                     st.rerun()
 
@@ -7176,7 +8425,7 @@ if st.session_state.df is not None:
                 st.markdown("**Limit fotografií**")
                 if "_prev_bulk_slider" not in st.session_state:
                     st.session_state["_prev_bulk_slider"] = int(cfg.get("pladias_photos_max", 3))
-                
+
                 bulk_photo_count = st.slider(
                     "Počet fotek na položku:",
                     min_value=1,
@@ -7185,7 +8434,7 @@ if st.session_state.df is not None:
                     key="w_bulk_photo_slider",
                     help="Hromadně nastaví maximální limit fotografií pro všechny povolené fotomoduly (Pladias.cz, iNaturalist, GBIF, Mykologie, DaLiBor...)"
                 )
-                # Synchronizovat POUZE pokud uživatel fyzicky pohnul tímto hromadným posuvníkem
+
                 if bulk_photo_count != st.session_state["_prev_bulk_slider"]:
                     st.session_state["_prev_bulk_slider"] = bulk_photo_count
                     cfg["pladias_photos_max"] = bulk_photo_count
@@ -7216,7 +8465,7 @@ if st.session_state.df is not None:
                 cfg[col_key] = columns[0] if columns else ""
 
         languages = {
-            "Angličtina": "en", "Čeština": "cs", "Němčina": "de", 
+            "Angličtina": "en", "Čeština": "cs", "Němčina": "de",
             "Španělština": "es", "Francouzština": "fr", "Italština": "it", "Ruština": "ru", "Latina": "la"
         }
 
@@ -7245,7 +8494,7 @@ if st.session_state.df is not None:
             topic_keys = ALL_BIO_KEYS if selected_topic == "Biologie" else (ALL_LANG_KEYS if selected_topic == "Jazyky" else ALL_GEO_KEYS)
             render_category_select_all_checkbox(f"topic_{selected_topic}", topic_keys)
         if selected_topic == "Biologie":
-            # Záložky pro jednotlivé biologické obory (včetně Obecné biologie před Botanikou)
+
             tab_obecna, tab_botanika, tab_mechorosty, tab_houby, tab_lisejniky, tab_rasy, tab_zoologie, tab_registry = st.tabs([
                 "Obecná biologie",
                 "Botanika",
@@ -7268,7 +8517,7 @@ if st.session_state.df is not None:
                 col_b1, col_b2 = st.columns(2)
                 with col_b1:
                     cfg["enable_inat"] = st.checkbox(
-                        "iNaturalist (České jméno & Obrázky)", 
+                        "iNaturalist (České jméno & Obrázky)",
                         value=cfg.get("enable_inat", False),
                         key="w_enable_inat"
                     )
@@ -7334,22 +8583,22 @@ if st.session_state.df is not None:
                         except ValueError:
                             inat_col_idx = 0
                         cfg["inat_col"] = st.selectbox(
-                            "Sloupec s vědeckým jménem druhu (iNaturalist)", 
-                            options=columns, 
+                            "Sloupec s vědeckým jménem druhu (iNaturalist)",
+                            options=columns,
                             index=inat_col_idx,
                             key="w_inat_col"
                         )
                     if cfg.get("enable_inat", False):
                         cfg["inat_max"] = st.slider(
-                            "Max fotek z iNat na řádek", 
-                            1, 5, 
+                            "Max fotek z iNat na řádek",
+                            1, 5,
                             value=cfg.get("inat_max", 4),
                             key="w_inat_max"
                         )
 
                     st.markdown("---")
                     cfg["enable_desc"] = st.checkbox(
-                        "Stáhnout popis druhu z Wikipedie", 
+                        "Stáhnout popis druhu z Wikipedie",
                         value=cfg.get("enable_desc", False),
                         key="w_enable_desc"
                     )
@@ -7360,8 +8609,8 @@ if st.session_state.df is not None:
                         except ValueError:
                             desc_col_idx = 0
                         cfg["desc_col"] = st.selectbox(
-                            "Sloupec s vědeckým jménem druhu pro popis", 
-                            options=columns, 
+                            "Sloupec s vědeckým jménem druhu pro popis",
+                            options=columns,
                             index=desc_col_idx,
                             key="w_desc_col"
                         )
@@ -7369,7 +8618,7 @@ if st.session_state.df is not None:
 
                 with col_b2:
                     cfg["enable_gbif"] = st.checkbox(
-                        "GBIF taxonomie", 
+                        "GBIF taxonomie",
                         value=cfg.get("enable_gbif", False),
                         key="w_enable_gbif",
                         help="Doplní vědecké taxonomické zařazení z globální databáze GBIF do sloupců [GBIF] Říše, [GBIF] Kmen atd."
@@ -7381,15 +8630,15 @@ if st.session_state.df is not None:
                         except ValueError:
                             gbif_col_idx = 0
                         cfg["gbif_col"] = st.selectbox(
-                            "Sloupec s vědeckým jménem k zařazení", 
-                            options=columns, 
+                            "Sloupec s vědeckým jménem k zařazení",
+                            options=columns,
                             index=gbif_col_idx,
                             key="w_gbif_col"
                         )
 
                     st.markdown("---")
                     cfg["enable_wiki_img"] = st.checkbox(
-                        "Wikimedia Commons vyhledávač obrázků", 
+                        "Wikimedia Commons vyhledávač obrázků",
                         value=cfg.get("enable_wiki_img", False),
                         key="w_enable_wiki_img"
                     )
@@ -7400,14 +8649,14 @@ if st.session_state.df is not None:
                         except ValueError:
                             wiki_col_idx = 0
                         cfg["wiki_col"] = st.selectbox(
-                            "Sloupec s vyhledávaným slovem pro obrázek", 
-                            options=columns, 
+                            "Sloupec s vyhledávaným slovem pro obrázek",
+                            options=columns,
                             index=wiki_col_idx,
                             key="w_wiki_col"
                         )
                         cfg["wiki_max"] = st.slider(
-                            "Max fotek z Wikimedia Commons na řádek", 
-                            1, 5, 
+                            "Max fotek z Wikimedia Commons na řádek",
+                            1, 5,
                             value=cfg.get("wiki_max", 3),
                             key="w_wiki_max"
                         )
@@ -7425,8 +8674,8 @@ if st.session_state.df is not None:
                         except ValueError:
                             wiki_link_col_idx = 0
                         cfg["wiki_link_col"] = st.selectbox(
-                            "Sloupec s vědeckým jménem pro Wikipedii", 
-                            options=columns, 
+                            "Sloupec s vědeckým jménem pro Wikipedii",
+                            options=columns,
                             index=wiki_link_col_idx,
                             key="w_wiki_link_col"
                         )
@@ -7453,6 +8702,12 @@ if st.session_state.df is not None:
                         options=columns,
                         index=pladias_tax_col_idx,
                         key="w_pladias_tax_col"
+                    )
+                    cfg["enable_pladias_czech_name"] = st.checkbox(
+                        "Stáhnout také české jméno druhu z Pladias.cz",
+                        value=cfg.get("enable_pladias_czech_name", True),
+                        key="w_enable_pladias_czech_name",
+                        help="Uloží oficiální české jméno rostliny z portálu Pladias.cz do sloupce [Pladias] České jméno a doplní jej i do prázdných položek sloupce České jméno."
                     )
 
                 cfg["enable_pladias_photos"] = st.checkbox(
@@ -7544,12 +8799,10 @@ if st.session_state.df is not None:
                         pladias_col_idx = 0
                     cfg["pladias_col"] = st.selectbox(
                         "Sloupec s vědeckým jménem druhu pro Pladias.cz odkaz",
-                        options=columns, 
+                        options=columns,
                         index=pladias_col_idx,
                         key="w_pladias_col"
                     )
-
-                # GBIF orgánové fotky (list, květ, herbář) byly odstraněny na přání uživatele ve prospěch přesnějšího Pladiasu
 
             with tab_mechorosty:
                 c_mr_t, c_mr_chk = st.columns([3.5, 1.5])
@@ -7883,8 +9136,8 @@ if st.session_state.df is not None:
                     except ValueError:
                         gbif_zoo_col_idx = 0
                     cfg["gbif_zoo_col"] = st.selectbox(
-                        "Sloupec s vědeckým jménem druhu pro zoologii", 
-                        options=columns, 
+                        "Sloupec s vědeckým jménem druhu pro zoologii",
+                        options=columns,
                         index=gbif_zoo_col_idx,
                         key="w_gbif_zoo_col"
                     )
@@ -7909,7 +9162,7 @@ if st.session_state.df is not None:
                         bird_col_idx = 0
                     cfg["bird_sounds_col"] = st.selectbox(
                         "Sloupec s vědeckým jménem druhu (Xeno-canto)",
-                        options=columns, 
+                        options=columns,
                         index=bird_col_idx,
                         key="w_bird_sounds_col"
                     )
@@ -7944,7 +9197,6 @@ if st.session_state.df is not None:
                     keys_registry = ["enable_nepuvodni", "enable_biotopy", "enable_ellenberg", "enable_cerveny_seznam", "enable_cerveny_seznam_url", "enable_kvetena_cr"]
                     render_category_select_all_checkbox("tab_registry", keys_registry)
 
-                # 1. Nepůvodní druhy
                 cfg["enable_nepuvodni"] = st.checkbox(
                     "Katalog nepůvodních druhů rostlin ČR (status, původ)",
                     value=cfg.get("enable_nepuvodni", False),
@@ -7960,7 +9212,6 @@ if st.session_state.df is not None:
                         key="w_nepuvodni_col"
                     )
 
-                # 3. Biotopy
                 cfg["enable_biotopy"] = st.checkbox(
                     "Výskyt v biotopech ČR",
                     value=cfg.get("enable_biotopy", False),
@@ -7976,7 +9227,6 @@ if st.session_state.df is not None:
                         key="w_biotopy_col"
                     )
 
-                # 4. Ellenberg
                 cfg["enable_ellenberg"] = st.checkbox(
                     "Ellenbergovy indikační hodnoty pro ČR (L, T, M, R, N, S)",
                     value=cfg.get("enable_ellenberg", False),
@@ -7992,7 +9242,6 @@ if st.session_state.df is not None:
                         key="w_ellenberg_col"
                     )
 
-                # 5. Červený seznam ČR (AOPK ČR – Všechny organismy)
                 cfg["enable_cerveny_seznam"] = st.checkbox(
                     "Červený seznam ČR (AOPK ČR – Kategorie ohrožení)",
                     value=cfg.get("enable_cerveny_seznam", False),
@@ -8013,7 +9262,6 @@ if st.session_state.df is not None:
                         key="w_enable_cerveny_seznam_url"
                     )
 
-                # 6. Květena ČR
                 cfg["enable_kvetena_cr"] = st.checkbox(
                     "Botanický popis z Květeny ČR (ibot.cas.cz PDF)",
                     value=cfg.get("enable_kvetena_cr", False),
@@ -8051,15 +9299,15 @@ if st.session_state.df is not None:
             col_l1, col_l2 = st.columns(2)
             with col_l1:
                 cfg["enable_trans"] = st.checkbox(
-                    "Překladač", 
+                    "Překladač",
                     value=cfg.get("enable_trans", False),
                     key="w_enable_trans"
                 )
 
                 trans_col_idx = get_smart_column_default(columns, cfg, "trans_col", ["překlad", "text", "slovo", "angličtina", "english", "český název", "česky"])
                 cfg["trans_col"] = st.selectbox(
-                    "Sloupec s textem k překladu", 
-                    options=columns, 
+                    "Sloupec s textem k překladu",
+                    options=columns,
                     index=trans_col_idx,
                     key="w_trans_col"
                 )
@@ -8071,8 +9319,8 @@ if st.session_state.df is not None:
                 except ValueError:
                     trans_src_idx = 0
                 cfg["trans_src"] = st.selectbox(
-                    "Zdrojový jazyk", 
-                    options=lang_keys, 
+                    "Zdrojový jazyk",
+                    options=lang_keys,
                     index=trans_src_idx,
                     key="w_trans_src"
                 )
@@ -8083,8 +9331,8 @@ if st.session_state.df is not None:
                 except ValueError:
                     trans_tgt_idx = 1 if len(lang_keys) > 1 else 0
                 cfg["trans_tgt"] = st.selectbox(
-                    "Cílový jazyk", 
-                    options=lang_keys, 
+                    "Cílový jazyk",
+                    options=lang_keys,
                     index=trans_tgt_idx,
                     key="w_trans_tgt"
                 )
@@ -8121,15 +9369,15 @@ if st.session_state.df is not None:
 
             with col_l2:
                 cfg["enable_tts"] = st.checkbox(
-                    "Hlasová výslovnost (Google TTS)", 
+                    "Hlasová výslovnost (Google TTS)",
                     value=cfg.get("enable_tts", False),
                     key="w_enable_tts"
                 )
 
                 tts_col_idx = get_smart_column_default(columns, cfg, "tts_col", ["slovo", "text", "anglick", "english", "výslovnost", "český"])
                 cfg["tts_col"] = st.selectbox(
-                    "Sloupec s textem k namluvení", 
-                    options=columns, 
+                    "Sloupec s textem k namluvení",
+                    options=columns,
                     index=tts_col_idx,
                     key="w_tts_col"
                 )
@@ -8140,42 +9388,41 @@ if st.session_state.df is not None:
                 except ValueError:
                     tts_lang_idx = 0
                 cfg["tts_lang"] = st.selectbox(
-                    "Jazyk výslovnosti", 
-                    options=lang_keys, 
+                    "Jazyk výslovnosti",
+                    options=lang_keys,
                     index=tts_lang_idx,
                     key="w_tts_lang"
                 )
 
                 cfg["enable_dict"] = st.checkbox(
-                    "Anglický výkladový slovník", 
+                    "Anglický výkladový slovník",
                     value=cfg.get("enable_dict", False),
                     key="w_enable_dict"
                 )
 
                 dict_col_idx = get_smart_column_default(columns, cfg, "dict_col", ["anglick", "english", "word", "slovo", "termín", "heslo"])
                 cfg["dict_col"] = st.selectbox(
-                    "Sloupec s anglickým slovem k definici", 
-                    options=columns, 
+                    "Sloupec s anglickým slovem k definici",
+                    options=columns,
                     index=dict_col_idx,
                     key="w_dict_col"
                 )
 
         elif selected_topic == "Zeměpis":
             cfg["enable_country"] = st.checkbox(
-                "Modul států (hlavní město, region, měna, vlajka...)", 
+                "Modul států (hlavní město, region, měna, vlajka...)",
                 value=cfg.get("enable_country", False),
                 key="w_enable_country"
             )
 
             country_col_idx = get_smart_column_default(columns, cfg, "country_col", ["stát", "země", "country", "state", "území", "národ"])
             cfg["country_col"] = st.selectbox(
-                "Sloupec s názvem státu (česky nebo anglicky)", 
-                options=columns, 
+                "Sloupec s názvem státu (česky nebo anglicky)",
+                options=columns,
                 index=country_col_idx,
                 key="w_country_col"
             )
 
-        # Přehled aktivních modulů - minimalistické štítky
         MODULE_HUMAN_NAMES = {
             "enable_inat": "iNaturalist",
             "enable_inat_map": "iNaturalist mapa pozorování",
@@ -8222,7 +9469,7 @@ if st.session_state.df is not None:
             "enable_dict": "Výkladový slovník",
             "enable_country": "Modul států"
         }
-        active_labels = [MODULE_HUMAN_NAMES.get(k, k.replace("enable_", "")) for k in ALL_MODULE_KEYS if cfg.get(k, False)]
+        active_labels = [MODULE_HUMAN_NAMES[k] for k in ALL_MODULE_KEYS if k in MODULE_HUMAN_NAMES and cfg.get(k, False)]
         if active_labels:
             pills_html = " ".join([f'<span style="display:inline-block; font-size:11px; padding:2px 8px; border-radius:12px; margin:2px 4px 2px 0; background:rgba(56, 156, 98, 0.12); border:1px solid rgba(56, 156, 98, 0.35); color:{css_fg}; font-weight:500;">{lbl}</span>' for lbl in active_labels])
             st.markdown(f'<div style="margin: 4px 0 10px 0;"><span style="font-size:11.5px; font-weight:600; color:{css_muted}; margin-right:6px;">Aktivní moduly ({len(active_labels)}):</span>{pills_html}</div>', unsafe_allow_html=True)
@@ -8231,7 +9478,13 @@ if st.session_state.df is not None:
 
         st.markdown("---")
 
-        # Spuštění obohacení
+        skip_existing = st.checkbox(
+            "Přeskočit položky, které již mají data vyplněná (nepřepisovat existující hodnoty)",
+            value=True,
+            key="cb_skip_existing_enrichment",
+            help="Pokud sloupec nebo buňka již obsahuje informace (např. z importovaného balíčku nebo tabulky), stahování se pro daný druh přeskočí a stávající hodnota zůstane zachována."
+        )
+
         btn_enrich_clicked = st.button("Spustit obohacení dat (API)", key="btn_run_api_enrichment_main", use_container_width=True, type="primary")
 
         if st.session_state.get("enrichment_success_info"):
@@ -8242,7 +9495,7 @@ if st.session_state.df is not None:
             )
 
         if btn_enrich_clicked:
-            # Načíst aktuální hodnoty ze session_state (přežijí přepnutí tabu)
+
             cfg = st.session_state.api_config
             enable_inat = cfg.get("enable_inat", False)
             enable_gbif = cfg.get("enable_gbif", False)
@@ -8303,6 +9556,7 @@ if st.session_state.df is not None:
             pladias_map_col = cfg.get("pladias_map_col", columns[0] if columns else "")
             pladias_col = cfg.get("pladias_col", columns[0] if columns else "")
             enable_pladias_tax = cfg.get("enable_pladias_tax", False)
+            enable_pladias_czech_name = cfg.get("enable_pladias_czech_name", True)
             pladias_tax_col = cfg.get("pladias_tax_col", columns[0] if columns else "")
             klic_2019_col = cfg.get("klic_2019_col", columns[0] if columns else "")
             nepuvodni_col = cfg.get("nepuvodni_col", columns[0] if columns else "")
@@ -8356,138 +9610,148 @@ if st.session_state.df is not None:
             enable_eol_link = cfg.get("enable_eol_link", False)
             eol_col = cfg.get("eol_col", columns[0] if columns else "")
 
-
             progress_bar = st.progress(0.0)
             status = st.empty()
 
             new_df = df.copy()
-            
-            # Vytvoření nových sloupců v DataFrame
+
+            def _ensure_new_col(col_name):
+                if col_name not in new_df.columns:
+                    new_df[col_name] = ""
+
             if enable_inat:
-                new_df["[iNat] České jméno"] = ""
-                new_df["[iNat] Obrázky (URL)"] = ""
+                _ensure_new_col("[iNat] České jméno")
+                _ensure_new_col("[iNat] Obrázky (URL)")
             if enable_desc:
-                new_df["[Popis] Popis z Wikipedie"] = ""
+                _ensure_new_col("[Popis] Popis z Wikipedie")
             if enable_gbif:
-                new_df["[GBIF] Říše"] = ""
-                new_df["[GBIF] Kmen"] = ""
-                new_df["[GBIF] Třída"] = ""
-                new_df["[GBIF] Řád"] = ""
-                new_df["[GBIF] Čeleď"] = ""
-                new_df["[GBIF] Rod"] = ""
+                _ensure_new_col("[GBIF] Říše")
+                _ensure_new_col("[GBIF] Kmen")
+                _ensure_new_col("[GBIF] Třída")
+                _ensure_new_col("[GBIF] Řád")
+                _ensure_new_col("[GBIF] Čeleď")
+                _ensure_new_col("[GBIF] Rod")
             if enable_wiki_img:
-                new_df["[Wikimedia] Obrázky (URL)"] = ""
+                _ensure_new_col("[Wikimedia] Obrázky (URL)")
             if enable_trans:
-                new_df[f"[Překlad] {trans_tgt}"] = ""
+                _ensure_new_col(f"[Překlad] {trans_tgt}")
             if enable_tts:
-                new_df["[TTS] Výslovnost (Audio)"] = ""
+                _ensure_new_col("[TTS] Výslovnost (Audio)")
             if enable_latin_tts:
-                new_df["[TTS] Latina"] = ""
+                _ensure_new_col("[TTS] Latina")
             if enable_latin_phonetic:
-                new_df["[Latina] Fonetická výslovnost"] = ""
+                _ensure_new_col("[Latina] Fonetická výslovnost")
             if enable_dict:
-                new_df["[Slovník] Výslovnost (Text)"] = ""
-                new_df["[Slovník] Definice"] = ""
-                new_df["[Slovník] Příkladová věta"] = ""
+                _ensure_new_col("[Slovník] Výslovnost (Text)")
+                _ensure_new_col("[Slovník] Definice")
+                _ensure_new_col("[Slovník] Příkladová věta")
             if enable_country:
-                new_df["[Zeměpis] Český název"] = ""
-                new_df["[Zeměpis] Hlavní město"] = ""
-                new_df["[Zeměpis] Region"] = ""
-                new_df["[Zeměpis] Jazyky"] = ""
-                new_df["[Zeměpis] Měna"] = ""
-                new_df["[Zeměpis] Rozloha"] = ""
-                new_df["[Zeměpis] Vlajka (URL)"] = ""
+                _ensure_new_col("[Zeměpis] Český název")
+                _ensure_new_col("[Zeměpis] Hlavní město")
+                _ensure_new_col("[Zeměpis] Region")
+                _ensure_new_col("[Zeměpis] Jazyky")
+                _ensure_new_col("[Zeměpis] Měna")
+                _ensure_new_col("[Zeměpis] Rozloha")
+                _ensure_new_col("[Zeměpis] Vlajka (URL)")
 
             if enable_pladias_photos:
                 target_cats = pladias_photos_parts if pladias_photos_parts else ["Všechny fotky dohromady (obecný sloupec)"]
                 for cat_opt in target_cats:
                     if cat_opt in PLADIAS_CATEGORY_MAPPING:
                         col_name = PLADIAS_CATEGORY_MAPPING[cat_opt][0]
-                        new_df[col_name] = ""
+                        _ensure_new_col(col_name)
             if enable_pladias_map:
-                new_df["[Pladias.cz] Mapa rozšíření"] = ""
+                _ensure_new_col("[Pladias.cz] Mapa rozšíření")
             if enable_pladias:
-                new_df["[Pladias.cz] Odkaz"] = ""
+                _ensure_new_col("[Pladias] Odkaz")
             if enable_pladias_tax:
-                new_df["[Pladias.cz] Oddělení"] = ""
-                new_df["[Pladias.cz] Třída"] = ""
-                new_df["[Pladias.cz] Řád"] = ""
-                new_df["[Pladias.cz] Čeleď"] = ""
-                new_df["[Pladias.cz] Rod"] = ""
+                if enable_pladias_czech_name:
+                    _ensure_new_col("[Pladias] České jméno")
+                _ensure_new_col("[Pladias] Oddělení")
+                _ensure_new_col("[Pladias] Třída")
+                _ensure_new_col("[Pladias] Řád")
+                _ensure_new_col("[Pladias] Čeleď")
+                _ensure_new_col("[Pladias] Rod")
             if enable_klic_2019:
-                new_df["[Klíč 2019] Jméno & Autorita"] = ""
-                new_df["[Klíč 2019] České jméno"] = ""
+                _ensure_new_col("[Klíč 2019] Jméno & Autorita")
+                _ensure_new_col("[Klíč 2019] České jméno")
             if enable_nepuvodni:
-                new_df["[Nepůvodní flóra] Invazní status & Původ"] = ""
+                _ensure_new_col("[Nepůvodní flóra] Invazní status & Původ")
             if enable_biotopy:
-                new_df["[Biotopy] Výskyt v biotopech ČR"] = ""
+                _ensure_new_col("[Biotopy] Výskyt v biotopech ČR")
             if enable_ellenberg:
-                new_df["[Ekologie] Ellenbergovy hodnoty"] = ""
+                _ensure_new_col("[Ekologie] Ellenbergovy hodnoty")
             if enable_cerveny_seznam:
-                new_df["[Červený seznam] Kategorie ohrožení"] = ""
+                _ensure_new_col("[Červený seznam] Kategorie ohrožení")
                 if enable_cerveny_seznam_url:
-                    new_df["[Červený seznam] Odkaz"] = ""
+                    _ensure_new_col("[Červený seznam] Odkaz")
             if enable_kvetena_cr:
-                new_df["[Květena ČR] Popis druhu"] = ""
-            # GBIF orgánové fotky odstraněny
+                _ensure_new_col("[Květena ČR] Popis druhu")
             if enable_bryo_photos:
-                new_df["[Mechorosty] Fotky"] = ""
+                _ensure_new_col("[Mechorosty] Fotky")
             if enable_bryo_desc:
-                new_df["[Mechorosty] Popis"] = ""
+                _ensure_new_col("[Mechorosty] Popis")
             if enable_bryo_link:
-                new_df["[Mechorosty] Odkaz"] = ""
+                _ensure_new_col("[Mechorosty] Odkaz")
             if enable_mykologie_img:
-                new_df["[Mykologie.net] Fotky"] = ""
+                _ensure_new_col("[Mykologie.net] Fotky")
             if enable_mykologie_desc:
-                new_df["[Mykologie.net] Popis"] = ""
+                _ensure_new_col("[Mykologie.net] Popis")
             if enable_mykologie_link:
-                new_df["[Mykologie.net] Odkaz"] = ""
+                _ensure_new_col("[Mykologie.net] Odkaz")
             if enable_inat_map:
-                new_df["[iNaturalist] Mapa nálezů"] = ""
+                _ensure_new_col("[iNaturalist] Mapa nálezů")
             if enable_mushroom_color_atlas:
-                new_df["[Mushroom Color Atlas] Odkaz"] = ""
+                _ensure_new_col("[Mushroom Color Atlas] Odkaz")
             if enable_dalibor_photos:
-                new_df["[DaLiBor] Fotky"] = ""
+                _ensure_new_col("[DaLiBor] Fotky")
             if enable_dalibor_desc:
-                new_df["[DaLiBor] Popis"] = ""
+                _ensure_new_col("[DaLiBor] Popis")
             if enable_dalibor_link:
-                new_df["[DaLiBor] Odkaz"] = ""
+                _ensure_new_col("[DaLiBor] Odkaz")
             if enable_diatombase_taxon:
-                new_df["[DiatomBase] Taxon & Autorita"] = ""
-                new_df["[DiatomBase] Taxonomie"] = ""
+                _ensure_new_col("[DiatomBase] Taxon & Autorita")
+                _ensure_new_col("[DiatomBase] Taxonomie")
             if enable_diatombase_link:
-                new_df["[DiatomBase] Odkaz"] = ""
+                _ensure_new_col("[DiatomBase] Odkaz")
             if enable_algaebase_link:
-                new_df["[AlgaeBase] Odkaz"] = ""
+                _ensure_new_col("[AlgaeBase] Odkaz")
             if enable_gbif_fungi:
-                new_df["[GBIF] Houby"] = ""
+                _ensure_new_col("[GBIF] Houby")
             if enable_gbif_zoo:
-                new_df["[GBIF] Zoologie"] = ""
+                _ensure_new_col("[GBIF] Zoologie")
             if enable_wiki_link:
-                new_df["[Wikipedie] Odkaz"] = ""
+                _ensure_new_col("[Wikipedie] Odkaz")
             if enable_bird_sounds:
-                new_df["[Zvuky] Hlasy ptáků"] = ""
+                _ensure_new_col("[Zvuky] Hlasy ptáků")
             if enable_adw_desc:
-                new_df["[ADW] Biologický popis"] = ""
+                _ensure_new_col("[ADW] Biologický popis")
             if enable_adw_link:
-                new_df["[ADW] Odkaz"] = ""
+                _ensure_new_col("[ADW] Odkaz")
             if enable_gbif_desc:
-                new_df["[GBIF] Vědecký popis"] = ""
+                _ensure_new_col("[GBIF] Vědecký popis")
             if enable_powo_desc:
-                new_df["[POWO Kew] Popis flóry"] = ""
+                _ensure_new_col("[POWO Kew] Popis flóry")
             if enable_powo_link:
-                new_df["[POWO Kew] Odkaz"] = ""
+                _ensure_new_col("[POWO Kew] Odkaz")
             if enable_eol_link:
-                new_df["[EOL] Odkaz"] = ""
+                _ensure_new_col("[EOL] Odkaz")
 
-            total = len(df)
-            unfound_list = []
+            def _is_val_empty(v):
+                if v is None or pd.isna(v):
+                    return True
+                s = str(v).strip()
+                return s == "" or s.lower() == "nan"
 
-            for idx, row in df.iterrows():
-                progress_bar.progress((idx + 1) / total)
-                status.text(f"Obohacuji řádek {idx+1}/{total}...")
+            def _enrich_single_row(idx, row):
+                row_updates = {}
+                row_unfounds = []
 
-                # Inicializace proměnných pro detekci a určení kategorie
+                def _is_target_filled(col_name):
+                    if not skip_existing or col_name not in row:
+                        return False
+                    return not _is_val_empty(row.get(col_name))
+
                 raw_main_val = str(row[columns[0]]).strip() if len(columns) > 0 else ""
                 inat_data = None
                 inat_cz = ""
@@ -8512,13 +9776,11 @@ if st.session_state.df is not None:
                 c_data = None
                 dict_data = None
 
-                # Rychlá před-kontrola taxonů v lokálních databázích
                 k_flora_check = query_klic_2019(raw_main_val) or query_nepuvodni_flora(raw_main_val)
                 k_red_check = query_cerveny_seznam(raw_main_val)
                 is_flora_plant = bool(k_flora_check or (k_red_check and "cévnat" in k_red_check.get("group", "").lower()))
 
-                # iNaturalist mapa pozorování
-                if enable_inat_map:
+                if enable_inat_map and not _is_target_filled("[iNaturalist] Mapa nálezů"):
                     try:
                         raw_sp = str(row[inat_map_col]).strip()
                         sel_p_opt = cfg.get("inat_place_opt", "Česká republika")
@@ -8526,132 +9788,121 @@ if st.session_state.df is not None:
                         p_id = resolve_inat_place_id(cust_p)
                         m_url = fetch_inaturalist_map_url(raw_sp, place_id=p_id)
                         if m_url:
-                            new_df.at[idx, "[iNaturalist] Mapa nálezů"] = m_url
+                            row_updates["[iNaturalist] Mapa nálezů"] = m_url
                     except Exception:
                         pass
 
-                # Mushroom Color Atlas
                 if enable_mushroom_color_atlas:
                     try:
                         raw_sp = str(row[mca_col]).strip()
                         mca_info = fetch_mushroom_color_atlas(raw_sp)
                         if mca_info:
-                            new_df.at[idx, "[Mushroom Color Atlas] Odkaz"] = mca_info["url"]
+                            row_updates["[Mushroom Color Atlas] Odkaz"] = mca_info["url"]
                     except Exception:
                         pass
 
-                # 1. iNaturalist
-                if enable_inat:
+                inat_check_cols = ["[iNat] České jméno", "[iNat] Obrázky (URL)"]
+                if enable_inat and not (skip_existing and all(_is_target_filled(c) for c in inat_check_cols)):
                     try:
                         raw_sp = str(row[inat_col]).strip()
                         sp = re.sub(r'\s*\(.*\)\s*', '', raw_sp).strip()
                         sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp).strip()
                         inat_data = fetch_inaturalist_data(sp_clean, inat_max_photos)
                         if inat_data.get('source') == 'Nenalezeno':
-                            unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'iNaturalist'})
+                            row_unfounds.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'iNaturalist'})
                         inat_cz = inat_data.get('common_name', '')
-                        new_df.at[idx, "[iNat] České jméno"] = inat_cz
-                        new_df.at[idx, "[iNat] Obrázky (URL)"] = ";".join(inat_data.get('photo_urls', []))
+                        if not skip_existing or not _is_target_filled("[iNat] České jméno"): row_updates["[iNat] České jméno"] = inat_cz
+                        if not skip_existing or not _is_target_filled("[iNat] Obrázky (URL)"): row_updates["[iNat] Obrázky (URL)"] = ";".join(inat_data.get('photo_urls', []))
                     except Exception:
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(inat_col, "")), 'Modul': 'iNaturalist (Chyba)'})
+                        row_unfounds.append({'Řádek': idx + 1, 'Položka': str(row.get(inat_col, "")), 'Modul': 'iNaturalist (Chyba)'})
 
-                # 1b. Popis druhu z Wikipedie (rostliny i živočichové)
-                if enable_desc:
+                if enable_desc and not _is_target_filled("[Popis] Popis z Wikipedie"):
                     try:
                         raw_sp = str(row[desc_col]).strip()
                         sp = re.sub(r'\s*\(.*\)\s*', '', raw_sp).strip()
                         sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp).strip()
                         desc_text = fetch_wiki_description(sp_clean)
                         if not desc_text:
-                            unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'Popis z Wikipedie'})
-                        new_df.at[idx, "[Popis] Popis z Wikipedie"] = desc_text
+                            row_unfounds.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'Popis z Wikipedie'})
+                        row_updates["[Popis] Popis z Wikipedie"] = desc_text
                     except Exception:
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(desc_col, "")), 'Modul': 'Popis z Wikipedie (Chyba)'})
+                        row_unfounds.append({'Řádek': idx + 1, 'Položka': str(row.get(desc_col, "")), 'Modul': 'Popis z Wikipedie (Chyba)'})
 
-                # 2. GBIF Taxonomie
-                if enable_gbif:
+                gbif_check_cols = ["[GBIF] Říše", "[GBIF] Kmen", "[GBIF] Třída", "[GBIF] Řád", "[GBIF] Čeleď", "[GBIF] Rod"]
+                if enable_gbif and not (skip_existing and all(_is_target_filled(c) for c in gbif_check_cols)):
                     try:
                         raw_sp = str(row[gbif_col]).strip()
                         sp = re.sub(r'\s*\(.*\)\s*', '', raw_sp).strip()
                         sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp).strip()
                         gbif_data = fetch_gbif_taxonomy(sp_clean)
                         if gbif_data.get('source') == 'Nenalezeno':
-                            unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'GBIF Taxonomie'})
-                        new_df.at[idx, "[GBIF] Říše"] = gbif_data.get('kingdom', '')
-                        new_df.at[idx, "[GBIF] Kmen"] = gbif_data.get('phylum', '')
-                        new_df.at[idx, "[GBIF] Třída"] = gbif_data.get('class', '')
-                        new_df.at[idx, "[GBIF] Řád"] = gbif_data.get('order', '')
-                        new_df.at[idx, "[GBIF] Čeleď"] = gbif_data.get('family', '')
-                        new_df.at[idx, "[GBIF] Rod"] = gbif_data.get('genus', '')
+                            row_unfounds.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'GBIF Taxonomie'})
+                        if not skip_existing or not _is_target_filled("[GBIF] Říše"): row_updates["[GBIF] Říše"] = gbif_data.get('kingdom', '')
+                        if not skip_existing or not _is_target_filled("[GBIF] Kmen"): row_updates["[GBIF] Kmen"] = gbif_data.get('phylum', '')
+                        if not skip_existing or not _is_target_filled("[GBIF] Třída"): row_updates["[GBIF] Třída"] = gbif_data.get('class', '')
+                        if not skip_existing or not _is_target_filled("[GBIF] Řád"): row_updates["[GBIF] Řád"] = gbif_data.get('order', '')
+                        if not skip_existing or not _is_target_filled("[GBIF] Čeleď"): row_updates["[GBIF] Čeleď"] = gbif_data.get('family', '')
+                        if not skip_existing or not _is_target_filled("[GBIF] Rod"): row_updates["[GBIF] Rod"] = gbif_data.get('genus', '')
                     except Exception:
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(gbif_col, "")), 'Modul': 'GBIF Taxonomie (Chyba)'})
+                        row_unfounds.append({'Řádek': idx + 1, 'Položka': str(row.get(gbif_col, "")), 'Modul': 'GBIF Taxonomie (Chyba)'})
 
-                # GBIF orgánové fotky (list, květ, herbář) byly odstraněny na přání uživatele
-
-                # 5. Wikimedia Commons
                 if enable_wiki_img:
                     try:
                         kw = str(row[wiki_img_col]).strip()
                         wiki_urls = fetch_wikimedia_images(kw, wiki_max_photos)
                         if not wiki_urls:
-                            unfound_list.append({'Řádek': idx + 1, 'Položka': kw, 'Modul': 'Wikimedia Commons'})
-                        new_df.at[idx, "[Wikimedia] Obrázky (URL)"] = ";".join(wiki_urls)
+                            row_unfounds.append({'Řádek': idx + 1, 'Položka': kw, 'Modul': 'Wikimedia Commons'})
+                        row_updates["[Wikimedia] Obrázky (URL)"] = ";".join(wiki_urls)
                     except Exception:
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(wiki_img_col, "")), 'Modul': 'Wikimedia Commons (Chyba)'})
+                        row_unfounds.append({'Řádek': idx + 1, 'Položka': str(row.get(wiki_img_col, "")), 'Modul': 'Wikimedia Commons (Chyba)'})
 
-                # 6. Překlad
                 if enable_trans:
                     try:
                         txt = str(row[trans_col]).strip()
                         src_code = languages[trans_src]
                         tgt_code = languages[trans_tgt]
                         translated = translate_text(txt, src_code, tgt_code)
-                        new_df.at[idx, f"[Překlad] {trans_tgt}"] = translated
+                        row_updates[f"[Překlad] {trans_tgt}"] = translated
                     except Exception:
                         pass
 
-                # 7. Google TTS
                 if enable_tts:
                     txt = str(row[tts_col]).strip()
                     lang_code = languages[tts_lang]
                     if txt:
-                        new_df.at[idx, "[TTS] Výslovnost (Audio)"] = f"{txt};{lang_code}"
+                        row_updates["[TTS] Výslovnost (Audio)"] = f"{txt};{lang_code}"
 
-                # 7b. Latinská hlasová výslovnost (Google TTS tl=la)
                 if enable_latin_tts:
                     try:
                         raw_sp = str(row[latin_tts_col]).strip()
                         sp_clean = re.sub(r'\s*\(.*\)\s*', '', raw_sp).strip()
                         sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp_clean).strip()
                         if sp_clean:
-                            new_df.at[idx, "[TTS] Latina"] = f"{sp_clean};la"
+                            row_updates["[TTS] Latina"] = f"{sp_clean};la"
                     except Exception:
                         pass
 
-                # 7c. Český fonetický přepis latiny
                 if enable_latin_phonetic:
                     try:
                         raw_sp = str(row[latin_phonetic_col]).strip()
                         phonetic_val = transcribe_latin_to_czech_phonetics(raw_sp)
                         if phonetic_val:
-                            new_df.at[idx, "[Latina] Fonetická výslovnost"] = phonetic_val
+                            row_updates["[Latina] Fonetická výslovnost"] = phonetic_val
                     except Exception:
                         pass
 
-                # 8. Dictionary API
                 if enable_dict:
                     try:
                         wd = str(row[dict_col]).strip()
                         dict_data = fetch_dictionary_data(wd)
                         if not dict_data.get('definition'):
-                            unfound_list.append({'Řádek': idx + 1, 'Položka': wd, 'Modul': 'Slovník'})
-                        new_df.at[idx, "[Slovník] Výslovnost (Text)"] = dict_data.get('phonetic', '')
-                        new_df.at[idx, "[Slovník] Definice"] = dict_data.get('definition', '')
-                        new_df.at[idx, "[Slovník] Příkladová věta"] = dict_data.get('example', '')
+                            row_unfounds.append({'Řádek': idx + 1, 'Položka': wd, 'Modul': 'Slovník'})
+                        row_updates["[Slovník] Výslovnost (Text)"] = dict_data.get('phonetic', '')
+                        row_updates["[Slovník] Definice"] = dict_data.get('definition', '')
+                        row_updates["[Slovník] Příkladová věta"] = dict_data.get('example', '')
                     except Exception:
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(dict_col, "")), 'Modul': 'Slovník (Chyba)'})
+                        row_unfounds.append({'Řádek': idx + 1, 'Položka': str(row.get(dict_col, "")), 'Modul': 'Slovník (Chyba)'})
 
-                # Pladias fotky (načítání do samostatných sloupců podle vybraných kategorií)
                 if enable_pladias_photos:
                     try:
                         raw_sp = str(row[pladias_photos_col]).strip()
@@ -8669,98 +9920,101 @@ if st.session_state.df is not None:
                                 )
                                 if cat_photos:
                                     has_any_photo = True
-                                    new_df.at[idx, col_name] = ";".join(cat_photos)
+                                    row_updates[col_name] = ";".join(cat_photos)
                         if has_any_photo:
                             is_flora_plant = True
                         else:
-                            unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'Pladias.cz Fotky'})
+                            row_unfounds.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'Pladias.cz Fotky'})
                     except Exception:
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(pladias_photos_col, "")), 'Modul': 'Pladias.cz Fotky (Chyba)'})
+                        row_unfounds.append({'Řádek': idx + 1, 'Položka': str(row.get(pladias_photos_col, "")), 'Modul': 'Pladias.cz Fotky (Chyba)'})
 
-                # Pladias taxonomie (Česká botanická taxonomie: Čeleď, Řád, Třída, Oddělení)
-                if enable_pladias_tax:
+                p_tax_check = ["[Pladias] Oddělení", "[Pladias] Třída", "[Pladias] Řád", "[Pladias] Čeleď", "[Pladias] Rod"]
+                if enable_pladias_czech_name:
+                    p_tax_check.append("[Pladias] České jméno")
+                if enable_pladias_tax and not (skip_existing and all(_is_target_filled(c) for c in p_tax_check)):
                     try:
                         raw_sp = str(row[pladias_tax_col]).strip()
                         p_tax = fetch_pladias_taxonomy(raw_sp)
                         if p_tax.get("source") != "Nenalezeno":
                             is_flora_plant = True
-                            new_df.at[idx, "[Pladias] Oddělení"] = p_tax.get("phylum", "")
-                            new_df.at[idx, "[Pladias] Třída"] = p_tax.get("class", "")
-                            new_df.at[idx, "[Pladias] Řád"] = p_tax.get("order", "")
-                            new_df.at[idx, "[Pladias] Čeleď"] = p_tax.get("family", "")
-                            new_df.at[idx, "[Pladias] Rod"] = p_tax.get("genus", "")
+                            if enable_pladias_czech_name and p_tax.get("czech_name"):
+                                cz_val = p_tax.get("czech_name", "").strip()
+                                if not skip_existing or not _is_target_filled("[Pladias] České jméno"):
+                                    row_updates["[Pladias] České jméno"] = cz_val
+                                for c_cand in ["České jméno", "Český název", "ceske_jmeno"]:
+                                    if c_cand in new_df.columns and not _is_target_filled(c_cand):
+                                        row_updates[c_cand] = cz_val
+                            if not skip_existing or not _is_target_filled("[Pladias] Oddělení"): row_updates["[Pladias] Oddělení"] = p_tax.get("phylum", "")
+                            if not skip_existing or not _is_target_filled("[Pladias] Třída"): row_updates["[Pladias] Třída"] = p_tax.get("class", "")
+                            if not skip_existing or not _is_target_filled("[Pladias] Řád"): row_updates["[Pladias] Řád"] = p_tax.get("order", "")
+                            if not skip_existing or not _is_target_filled("[Pladias] Čeleď"): row_updates["[Pladias] Čeleď"] = p_tax.get("family", "")
+                            if not skip_existing or not _is_target_filled("[Pladias] Rod"): row_updates["[Pladias] Rod"] = p_tax.get("genus", "")
                         else:
-                            unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'Pladias.cz Taxonomie'})
+                            row_unfounds.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'Pladias.cz Taxonomie'})
                     except Exception:
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(pladias_tax_col, "")), 'Modul': 'Pladias.cz Taxonomie (Chyba)'})
+                        row_unfounds.append({'Řádek': idx + 1, 'Položka': str(row.get(pladias_tax_col, "")), 'Modul': 'Pladias.cz Taxonomie (Chyba)'})
 
-                # 1. Klíč 2019 / Seznam cévnatých rostlin ČR (Kaplan et al. 2019)
                 if enable_klic_2019:
                     try:
                         raw_sp = str(row[klic_2019_col]).strip()
                         k1 = query_klic_2019(raw_sp)
                         if k1:
                             is_flora_plant = True
-                            new_df.at[idx, "[Klíč 2019] Jméno & Autorita"] = k1.get("key_full", "")
-                            new_df.at[idx, "[Klíč 2019] České jméno"] = k1.get("name_cz", "")
+                            row_updates["[Klíč 2019] Jméno & Autorita"] = k1.get("key_full", "")
+                            row_updates["[Klíč 2019] České jméno"] = k1.get("name_cz", "")
                         else:
-                            unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'Klíč 2019'})
+                            row_unfounds.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'Klíč 2019'})
                     except Exception:
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(klic_2019_col, "")), 'Modul': 'Klíč 2019 (Chyba)'})
+                        row_unfounds.append({'Řádek': idx + 1, 'Položka': str(row.get(klic_2019_col, "")), 'Modul': 'Klíč 2019 (Chyba)'})
 
-                # 2. Katalog nepůvodních druhů rostlin ČR (Pyšek et al. 2022)
                 if enable_nepuvodni:
                     try:
                         raw_sp = str(row[nepuvodni_col]).strip()
                         k2 = query_nepuvodni_flora(raw_sp)
                         if k2:
                             is_flora_plant = True
-                            new_df.at[idx, "[Nepůvodní flóra] Invazní status & Původ"] = k2.get("formatted", "")
+                            row_updates["[Nepůvodní flóra] Invazní status & Původ"] = k2.get("formatted", "")
                         else:
-                            new_df.at[idx, "[Nepůvodní flóra] Invazní status & Původ"] = "Původní druh v ČR (není v katalogu nepůvodních)"
+                            row_updates["[Nepůvodní flóra] Invazní status & Původ"] = "Původní druh v ČR (není v katalogu nepůvodních)"
                     except Exception:
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(nepuvodni_col, "")), 'Modul': 'Nepůvodní druhy (Chyba)'})
+                        row_unfounds.append({'Řádek': idx + 1, 'Položka': str(row.get(nepuvodni_col, "")), 'Modul': 'Nepůvodní druhy (Chyba)'})
 
-                # 3. Výskyt v biotopech ČR (Chytrý & Rafajová 2003 / Sádlo et al. 2007)
                 if enable_biotopy:
                     try:
                         raw_sp = str(row[biotopy_col]).strip()
                         k3 = query_biotopy(raw_sp)
                         if k3 and k3.get("formatted"):
                             is_flora_plant = True
-                            new_df.at[idx, "[Biotopy] Výskyt v biotopech ČR"] = k3.get("formatted", "")
+                            row_updates["[Biotopy] Výskyt v biotopech ČR"] = k3.get("formatted", "")
                         else:
-                            unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'Biotopy ČR'})
+                            row_unfounds.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'Biotopy ČR'})
                     except Exception:
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(biotopy_col, "")), 'Modul': 'Biotopy ČR (Chyba)'})
+                        row_unfounds.append({'Řádek': idx + 1, 'Položka': str(row.get(biotopy_col, "")), 'Modul': 'Biotopy ČR (Chyba)'})
 
-                # 4. Ellenbergovy indikační hodnoty (Chytrý et al. 2018)
                 if enable_ellenberg:
                     try:
                         raw_sp = str(row[ellenberg_col]).strip()
                         k4 = query_ellenberg(raw_sp)
                         if k4 and k4.get("formatted"):
                             is_flora_plant = True
-                            new_df.at[idx, "[Ekologie] Ellenbergovy hodnoty"] = k4.get("formatted", "")
+                            row_updates["[Ekologie] Ellenbergovy hodnoty"] = k4.get("formatted", "")
                         else:
-                            unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'Ellenbergovy hodnoty'})
+                            row_unfounds.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'Ellenbergovy hodnoty'})
                     except Exception:
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(ellenberg_col, "")), 'Modul': 'Ellenbergovy hodnoty (Chyba)'})
+                        row_unfounds.append({'Řádek': idx + 1, 'Položka': str(row.get(ellenberg_col, "")), 'Modul': 'Ellenbergovy hodnoty (Chyba)'})
 
-                # Pladias mapa rozšíření (Pouze pro skutečné české cévnaté rostliny)
-                if enable_pladias_map:
+                if enable_pladias_map and not _is_target_filled("[Pladias.cz] Mapa rozšíření"):
                     try:
                         raw_sp = str(row[pladias_map_col]).strip()
                         sp_clean = re.sub(r'\s*\(.*\)\s*', '', raw_sp).strip()
                         sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp_clean).strip()
                         if is_flora_plant or query_klic_2019(sp_clean) or query_nepuvodni_flora(sp_clean):
-                            new_df.at[idx, "[Pladias.cz] Mapa rozšíření"] = f"https://pladias.cz/taxon/distribution/{urllib.parse.quote(sp_clean)}"
+                            row_updates["[Pladias.cz] Mapa rozšíření"] = f"https://pladias.cz/taxon/distribution/{urllib.parse.quote(sp_clean)}"
                         else:
-                            new_df.at[idx, "[Pladias.cz] Mapa rozšíření"] = ""
+                            row_updates["[Pladias.cz] Mapa rozšíření"] = ""
                     except Exception:
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(pladias_map_col, "")), 'Modul': 'Pladias.cz Mapa (Chyba)'})
+                        row_unfounds.append({'Řádek': idx + 1, 'Položka': str(row.get(pladias_map_col, "")), 'Modul': 'Pladias.cz Mapa (Chyba)'})
 
-                # Pladias odkaz (Pouze pro skutečné české cévnaté rostliny)
                 if enable_pladias:
                     try:
                         raw_sp = str(row[pladias_col]).strip()
@@ -8768,41 +10022,38 @@ if st.session_state.df is not None:
                         sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp_clean).strip()
                         if is_flora_plant or query_klic_2019(sp_clean) or query_nepuvodni_flora(sp_clean):
                             encoded_sp = urllib.parse.quote(sp_clean)
-                            new_df.at[idx, "[Pladias] Odkaz"] = f"https://pladias.cz/taxon/overview/{encoded_sp}"
+                            row_updates["[Pladias] Odkaz"] = f"https://pladias.cz/taxon/overview/{encoded_sp}"
                         else:
-                            new_df.at[idx, "[Pladias] Odkaz"] = ""
+                            row_updates["[Pladias] Odkaz"] = ""
                     except Exception:
                         pass
 
-                # 5. Červený seznam ČR (AOPK ČR – Všechny organismy)
                 if enable_cerveny_seznam:
                     try:
                         raw_sp = str(row[cerveny_seznam_col]).strip()
                         k5 = query_cerveny_seznam(raw_sp)
                         if k5 and (k5.get("formatted") or k5.get("author")):
-                            new_df.at[idx, "[Červený seznam] Kategorie ohrožení"] = k5.get("formatted", "")
+                            row_updates["[Červený seznam] Kategorie ohrožení"] = k5.get("formatted", "")
                             url_val = k5.get("url", "").strip()
                             if enable_cerveny_seznam_url and "[Červený seznam] Odkaz" in new_df.columns:
-                                new_df.at[idx, "[Červený seznam] Odkaz"] = url_val if url_val.startswith("http") else ""
+                                row_updates["[Červený seznam] Odkaz"] = url_val if url_val.startswith("http") else ""
                         else:
-                            unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'Červený seznam ČR'})
+                            row_unfounds.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'Červený seznam ČR'})
                     except Exception:
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(cerveny_seznam_col, "")), 'Modul': 'Červený seznam ČR (Chyba)'})
+                        row_unfounds.append({'Řádek': idx + 1, 'Položka': str(row.get(cerveny_seznam_col, "")), 'Modul': 'Červený seznam ČR (Chyba)'})
 
-                # 6. Květena ČR (Hejný & Slavík et al. / ibot.cas.cz PDF)
                 if enable_kvetena_cr:
                     try:
                         raw_sp = str(row[kvetena_cr_col]).strip()
                         actual_max = 0 if cfg.get("kvetena_cr_full", False) else kvetena_cr_max_chars
                         kv_desc = fetch_kvetena_cr_description(raw_sp, max_chars=actual_max)
                         if kv_desc:
-                            new_df.at[idx, "[Květena ČR] Popis druhu"] = kv_desc
+                            row_updates["[Květena ČR] Popis druhu"] = kv_desc
                         else:
-                            unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'Květena ČR (Popis)'})
+                            row_unfounds.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'Květena ČR (Popis)'})
                     except Exception:
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(kvetena_cr_col, "")), 'Modul': 'Květena ČR (Chyba)'})
+                        row_unfounds.append({'Řádek': idx + 1, 'Položka': str(row.get(kvetena_cr_col, "")), 'Modul': 'Květena ČR (Chyba)'})
 
-                # Mechorosty (Fotky, Popis, Odkaz)
                 is_bryo = False
                 if enable_bryo_photos or enable_bryo_desc or enable_bryo_link:
                     raw_sp_bryo = ""
@@ -8836,77 +10087,90 @@ if st.session_state.df is not None:
                             if enable_bryo_photos:
                                 b_photos = fetch_bryophyte_photos(sp_bryo_clean, max_photos=bryo_photos_max)
                                 if b_photos:
-                                    new_df.at[idx, "[Mechorosty] Fotky"] = ";".join(b_photos[:bryo_photos_max])
+                                    row_updates["[Mechorosty] Fotky"] = ";".join(b_photos[:bryo_photos_max])
                             if enable_bryo_desc:
                                 b_desc = fetch_bryophyte_description(sp_bryo_clean)
                                 if b_desc:
-                                    new_df.at[idx, "[Mechorosty] Popis"] = b_desc
+                                    row_updates["[Mechorosty] Popis"] = b_desc
                             if enable_bryo_link:
-                                new_df.at[idx, "[Mechorosty] Odkaz"] = f"https://bryophyteportal.org/portal/taxa/index.php?taxon={urllib.parse.quote(sp_bryo_clean)}"
+                                row_updates["[Mechorosty] Odkaz"] = f"https://bryophyteportal.org/portal/taxa/index.php?taxon={urllib.parse.quote(sp_bryo_clean)}"
                         else:
-                            new_df.at[idx, "[Mechorosty] Fotky"] = ""
-                            new_df.at[idx, "[Mechorosty] Popis"] = ""
-                            new_df.at[idx, "[Mechorosty] Odkaz"] = ""
+                            row_updates["[Mechorosty] Fotky"] = ""
+                            row_updates["[Mechorosty] Popis"] = ""
+                            row_updates["[Mechorosty] Odkaz"] = ""
                     except Exception:
                         pass
 
-                # Mykologie.net (Fotky, Popis, Odkaz)
                 if enable_mykologie_img or enable_mykologie_desc or enable_mykologie_link:
-                    raw_val = ""
-                    try:
-                        for c_cand in [mykologie_img_col if enable_mykologie_img else None,
-                                       mykologie_desc_col if enable_mykologie_desc else None,
-                                       mykologie_link_col if enable_mykologie_link else None]:
-                            if c_cand and c_cand in row:
-                                raw_val = str(row[c_cand]).strip()
-                                if raw_val:
-                                    break
-                        if not raw_val and len(columns) > 0:
-                            raw_val = str(row[columns] if isinstance(columns, str) else columns[0]).strip()
+                    myko_check_cols = []
+                    if enable_mykologie_img: myko_check_cols.append("[Mykologie.net] Fotky")
+                    if enable_mykologie_desc: myko_check_cols.append("[Mykologie.net] Popis")
+                    if enable_mykologie_link: myko_check_cols.append("[Mykologie.net] Odkaz")
 
-                        myko_data = fetch_mykologie_data(raw_val, max_photos=mykologie_img_max if enable_mykologie_img else 4)
-                        if myko_data.get('source') == 'Nenalezeno':
-                            unfound_list.append({'Řádek': idx + 1, 'Položka': raw_val, 'Modul': 'Mykologie.net'})
+                    if skip_existing and all(_is_target_filled(c) for c in myko_check_cols):
+                        pass
+                    else:
+                        raw_val = ""
+                        try:
+                            for c_cand in [mykologie_img_col if enable_mykologie_img else None,
+                                           mykologie_desc_col if enable_mykologie_desc else None,
+                                           mykologie_link_col if enable_mykologie_link else None]:
+                                if c_cand and c_cand in row:
+                                    raw_val = str(row[c_cand]).strip()
+                                    if raw_val:
+                                        break
+                            if not raw_val and len(columns) > 0:
+                                raw_val = str(row[columns] if isinstance(columns, str) else columns[0]).strip()
 
-                        if enable_mykologie_img:
-                            new_df.at[idx, "[Mykologie.net] Fotky"] = ";".join(myko_data.get('photo_urls', []))
-                        if enable_mykologie_desc:
-                            new_df.at[idx, "[Mykologie.net] Popis"] = myko_data.get('description', '')
-                        if enable_mykologie_link:
-                            url_val = myko_data.get('url', '')
-                            new_df.at[idx, "[Mykologie.net] Odkaz"] = url_val if (url_val and myko_data.get('source') != 'Nenalezeno') else ""
-                    except Exception:
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': str(raw_val), 'Modul': 'Mykologie.net (Chyba)'})
+                            myko_data = fetch_mykologie_data(raw_val, max_photos=mykologie_img_max if enable_mykologie_img else 4)
+                            if myko_data.get('source') == 'Nenalezeno':
+                                row_unfounds.append({'Řádek': idx + 1, 'Položka': raw_val, 'Modul': 'Mykologie.net'})
 
-                # DaLiBor (Lišejníky - Fotky, Popis, Odkaz)
+                            if enable_mykologie_img and (not skip_existing or not _is_target_filled("[Mykologie.net] Fotky")):
+                                row_updates["[Mykologie.net] Fotky"] = ";".join(myko_data.get('photo_urls', []))
+                            if enable_mykologie_desc and (not skip_existing or not _is_target_filled("[Mykologie.net] Popis")):
+                                row_updates["[Mykologie.net] Popis"] = myko_data.get('description', '')
+                            if enable_mykologie_link and (not skip_existing or not _is_target_filled("[Mykologie.net] Odkaz")):
+                                url_val = myko_data.get('url', '')
+                                row_updates["[Mykologie.net] Odkaz"] = url_val if (url_val and myko_data.get('source') != 'Nenalezeno') else ""
+                        except Exception:
+                            row_unfounds.append({'Řádek': idx + 1, 'Položka': str(raw_val), 'Modul': 'Mykologie.net (Chyba)'})
+
                 if enable_dalibor_photos or enable_dalibor_desc or enable_dalibor_link:
-                    raw_val = ""
-                    try:
-                        for c_cand in [dalibor_photos_col if enable_dalibor_photos else None,
-                                       dalibor_desc_col if enable_dalibor_desc else None,
-                                       dalibor_link_col if enable_dalibor_link else None]:
-                            if c_cand and c_cand in row:
-                                raw_val = str(row[c_cand]).strip()
-                                if raw_val:
-                                    break
-                        if not raw_val and len(columns) > 0:
-                            raw_val = str(row[columns] if isinstance(columns, str) else columns[0]).strip()
+                    dalib_check_cols = []
+                    if enable_dalibor_photos: dalib_check_cols.append("[DaLiBor] Fotky")
+                    if enable_dalibor_desc: dalib_check_cols.append("[DaLiBor] Popis")
+                    if enable_dalibor_link: dalib_check_cols.append("[DaLiBor] Odkaz")
 
-                        dalib_data = fetch_dalibor_data(raw_val, max_photos=dalibor_photos_max if enable_dalibor_photos else 3)
-                        if dalib_data.get('source') == 'Nenalezeno':
-                            unfound_list.append({'Řádek': idx + 1, 'Položka': raw_val, 'Modul': 'DaLiBor (Lišejníky)'})
+                    if skip_existing and all(_is_target_filled(c) for c in dalib_check_cols):
+                        pass
+                    else:
+                        raw_val = ""
+                        try:
+                            for c_cand in [dalibor_photos_col if enable_dalibor_photos else None,
+                                           dalibor_desc_col if enable_dalibor_desc else None,
+                                           dalibor_link_col if enable_dalibor_link else None]:
+                                if c_cand and c_cand in row:
+                                    raw_val = str(row[c_cand]).strip()
+                                    if raw_val:
+                                        break
+                            if not raw_val and len(columns) > 0:
+                                raw_val = str(row[columns] if isinstance(columns, str) else columns[0]).strip()
 
-                        if enable_dalibor_photos:
-                            new_df.at[idx, "[DaLiBor] Fotky"] = ";".join(dalib_data.get('photo_urls', []))
-                        if enable_dalibor_desc:
-                            new_df.at[idx, "[DaLiBor] Popis"] = dalib_data.get('description', '')
-                        if enable_dalibor_link:
-                            url_val = dalib_data.get('url', '')
-                            new_df.at[idx, "[DaLiBor] Odkaz"] = url_val if (url_val and dalib_data.get('source') != 'Nenalezeno') else ""
-                    except Exception:
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': str(raw_val), 'Modul': 'DaLiBor (Chyba)'})
+                            dalib_data = fetch_dalibor_data(raw_val, max_photos=dalibor_photos_max if enable_dalibor_photos else 3)
+                            if dalib_data.get('source') == 'Nenalezeno':
+                                row_unfounds.append({'Řádek': idx + 1, 'Položka': raw_val, 'Modul': 'DaLiBor (Lišejníky)'})
 
-                # DiatomBase (Rozsivky - Taxonomie, Autorita, Odkaz)
+                            if enable_dalibor_photos and (not skip_existing or not _is_target_filled("[DaLiBor] Fotky")):
+                                row_updates["[DaLiBor] Fotky"] = ";".join(dalib_data.get('photo_urls', []))
+                            if enable_dalibor_desc and (not skip_existing or not _is_target_filled("[DaLiBor] Popis")):
+                                row_updates["[DaLiBor] Popis"] = dalib_data.get('description', '')
+                            if enable_dalibor_link and (not skip_existing or not _is_target_filled("[DaLiBor] Odkaz")):
+                                url_val = dalib_data.get('url', '')
+                                row_updates["[DaLiBor] Odkaz"] = url_val if (url_val and dalib_data.get('source') != 'Nenalezeno') else ""
+                        except Exception:
+                            row_unfounds.append({'Řádek': idx + 1, 'Položka': str(raw_val), 'Modul': 'DaLiBor (Chyba)'})
+
                 if enable_diatombase_taxon or enable_diatombase_link:
                     raw_val = ""
                     try:
@@ -8921,70 +10185,65 @@ if st.session_state.df is not None:
 
                         diatom_data = fetch_diatombase_data(raw_val)
                         if diatom_data.get('source') == 'Nenalezeno':
-                            unfound_list.append({'Řádek': idx + 1, 'Položka': raw_val, 'Modul': 'DiatomBase'})
+                            row_unfounds.append({'Řádek': idx + 1, 'Položka': raw_val, 'Modul': 'DiatomBase'})
 
                         if enable_diatombase_taxon:
                             taxon_str = diatom_data.get('scientific_name', '')
                             if diatom_data.get('authority'):
                                 taxon_str += f" {diatom_data.get('authority')}"
-                            new_df.at[idx, "[DiatomBase] Taxon & Autorita"] = taxon_str
-                            new_df.at[idx, "[DiatomBase] Taxonomie"] = diatom_data.get('classification', '')
+                            row_updates["[DiatomBase] Taxon & Autorita"] = taxon_str
+                            row_updates["[DiatomBase] Taxonomie"] = diatom_data.get('classification', '')
                         if enable_diatombase_link:
                             url_val = diatom_data.get('url', '')
-                            new_df.at[idx, "[DiatomBase] Odkaz"] = url_val if (url_val and diatom_data.get('source') != 'Nenalezeno') else ""
+                            row_updates["[DiatomBase] Odkaz"] = url_val if (url_val and diatom_data.get('source') != 'Nenalezeno') else ""
                     except Exception:
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': str(raw_val), 'Modul': 'DiatomBase (Chyba)'})
+                        row_unfounds.append({'Řádek': idx + 1, 'Položka': str(raw_val), 'Modul': 'DiatomBase (Chyba)'})
 
-                # AlgaeBase (Řasy & sinice - Odkaz) - Chráněno před vytvářením nesmyslných odkazů/QR kódů
                 if enable_algaebase_link:
                     try:
                         raw_sp = str(row[algaebase_link_col]).strip()
-                        # Ověření, zda jde o řasu/sinici či rozsivku (a nikoliv ptáka, savce, cévnatou rostlinu, houbu nebo lišejník)
+
                         is_algae_cand = (
                             (k5 and any(g in k5.get("group", "").lower() for g in ["řas", "sinic", "algae", "diatom"]))
                             or (diatom_data and diatom_data.get("source") != "Nenalezeno")
                         )
                         if sp_clean and is_algae_cand:
-                            new_df.at[idx, "[AlgaeBase] Odkaz"] = f"https://www.algaebase.org/search/species/?name={urllib.parse.quote(sp_clean)}"
+                            row_updates["[AlgaeBase] Odkaz"] = f"https://www.algaebase.org/search/species/?name={urllib.parse.quote(sp_clean)}"
                         else:
-                            new_df.at[idx, "[AlgaeBase] Odkaz"] = ""
+                            row_updates["[AlgaeBase] Odkaz"] = ""
                     except Exception:
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(algaebase_link_col, "")), 'Modul': 'AlgaeBase (Chyba)'})
+                        row_unfounds.append({'Řádek': idx + 1, 'Položka': str(row.get(algaebase_link_col, "")), 'Modul': 'AlgaeBase (Chyba)'})
 
-                # GBIF Houby / Mykologie fotky
                 if enable_gbif_fungi:
                     try:
                         raw_sp = str(row[gbif_fungi_col]).strip()
                         fungi_photos = fetch_gbif_fungi_photos(raw_sp, max_photos=gbif_fungi_max)
                         if not fungi_photos:
-                            unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'GBIF Houby'})
-                        new_df.at[idx, "[GBIF] Houby"] = ";".join(fungi_photos)
+                            row_unfounds.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'GBIF Houby'})
+                        row_updates["[GBIF] Houby"] = ";".join(fungi_photos)
                     except Exception:
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(gbif_fungi_col, "")), 'Modul': 'GBIF Houby (Chyba)'})
+                        row_unfounds.append({'Řádek': idx + 1, 'Položka': str(row.get(gbif_fungi_col, "")), 'Modul': 'GBIF Houby (Chyba)'})
 
-                # GBIF Zoologie fotky
                 if enable_gbif_zoo:
                     try:
                         raw_sp = str(row[gbif_zoo_col]).strip()
                         zoo_photos = fetch_gbif_zoo_photos(raw_sp, max_photos=gbif_zoo_max)
                         if not zoo_photos:
-                            unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'GBIF Zoologie'})
-                        new_df.at[idx, "[GBIF] Zoologie"] = ";".join(zoo_photos)
+                            row_unfounds.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'GBIF Zoologie'})
+                        row_updates["[GBIF] Zoologie"] = ";".join(zoo_photos)
                     except Exception:
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(gbif_zoo_col, "")), 'Modul': 'GBIF Zoologie (Chyba)'})
+                        row_unfounds.append({'Řádek': idx + 1, 'Položka': str(row.get(gbif_zoo_col, "")), 'Modul': 'GBIF Zoologie (Chyba)'})
 
-                # Wikipedia odkaz
                 if enable_wiki_link:
                     raw_sp = str(row[wiki_link_col]).strip()
                     sp_clean = re.sub(r'\s*\(.*\)\s*', '', raw_sp).strip()
                     sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp_clean).strip()
                     if sp_clean:
                         slug_sp = sp_clean.replace(' ', '_')
-                        new_df.at[idx, "[Wikipedie] Odkaz"] = f"https://cs.wikipedia.org/wiki/{slug_sp}"
+                        row_updates["[Wikipedie] Odkaz"] = f"https://cs.wikipedia.org/wiki/{slug_sp}"
                     else:
-                        new_df.at[idx, "[Wikipedie] Odkaz"] = ""
+                        row_updates["[Wikipedie] Odkaz"] = ""
 
-                # Hlasy ptáků (Xeno-canto API v3)
                 if enable_bird_sounds:
                     try:
                         raw_sp = str(row[bird_sounds_col]).strip()
@@ -9002,38 +10261,34 @@ if st.session_state.df is not None:
                             api_key=xc_api_key
                         )
                         if not sound_results:
-                            unfound_list.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'Hlasy ptáků (Xeno-canto)'})
-                        new_df.at[idx, "[Zvuky] Hlasy ptáků"] = ";".join(f"{u}|{t}|{att}" if att else f"{u}|{t}" for u, t, att in sound_results)
+                            row_unfounds.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'Hlasy ptáků (Xeno-canto)'})
+                        row_updates["[Zvuky] Hlasy ptáků"] = ";".join(f"{u}|{t}|{att}" if att else f"{u}|{t}" for u, t, att in sound_results)
                     except Exception:
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(bird_sounds_col, "")), 'Modul': 'Hlasy ptáků (Chyba)'})
+                        row_unfounds.append({'Řádek': idx + 1, 'Položka': str(row.get(bird_sounds_col, "")), 'Modul': 'Hlasy ptáků (Chyba)'})
 
-                # 12. Zeměpis & Státy
                 if enable_country:
                     try:
                         c_name = str(row[country_col]).strip()
                         c_data = fetch_country_data(c_name, countries_db)
                         if c_data.get('source') == 'Nenalezeno':
-                            unfound_list.append({'Řádek': idx + 1, 'Položka': c_name, 'Modul': 'Zeměpis'})
-                        new_df.at[idx, "[Zeměpis] Český název"] = c_data.get('common_name', '')
-                        new_df.at[idx, "[Zeměpis] Hlavní město"] = c_data.get('capital', '')
-                        new_df.at[idx, "[Zeměpis] Region"] = f"{c_data['region']} ({c_data['subregion']})" if c_data.get('subregion') else c_data.get('region', '')
-                        new_df.at[idx, "[Zeměpis] Jazyky"] = c_data.get('languages', '')
-                        new_df.at[idx, "[Zeměpis] Měna"] = c_data.get('currencies', '')
-                        new_df.at[idx, "[Zeměpis] Rozloha"] = c_data.get('area', '')
-                        new_df.at[idx, "[Zeměpis] Vlajka (URL)"] = c_data.get('flag_url', '')
+                            row_unfounds.append({'Řádek': idx + 1, 'Položka': c_name, 'Modul': 'Zeměpis'})
+                        row_updates["[Zeměpis] Český název"] = c_data.get('common_name', '')
+                        row_updates["[Zeměpis] Hlavní město"] = c_data.get('capital', '')
+                        row_updates["[Zeměpis] Region"] = f"{c_data['region']} ({c_data['subregion']})" if c_data.get('subregion') else c_data.get('region', '')
+                        row_updates["[Zeměpis] Jazyky"] = c_data.get('languages', '')
+                        row_updates["[Zeměpis] Měna"] = c_data.get('currencies', '')
+                        row_updates["[Zeměpis] Rozloha"] = c_data.get('area', '')
+                        row_updates["[Zeměpis] Vlajka (URL)"] = c_data.get('flag_url', '')
                     except Exception:
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(country_col, "")), 'Modul': 'Zeměpis (Chyba)'})
+                        row_unfounds.append({'Řádek': idx + 1, 'Položka': str(row.get(country_col, "")), 'Modul': 'Zeměpis (Chyba)'})
 
-                # 13. Mezinárodní vědecké popisy a monografie (ADW, GBIF Descriptions, POWO Kew, EOL)
-                # Pomocná proměnná: kingdom z GBIF (k dispozici z modulu 2 výše)
                 _gbif_kingdom = (gbif_data.get("kingdom", "") if gbif_data else "").strip()
                 _gbif_phylum  = (gbif_data.get("phylum",  "") if gbif_data else "").strip()
 
-                # ADW – pouze pro živočichy (kingdom Animalia)
                 if enable_adw_desc or enable_adw_link:
                     _is_animal = _gbif_kingdom == "Animalia"
                     if not _is_animal:
-                        # záloha: is_bryo/is_flora detekce → stačí zamítnout non-Animalia
+
                         pass
                     try:
                         raw_adw = str(row[adw_col]).strip() if adw_col in row else ""
@@ -9041,18 +10296,18 @@ if st.session_state.df is not None:
                             if enable_adw_desc:
                                 adw_res = fetch_adw_description(raw_adw)
                                 if adw_res:
-                                    new_df.at[idx, "[ADW] Biologický popis"] = adw_res
+                                    row_updates["[ADW] Biologický popis"] = adw_res
                                 else:
-                                    unfound_list.append({'Řádek': idx + 1, 'Položka': raw_adw, 'Modul': 'ADW (Popis živočicha)'})
+                                    row_unfounds.append({'Řádek': idx + 1, 'Položka': raw_adw, 'Modul': 'ADW (Popis živočicha)'})
                             if enable_adw_link:
                                 adw_l = get_adw_link(raw_adw)
                                 if adw_l:
-                                    new_df.at[idx, "[ADW] Odkaz"] = adw_l
+                                    row_updates["[ADW] Odkaz"] = adw_l
                         elif raw_adw and not _is_animal:
-                            # Druh není živočich – přeskočit ADW, neplnit unfound (záměrné)
+
                             pass
                     except Exception:
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(adw_col, "")), 'Modul': 'ADW (Chyba)'})
+                        row_unfounds.append({'Řádek': idx + 1, 'Položka': str(row.get(adw_col, "")), 'Modul': 'ADW (Chyba)'})
 
                 if enable_gbif_desc:
                     try:
@@ -9060,8 +10315,7 @@ if st.session_state.df is not None:
                         if raw_gb_d:
                             gb_desc_res = fetch_gbif_species_description(raw_gb_d)
                             if gb_desc_res:
-                                # Filtr kvality jazyka: přeskočit čistě španělské/italské/latinské citace
-                                # (heuristika: méně než 30 % slov je anglicky → přeskočit)
+
                                 _en_words = {"the", "a", "an", "is", "are", "of", "in", "and", "with", "on",
                                              "from", "to", "by", "at", "or", "for", "this", "that", "it",
                                              "has", "have", "been", "body", "leaf", "stem", "root", "species",
@@ -9069,16 +10323,15 @@ if st.session_state.df is not None:
                                 _words = gb_desc_res.lower().split()
                                 _en_count = sum(1 for w in _words if re.sub(r"[^a-z]", "", w) in _en_words)
                                 _en_ratio = _en_count / max(len(_words), 1)
-                                if _en_ratio >= 0.05:  # aspoň 5 % anglicky čitelných slov
-                                    new_df.at[idx, "[GBIF] Vědecký popis"] = gb_desc_res
+                                if _en_ratio >= 0.05:
+                                    row_updates["[GBIF] Vědecký popis"] = gb_desc_res
                                 else:
-                                    unfound_list.append({'Řádek': idx + 1, 'Položka': raw_gb_d, 'Modul': 'GBIF TreatmentBank (pouze cizí jazyk)'})
+                                    row_unfounds.append({'Řádek': idx + 1, 'Položka': raw_gb_d, 'Modul': 'GBIF TreatmentBank (pouze cizí jazyk)'})
                             else:
-                                unfound_list.append({'Řádek': idx + 1, 'Položka': raw_gb_d, 'Modul': 'GBIF TreatmentBank (Popis)'})
+                                row_unfounds.append({'Řádek': idx + 1, 'Položka': raw_gb_d, 'Modul': 'GBIF TreatmentBank (Popis)'})
                     except Exception:
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(gbif_desc_col, "")), 'Modul': 'GBIF TreatmentBank (Chyba)'})
+                        row_unfounds.append({'Řádek': idx + 1, 'Položka': str(row.get(gbif_desc_col, "")), 'Modul': 'GBIF TreatmentBank (Chyba)'})
 
-                # POWO Kew – pouze pro rostliny (kingdom Plantae)
                 if enable_powo_desc or enable_powo_link:
                     _is_plant = _gbif_kingdom == "Plantae" or (
                         is_flora_plant or is_bryo or
@@ -9091,38 +10344,33 @@ if st.session_state.df is not None:
                             if enable_powo_desc:
                                 powo_res = fetch_powo_kew_description(raw_powo)
                                 if powo_res:
-                                    new_df.at[idx, "[POWO Kew] Popis flóry"] = powo_res
+                                    row_updates["[POWO Kew] Popis flóry"] = powo_res
                                 else:
-                                    unfound_list.append({'Řádek': idx + 1, 'Položka': raw_powo, 'Modul': 'POWO Kew (Popis)'})
+                                    row_unfounds.append({'Řádek': idx + 1, 'Položka': raw_powo, 'Modul': 'POWO Kew (Popis)'})
                             if enable_powo_link:
                                 powo_l = get_powo_kew_link(raw_powo)
                                 if powo_l:
-                                    new_df.at[idx, "[POWO Kew] Odkaz"] = powo_l
+                                    row_updates["[POWO Kew] Odkaz"] = powo_l
                         elif raw_powo and not _is_plant:
-                            pass  # Není rostlina – přeskočit POWO Kew
+                            pass
                     except Exception:
-                        unfound_list.append({'Řádek': idx + 1, 'Položka': str(row.get(powo_col, "")), 'Modul': 'POWO Kew (Chyba)'})
+                        row_unfounds.append({'Řádek': idx + 1, 'Položka': str(row.get(powo_col, "")), 'Modul': 'POWO Kew (Chyba)'})
 
-                # EOL – universální (odkaz pro všechny organismy)
                 if enable_eol_link:
                     try:
                         raw_eol = str(row[eol_col]).strip() if eol_col in row else ""
                         if raw_eol:
                             eol_l = get_eol_link(raw_eol)
                             if eol_l:
-                                new_df.at[idx, "[EOL] Odkaz"] = eol_l
+                                row_updates["[EOL] Odkaz"] = eol_l
                     except Exception:
                         pass
 
-                # Určení kategorie a zdrojové databáze pro třídění podbalíčků
-                # Priorita: Zeměpis > GBIF taxonomie > české DB > Red list > stávající [Kategorie] > ostatní
                 cat_label = ""
 
-                # 1. Zeměpis – nejvyšší priorita
                 if c_data and c_data.get("source") != "Nenalezeno" and c_data.get("common_name"):
                     cat_label = "Zeměpis (Státy)"
 
-                # 2. GBIF taxonomie – granulární kategorie pro všechny biologické skupiny
                 elif gbif_data and gbif_data.get("source") != "Nenalezeno" and gbif_data.get("kingdom"):
                     gbif_cat = gbif_class_to_category(
                         gbif_data.get("kingdom", ""),
@@ -9130,13 +10378,12 @@ if st.session_state.df is not None:
                         gbif_data.get("class", "")
                     )
                     if gbif_cat:
-                        # Lišejníky jsou v GBIF Fungi, ale mají vlastní DB – upřesnit
+
                         if "Houby" in gbif_cat and dalib_data and dalib_data.get("source") != "Nenalezeno":
                             cat_label = "Lišejníky (DaLiBor)"
                         else:
                             cat_label = gbif_cat
 
-                # 3. České specifické databáze (záloha – fungují i pro synonyma a starou nomenklaturu)
                 elif dalib_data and dalib_data.get("source") != "Nenalezeno" and (dalib_data.get("photo_urls") or dalib_data.get("description")):
                     cat_label = "Lišejníky (DaLiBor)"
                 elif myko_data and myko_data.get("source") != "Nenalezeno" and (myko_data.get("photo_urls") or myko_data.get("description")):
@@ -9154,18 +10401,16 @@ if st.session_state.df is not None:
                 elif fungi_photos:
                     cat_label = "Houby (Fungi)"
 
-                # 4. Červený seznam ČR – skupinový label
                 elif k5 and k5.get("group"):
                     cat_label = k5.get("group")
                 elif k_red_check and k_red_check.get("group"):
                     cat_label = k_red_check.get("group")
 
-                # 5. Záloha z existujícího sloupce [Kategorie] (pomáhá u synonym a staré nomenklatury)
                 else:
                     _existing_cat = ""
                     for _cat_col in ("[Kategorie]", "Kategorie", "kategorie"):
                         if _cat_col in new_df.columns:
-                            _v = str(new_df.at[idx, _cat_col]).strip()
+                            _v = str(row.get(_cat_col, "")).strip()
                             if _v and _v not in ("nan", ""):
                                 _existing_cat = _v
                                 break
@@ -9192,9 +10437,8 @@ if st.session_state.df is not None:
                         elif any(w in ec for w in ["slovník", "jazyk", "vocab", "dict"]):
                             cat_label = "Jazyky a slovník"
                         else:
-                            cat_label = _existing_cat  # použít originální hodnotu
+                            cat_label = _existing_cat
 
-                # 6. Slovník a ostatní
                 if not cat_label:
                     if dict_data and dict_data.get("definition"):
                         cat_label = "Jazyky a slovník"
@@ -9203,8 +10447,27 @@ if st.session_state.df is not None:
                     else:
                         cat_label = "Ostatní / Nezařazeno"
 
-                
-                time.sleep(0.1)
+                return idx, row_updates, row_unfounds
+
+            total = len(df)
+            unfound_list = []
+
+            for idx, row in df.iterrows():
+                pct = idx / total if total > 0 else 0.0
+                progress_bar.progress(pct)
+                current_item = str(row[columns[0]]).strip() if len(columns) > 0 else f"Položka {idx + 1}"
+                status.text(f"Obohacování dat: {idx + 1}/{total} ({int(pct * 100)}%) — {current_item}...")
+
+                try:
+                    r_idx, r_updates, r_unfounds = _enrich_single_row(idx, row)
+                    for c_col, c_val in r_updates.items():
+                        new_df.at[r_idx, c_col] = c_val
+                    unfound_list.extend(r_unfounds)
+                except Exception:
+                    pass
+
+            progress_bar.progress(1.0)
+            status.text(f"Obohacování dat dokončeno ({total}/{total} položek).")
 
             st.session_state.df = new_df
             st.session_state.enhancements_applied = True
@@ -9219,7 +10482,6 @@ if st.session_state.df is not None:
 
     with st.expander("4. Výběr výstupního formátu a obsahu", expanded=False):
 
-        # Společný výpočet citací pro všechny záložky
         active_cols_for_desc = list(dict.fromkeys(st.session_state.front_cols_ordered + st.session_state.back_cols_ordered))
         has_pladias = any(("[Pladias]" in str(c) or "[Pladias.cz]" in str(c)) for c in active_cols_for_desc)
         has_myko = any("[Mykologie.net]" in str(c) for c in active_cols_for_desc)
@@ -9229,10 +10491,11 @@ if st.session_state.df is not None:
         has_attribution = has_pladias or has_myko or has_dalibor or has_diatom or has_algae
         default_attribution_desc = build_deck_attribution(active_cols_for_desc) if has_attribution else ""
 
-        tab_anki, tab_pdf, tab_docx = st.tabs([
+        tab_anki, tab_obsidian, tab_pdf, tab_docx = st.tabs([
             "1. Balíček pro Anki (.apkg)",
-            "2. Studijní brožura v PDF (.pdf)",
-            "3. Dokument ve Wordu (.docx)"
+            "2. Kartičky pro mobil i PC (.zip / HTML / Obsidian)",
+            "3. Studijní brožura v PDF (.pdf)",
+            "4. Dokument ve Wordu (.docx)"
         ])
 
         with tab_anki:
@@ -9368,8 +10631,6 @@ if st.session_state.df is not None:
                     else:
                         st.session_state.type_target_col = None
 
-
-                # Pokročilé nastavení zobrazení sloupců (pouze textové sloupce, sloupce s obrázky/fotkami jsou vynechány)
                 all_selected_cols = list(dict.fromkeys(st.session_state.front_cols_ordered + st.session_state.back_cols_ordered))
                 text_cols_to_style = [
                     c for c in all_selected_cols
@@ -9424,18 +10685,17 @@ if st.session_state.df is not None:
                     preview_row = df.iloc[row_idx]
                     show_media_attr_val = st.session_state.get("show_media_attribution", True)
 
-                    # Výpočet barev pro náhled
                     is_light_card_preview = (card_theme == "Světlý režim (vždy světlé)") or (card_theme == "Obojetný (automaticky přepínatelný)" and is_light_ui)
                     if is_light_card_preview:
                         preview_bg = "#ffffff"
-                        preview_fg = "#111d14"
-                        preview_border = "#cfe0d5"
-                        preview_label = "#2d5438"
+                        preview_fg = "#1f2937"
+                        preview_border = "#e5e7eb"
+                        preview_label = "#6b7280"
                     else:
-                        preview_bg = "#121c16"
-                        preview_fg = "#f4faf6"
-                        preview_border = "#23362b"
-                        preview_label = "#8da897"
+                        preview_bg = "#2f2f31"
+                        preview_fg = "#f4f4f5"
+                        preview_border = "#3f3f46"
+                        preview_label = "#a1a1aa"
 
                     tab_prev_front, tab_prev_back = st.tabs(["Líc", "Rub"])
 
@@ -9682,7 +10942,6 @@ if st.session_state.df is not None:
                     key="anki_subdeck_choice"
                 )
 
-            # Nastavení štítků (Tags)
             enable_tagging = st.checkbox("Přidat štítky (tags) ke kartičkám podle hodnoty ve sloupci", value=False, key="anki_enable_tagging")
             tag_col = ""
             tag_match_val = ""
@@ -9719,7 +10978,6 @@ if st.session_state.df is not None:
                 if has_algae: src_names.append("AlgaeBase")
                 st.caption(f"*Do popisu balíčku budou automaticky připojeny citace a uvedení zdrojů ({', '.join(src_names)}).*")
 
-            # Sestavení finálního popisu balíčku
             full_desc_parts = []
             if deck_custom_desc and deck_custom_desc.strip():
                 full_desc_parts.append(deck_custom_desc.strip())
@@ -9731,7 +10989,25 @@ if st.session_state.df is not None:
                 with st.expander("Náhled kompletního popisu balíčku pro Anki", expanded=False):
                     st.markdown(format_deck_description(deck_desc_input), unsafe_allow_html=True)
 
+            with st.expander("ℹ️ Nápověda: Hláška 'Prosím aktualizujte na nejnovější verzi Anki' nebo použití na iPhone", expanded=False):
+                st.markdown("""
+                **1. Proč se tato hláška v programu Anki objevuje?**
+                Generátor vytváří balíčky kompatibilní s moderním standardem Anki (Anki 23 a 24+). Pokud máte na počítači nainstalovanou starší verzi Anki (např. 2.1.x z minulých let), Anki zobrazí výzvu k aktualizaci.
+                👉 **Řešení pro PC/Mac:** Stačí si stáhnout a nainstalovat bezplatnou aktualizaci z oficiálního webu [apps.ankiweb.net](https://apps.ankiweb.net). Všechny vaše dosavadní balíčky a postup zůstanou zachovány.
+
+                **2. Jak používat kartičky na iPhone / iPad zdarma?**
+                - Oficiální mobilní aplikace **AnkiMobile** pro iOS je placená (cca 700 Kč, jednorázově).
+                - Neoficiální aplikace třetích stran v App Store (jako *AnkiPro* nebo *AnkiApp*) jsou placené kopie s předplatným a standardní `.apkg` nepodporují.
+                - **Možnost zdarma A:** Použijte **bezplatný AnkiWeb** přímo v Safari na iPhone po bezplatné synchronizaci z PC.
+                - **Možnost zdarma B (Doporučeno):** Použijte náš export do **Obsidianu (záložka 2 nahoře)** – aplikace Obsidian je na iPhone i iPad 100% zdarma, funguje plně offline a s bezplatným doplňkem *Spaced Repetition* se učíte úplně stejně jako v Anki!
+                """)
             st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+            st.checkbox(
+                "Vynutit nová ID karet v Anki (vytvořit jako nové karty místo aktualizace existujících)",
+                value=False,
+                key="cb_force_new_anki_cards",
+                help="Zaškrtněte, pokud chcete v Anki vytvořit nový samostatný balíček a předejít přeskočení karet kvůli předchozím importům."
+            )
             btn_gen_apkg_clicked = st.button("Generovat balíček pro Anki (.apkg)", key="btn_gen_apkg", use_container_width=True, type="primary")
 
             if btn_gen_apkg_clicked:
@@ -9747,7 +11023,6 @@ if st.session_state.df is not None:
                     progress_bar = st.progress(0.0)
                     status = st.empty()
 
-                    # --- FÁZE 1: SBĚR VŠECH MÉDIÍ K PARALELNÍMU STAŽENÍ ---
                     status.text("Připravuji seznam médií ke stažení...")
                     media_tasks = {}
                     media_attributions = {}
@@ -9759,7 +11034,6 @@ if st.session_state.df is not None:
                             if pd.isna(val) or str(val).strip() == "" or str(val).lower() == "nan":
                                 continue
 
-                            # TTS
                             if str(col).startswith("[TTS]"):
                                 parts = str(val).split(';')
                                 if len(parts) >= 2:
@@ -9771,7 +11045,6 @@ if st.session_state.df is not None:
                                         tts_url = f"https://translate.google.com/translate_tts?ie=UTF-8&tl={lang_code}&client=tw-ob&q={urllib.parse.quote(text_to_speak)}"
                                         media_tasks[safe_filename] = (tts_url, 'audio')
 
-                            # Xeno-canto Hlasy ptáků
                             elif col == "[Zvuky] Hlasy ptáků":
                                 entries = [e.strip() for e in str(val).split(';') if e.strip()]
                                 for s_idx, entry in enumerate(entries):
@@ -9788,7 +11061,6 @@ if st.session_state.df is not None:
                                     if attr_txt:
                                         media_attributions[safe_filename] = attr_txt
 
-                            # Pladias mapa rozšíření
                             elif col in ["[Pladias] Mapa rozšíření", "[Pladias.cz] Mapa rozšíření"]:
                                 species_col = st.session_state.api_config.get("pladias_map_col", columns[0])
                                 raw_species = str(row[species_col]).strip() if species_col in row else str(val).strip()
@@ -9796,7 +11068,6 @@ if st.session_state.df is not None:
                                 safe_filename = f"{clean_species}_pladias_map_{idx}.jpg"
                                 media_tasks[safe_filename] = (raw_species, 'pladias_map')
 
-                            # Speciální GBIF orgánové sloupce
                             elif col in ["[GBIF] Habitus", "[GBIF] Květ", "[GBIF] List", "[GBIF] Plod", "[GBIF] Herbář"] and is_image_col(col, val):
                                 raw_entries = [u.strip() for u in str(val).split(';') if u.strip()]
                                 organ_map = {
@@ -9831,7 +11102,6 @@ if st.session_state.df is not None:
                                         if attr_txt:
                                             media_attributions[safe_filename] = attr_txt
 
-                            # Běžný obrázkový sloupec (iNaturalist, Wikimedia, GBIF Zoo, GBIF Houby, Zeměpis...)
                             elif is_image_col(col, val):
                                 raw_entries = [u.strip() for u in str(val).split(';') if u.strip()]
                                 raw_sp_name = str(row[columns[0]]).strip() if len(columns) > 0 else f"druh_{idx}"
@@ -9846,8 +11116,11 @@ if st.session_state.df is not None:
                                         url = entry.strip()
                                         attr_txt = ""
 
+                                    loc_src = ""
                                     if not url.startswith('http://') and not url.startswith('https://'):
-                                        continue
+                                        loc_src = resolve_local_media_path(url)
+                                        if not loc_src:
+                                            continue
                                     ext = ".jpg"
                                     if ".png" in url.lower():
                                         ext = ".png"
@@ -9858,11 +11131,13 @@ if st.session_state.df is not None:
                                     safe_col = slugify(col)[:12]
                                     url_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()[:6]
                                     safe_filename = f"{clean_sp}_{safe_col}_{idx}_{img_idx}_{url_hash}{ext}"
-                                    media_tasks[safe_filename] = (url, 'image')
+                                    if loc_src:
+                                        media_tasks[safe_filename] = (loc_src, 'local_image')
+                                    else:
+                                        media_tasks[safe_filename] = (url, 'image')
                                     if attr_txt:
                                         media_attributions[safe_filename] = attr_txt
 
-                    # --- FÁZE 2: RYCHLÉ PARALELNÍ STAŽENÍ A OPTIMALIZACE VÍCE VLÁKNY ---
                     downloaded_media = []
                     total_tasks = len(media_tasks)
                     if total_tasks > 0:
@@ -9879,9 +11154,17 @@ if st.session_state.df is not None:
                                     if render_pladias_distribution_map(url, local_path):
                                         return fname, local_path, True
                                     return fname, local_path, False
+                                elif mtype == 'local_image':
+                                    if os.path.isfile(url):
+                                        with open(url, "rb") as rf:
+                                            fcontent = rf.read()
+                                        if not save_optimized_image(fcontent, local_path, max_dim=800, quality=80):
+                                            shutil.copy2(url, local_path)
+                                        return fname, local_path, True
+                                    return fname, local_path, False
                                 r_resp = requests.get(
-                                    url, 
-                                    headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}, 
+                                    url,
+                                    headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'},
                                     timeout=(2.5, 5.0)
                                 )
                                 if r_resp.status_code == 404 and 'cevs/images/taxa/' in url:
@@ -9904,7 +11187,7 @@ if st.session_state.df is not None:
                                             else:
                                                 if os.path.exists(local_path):
                                                     os.remove(local_path)
-                                    else: # audio / tts
+                                    else:
                                         with open(local_path, 'wb') as f:
                                             f.write(r_resp.content)
                                         if os.path.exists(local_path) and os.path.getsize(local_path) > 0:
@@ -9930,7 +11213,6 @@ if st.session_state.df is not None:
                             except concurrent.futures.TimeoutError:
                                 status.text(f"Časový limit pro pomalá média vypršel ({completed_count}/{total_tasks}). Pokračuji v sestavování balíčku...")
 
-                    # --- FÁZE 3: OKAMŽITÉ SESTAVENÍ KARET V PAMĚTI ---
                     status.text("Sestavuji kartičky...")
                     progress_bar.progress(1.0)
 
@@ -9947,7 +11229,6 @@ if st.session_state.df is not None:
                             if pd.isna(val) or str(val).strip() == "" or str(val).lower() == "nan":
                                 continue
 
-                            # Načíst nastavení stylů pro tento sloupec
                             show_label = True
                             label_text = col
                             if 'col_styles' in st.session_state and col in st.session_state.col_styles:
@@ -9958,7 +11239,6 @@ if st.session_state.df is not None:
                             val_style_attr = f' style="{val_css}"' if val_css else ''
                             label_html = f'<span class="field-label">{label_text}</span>' if show_label else ''
 
-                            # TTS hlasový modul
                             if str(col).startswith("[TTS]"):
                                 parts = str(val).split(';')
                                 if len(parts) >= 2:
@@ -9972,7 +11252,6 @@ if st.session_state.df is not None:
                                             html_parts.append(f"[sound:{safe_filename}]")
                                 continue
 
-                            # Xeno-canto hlasy ptáků
                             if col == "[Zvuky] Hlasy ptáků":
                                 entries = [e.strip() for e in str(val).split(';') if e.strip()]
                                 for s_idx, entry in enumerate(entries):
@@ -10002,7 +11281,6 @@ if st.session_state.df is not None:
                                         )
                                 continue
 
-                            # Pladias mapa rozšíření
                             if col in ["[Pladias] Mapa rozšíření", "[Pladias.cz] Mapa rozšíření"]:
                                 species_col = st.session_state.api_config.get("pladias_map_col", columns[0])
                                 raw_species = str(row_data[species_col]).strip() if species_col in row_data else str(val).strip()
@@ -10019,7 +11297,6 @@ if st.session_state.df is not None:
                                     )
                                 continue
 
-                            # Speciální GBIF obrázkové sloupce
                             is_gbif_photo = col in ["[GBIF] Habitus", "[GBIF] Květ", "[GBIF] List", "[GBIF] Plod", "[GBIF] Herbář"]
                             if is_gbif_photo and is_image_col(col, val):
                                 raw_entries = [u.strip() for u in str(val).split(';') if u.strip()]
@@ -10061,7 +11338,6 @@ if st.session_state.df is not None:
                                         break
                                 continue
 
-                            # Obrázkový sloupec (iNaturalist, Wikimedia, GBIF Zoologie, GBIF Houby, Vlajky...)
                             if is_image_col(col, val):
                                 raw_entries = [u.strip() for u in str(val).split(';') if u.strip()]
                                 local_filenames = []
@@ -10074,7 +11350,8 @@ if st.session_state.df is not None:
                                     else:
                                         url = entry.strip()
                                     if not url.startswith('http://') and not url.startswith('https://'):
-                                        continue
+                                        if not resolve_local_media_path(url):
+                                            continue
                                     ext = ".jpg"
                                     if ".png" in url.lower():
                                         ext = ".png"
@@ -10104,7 +11381,6 @@ if st.session_state.df is not None:
                                         f'</div>'
                                     )
 
-                            # Speciální sloupce s hypertextovými odkazy (Pladias, Mykologie.net, DaLiBor, DiatomBase, AlgaeBase, Wikipedie)
                             elif col.startswith(("[Pladias]", "[Pladias.cz]")) or col.startswith("[Mykologie.net] Odkaz") or col.startswith("[DaLiBor] Odkaz") or col.startswith("[DiatomBase] Odkaz") or col.startswith("[AlgaeBase] Odkaz") or (col.startswith("[Wikipedie]") and str(val).startswith("http")):
                                 url = str(val).strip()
                                 if "pladias.cz" in url:
@@ -10126,7 +11402,6 @@ if st.session_state.df is not None:
                                     f'</div>'
                                 )
 
-                            # Běžný textový sloupec
                             else:
                                 val_str = str(val)
                                 if not re.search(r'<[a-zA-Z0-9/]+[^>]*>', val_str):
@@ -10159,7 +11434,6 @@ if st.session_state.df is not None:
                             if pd.notna(raw_val) and str(raw_val).strip() != "":
                                 subdeck_val = str(raw_val).strip()
 
-                        # Výpočet štítků (tags)
                         card_tags = []
                         if enable_tagging and tag_col and tag_name_input.strip():
                             cell_raw = str(row.get(tag_col, "")).strip()
@@ -10185,10 +11459,23 @@ if st.session_state.df is not None:
 
                     status.text("Zapisuji balíček Anki (.apkg)...")
 
-                    # Sestavení balíčku
                     schema_str = ",".join(st.session_state.front_cols_ordered) + "|" + ",".join(st.session_state.back_cols_ordered) + "|" + deck_name_input + "|" + card_layout_mode + "|" + str(is_type_in) + "|" + str(type_target_col)
                     model_hash = hashlib.sha256(schema_str.encode('utf-8')).hexdigest()[:8]
-                    model_id = get_stable_id(deck_name_input + "_model_" + model_hash)
+
+                    existing_mid = None
+                    if '_anki_mid' in df.columns:
+                        valid_mids = [m for m in df['_anki_mid'] if pd.notna(m) and str(m).strip().isdigit()]
+                        if valid_mids:
+                            try:
+                                existing_mid = int(valid_mids[0])
+                            except Exception:
+                                existing_mid = None
+
+                    force_new_guids = st.session_state.get("cb_force_new_anki_cards", False)
+                    if existing_mid and not force_new_guids:
+                        model_id = existing_mid
+                    else:
+                        model_id = get_stable_id(f"Universal_Model_{deck_name_input}")
                     deck_id = get_stable_id(deck_name_input)
 
                     if is_type_in and type_target_col:
@@ -10246,7 +11533,6 @@ if st.session_state.df is not None:
                         css=get_anki_css(card_theme)
                     )
 
-                    # Vytvoření balíčků (včetně podbalíčků)
                     formatted_deck_desc = format_deck_description(deck_desc_input)
                     decks = {}
                     parent_deck_id = get_stable_id(deck_name_input)
@@ -10260,14 +11546,19 @@ if st.session_state.df is not None:
                             note_fields.append(note_data.get('type_target', ''))
 
                         explicit_guid = note_data.get('anki_guid')
+                        force_new_guids = st.session_state.get("cb_force_new_anki_cards", False)
+                        if explicit_guid and not force_new_guids:
+                            final_guid = explicit_guid
+                        else:
+                            final_guid = genanki.guid_for(note_data['guid_src'] + "|" + deck_name_input + ("|" + content_hash if force_new_guids else ""))
+
                         note = genanki.Note(
                             model=anki_model,
                             fields=note_fields,
                             tags=note_data.get('tags', []),
-                            guid=explicit_guid if explicit_guid else genanki.guid_for(note_data['guid_src'] + "|" + model_hash + "|" + content_hash)
+                            guid=final_guid
                         )
 
-                        # Zjištění, do kterého balíčku karta patří
                         target_deck_name = deck_name_input
                         if subdeck_col_choice != "— Bez rozdělení —" and note_data.get('subdeck_val'):
                             target_deck_name = f"{deck_name_input}::{note_data['subdeck_val']}"
@@ -10291,7 +11582,6 @@ if st.session_state.df is not None:
                     with open(apkg_path, "rb") as f:
                         apkg_bytes = f.read()
 
-                    # Uložení výsledků do session_state pro perzistentní stahování
                     st.session_state.generated_apkg_data = apkg_bytes
                     st.session_state.generated_apkg_filename = apkg_filename
                     st.session_state.notes_count = len(processed_notes)
@@ -10310,7 +11600,388 @@ if st.session_state.df is not None:
                     st.success("Balíček Anki byl úspěšně vygenerován.")
                     st.rerun()
 
-        # --- ZÁLOŽKA 2: GENEROVÁNÍ STUDIJNÍ BROŽURY / ATLASU V PDF ---
+        with tab_obsidian:
+            st.markdown("#### Export kartiček (.zip) – Webový přehrávač & Obsidian (Zdarma pro iPhone, iPad i PC)")
+            st.info("Vygenerovaný **.zip** balíček můžete otevřít **přímo v telefonu nebo PC** pomocí samostatného přehrávače (**Karty.html / index.html** uvnitř balíčku), nebo jej otevřít v bezplatné aplikaci **Obsidian** s doplňkem *Spaced Repetition*. Obě varianty jsou 100% zdarma, fungují offline a pamatují si postup učení!")
+
+            col_obs_left, col_obs_right = st.columns([1.1, 0.9], gap="large")
+
+            with col_obs_left:
+                default_obs_vault = f"Atlas_{slugify(st.session_state.get('imported_apkg_deck_name', 'karticky'))}"
+                obs_vault_name = st.text_input("Název složky / balíčku v Obsidianu:", value=default_obs_vault, key="obs_vault_name_input")
+                obs_card_sep_mode = st.radio(
+                    "Režim kartiček pro Spaced Repetition:",
+                    ["Jednosměrné (?) - líc na rub (Doporučeno)", "Obousměrné (??) - líc na rub i rub na líc"],
+                    index=0,
+                    key="obs_card_sep_radio",
+                    help="Jednosměrné používá '?' a zkouší vás z líce na rub (např. z fotky na název a popis). Obousměrné používá '??' a vytvoří z každého druhu dvě kartičky."
+                )
+
+                if "obs_front_cols_ordered" not in st.session_state:
+                    st.session_state.obs_front_cols_ordered = list(st.session_state.front_cols_ordered) if st.session_state.front_cols_ordered else ([columns[0]] if columns else [])
+                if "obs_back_cols_ordered" not in st.session_state:
+                    st.session_state.obs_back_cols_ordered = list(st.session_state.back_cols_ordered) if st.session_state.back_cols_ordered else [c for c in columns if c not in st.session_state.obs_front_cols_ordered]
+                if "obs_col_styles" not in st.session_state:
+                    st.session_state.obs_col_styles = dict(st.session_state.col_styles) if st.session_state.col_styles else {}
+
+                col_obs_front, col_obs_back = st.columns(2)
+                with col_obs_front:
+                    st.markdown("##### 1. Otázka / Líc kartičky")
+                    obs_front_cols = st.multiselect(
+                        "Sloupce zobrazené před otočením (např. foto):",
+                        options=columns,
+                        default=[c for c in st.session_state.obs_front_cols_ordered if c in columns],
+                        key="obs_front_cols_multiselect"
+                    )
+                    sync_ordered_cols(obs_front_cols, "obs_front_cols_ordered")
+
+                    with st.expander("Změnit pořadí sloupců na líci (▲ / ▼)", expanded=False):
+                        for i, col in enumerate(st.session_state.obs_front_cols_ordered):
+                            c_name, c_up, c_down = st.columns([6, 1, 1])
+                            with c_name:
+                                st.write(f"**{col}**")
+                            with c_up:
+                                if st.button("▲", key=f"obs_up_front_{col}_{i}"):
+                                    if i > 0:
+                                        st.session_state.obs_front_cols_ordered[i], st.session_state.obs_front_cols_ordered[i-1] = st.session_state.obs_front_cols_ordered[i-1], st.session_state.obs_front_cols_ordered[i]
+                                        st.rerun()
+                            with c_down:
+                                if st.button("▼", key=f"obs_down_front_{col}_{i}"):
+                                    if i < len(st.session_state.obs_front_cols_ordered) - 1:
+                                        st.session_state.obs_front_cols_ordered[i], st.session_state.obs_front_cols_ordered[i+1] = st.session_state.obs_front_cols_ordered[i+1], st.session_state.obs_front_cols_ordered[i]
+                                        st.rerun()
+
+                with col_obs_back:
+                    st.markdown("##### 2. Odpověď / Rub kartičky")
+                    default_obs_back = [c for c in st.session_state.obs_back_cols_ordered if c in columns and c not in obs_front_cols]
+                    obs_back_cols = st.multiselect(
+                        "Sloupce zobrazené po otočení (jméno, popis):",
+                        options=columns,
+                        default=default_obs_back,
+                        key="obs_back_cols_multiselect"
+                    )
+                    sync_ordered_cols(obs_back_cols, "obs_back_cols_ordered")
+
+                    with st.expander("Změnit pořadí sloupců na rubu (▲ / ▼)", expanded=False):
+                        for i, col in enumerate(st.session_state.obs_back_cols_ordered):
+                            c_name, c_up, c_down = st.columns([6, 1, 1])
+                            with c_name:
+                                st.write(f"**{col}**")
+                            with c_up:
+                                if st.button("▲", key=f"obs_up_back_{col}_{i}"):
+                                    if i > 0:
+                                        st.session_state.obs_back_cols_ordered[i], st.session_state.obs_back_cols_ordered[i-1] = st.session_state.obs_back_cols_ordered[i-1], st.session_state.obs_back_cols_ordered[i]
+                                        st.rerun()
+                            with c_down:
+                                if st.button("▼", key=f"obs_down_back_{col}_{i}"):
+                                    if i < len(st.session_state.obs_back_cols_ordered) - 1:
+                                        st.session_state.obs_back_cols_ordered[i], st.session_state.obs_back_cols_ordered[i+1] = st.session_state.obs_back_cols_ordered[i+1], st.session_state.obs_back_cols_ordered[i]
+                                        st.rerun()
+
+                obs_selected_cols = list(dict.fromkeys(st.session_state.obs_front_cols_ordered + st.session_state.obs_back_cols_ordered))
+                obs_text_cols = [
+                    c for c in obs_selected_cols
+                    if not (check_col_is_image(c, df) or is_image_col(c) or any(img_kw in c.lower() for img_kw in ["foto", "fotka", "obrázek", "obrazek", "habitus", "květ", "kvet", "list", "plod", "herbář", "herbar", "detail", "mikrofoto"]))
+                ]
+                if obs_text_cols:
+                    with st.expander("Pokročilé nastavení zobrazení sloupců (formátování textu v Obsidianu)", expanded=False):
+                        for col in obs_text_cols:
+                            if col not in st.session_state.obs_col_styles:
+                                existing_s = st.session_state.col_styles.get(col, {})
+                                st.session_state.obs_col_styles[col] = {
+                                    "bold": existing_s.get("bold", False),
+                                    "italic": existing_s.get("italic", False),
+                                    "size": existing_s.get("size", "Výchozí"),
+                                    "custom_label": existing_s.get("custom_label", col),
+                                    "show_label": existing_s.get("show_label", True)
+                                }
+                            style = st.session_state.obs_col_styles[col]
+                            st.markdown(f"**Sloupec: {col}**")
+                            sc1, sc2, sc3 = st.columns([1.2, 1.4, 1.4])
+                            with sc1:
+                                style["bold"] = st.checkbox("Tučné", value=style["bold"], key=f"obs_style_bold_{col}")
+                                style["italic"] = st.checkbox("Kurzíva", value=style["italic"], key=f"obs_style_italic_{col}")
+                            with sc2:
+                                sizes = ["Výchozí", "Malé (12px)", "Střední (16px)", "Velké (20px)", "Obrovské (24px)"]
+                                current_idx = sizes.index(style["size"]) if style["size"] in sizes else 0
+                                style["size"] = st.selectbox(
+                                    "Velikost písma:",
+                                    sizes,
+                                    index=current_idx,
+                                    key=f"obs_style_size_{col}"
+                                )
+                            with sc3:
+                                style["show_label"] = st.checkbox("Zobrazit název pole", value=style["show_label"], key=f"obs_style_show_lbl_{col}")
+                                style["custom_label"] = st.text_input("Vlastní název pole:", value=style["custom_label"], key=f"obs_style_cust_lbl_{col}")
+
+                c_opt1, c_opt2 = st.columns(2)
+                with c_opt1:
+                    obs_include_index = st.checkbox("Vytvořit hlavní rejstřík (00_Atlas_a_Prehled.md)", value=True, key="obs_include_index_cb")
+                with c_opt2:
+                    obs_include_guide = st.checkbox("Připojit návod pro iPhone (00_NAVOD_JAK_POUZIVAT.md)", value=True, key="obs_include_guide_cb")
+
+                with st.expander("📱 Dvě možnosti použití zdarma (Obsidian & Karty.html)", expanded=False):
+                    st.markdown("""
+                    **1. Samostatný přehrávač (Karty.html):**
+                    - Přibalen přímo uvnitř vygenerovaného `.zip` souboru jako `index.html`.
+                    - Stačí balíček stáhnout a otevřít v jakémkoliv prohlížeči na mobilu i PC.
+                    - Žádná instalace ani registrace, 100% offline, chytré opakování (SM-2), zvětšování fotografií klepnutím, podpora více balíčků najednou.
+
+                    **2. Aplikace Obsidian (iOS / Android / PC):**
+                    - Bezplatná aplikace z App Store / Google Play.
+                    - Složku z balíčku otevřete v Obsidianu jako nový trezor (*Vault*).
+                    - V komunitních doplňcích zapnete *Spaced Repetition*.
+                    """)
+                    st.caption("💡 **Tip ke stažení:** Samostatný soubor přehrávače si můžete stáhnout níže v rozbalovací záložce **🛠️ Doplňkové nástroje** (nebo využít soubor `index.html` zabalený přímo v exportovaném .zip archivu).")
+                    st.caption("ℹ️ **Webový přehrávač (Karty.html)** slouží pro rychlé, bezpečné a pohodlné offline procvičování přímo ve webovém prohlížeči (na PC, mobilu i tabletu).")
+
+            with col_obs_right:
+                st.markdown("#### Vizuální náhled kartičky")
+                if st.session_state.obs_front_cols_ordered or st.session_state.obs_back_cols_ordered:
+                    c_prev_r1, c_prev_r2 = st.columns([2, 1])
+                    with c_prev_r1:
+                        obs_row_idx = st.number_input(
+                            f"Náhled pro řádek (1 z {len(df)}):",
+                            min_value=1,
+                            max_value=max(1, len(df)),
+                            value=1,
+                            step=1,
+                            key="obs_card_preview_row_selector"
+                        ) - 1
+                    with c_prev_r2:
+                        st.caption("Živý náhled v reálném čase")
+
+                    preview_row = df.iloc[obs_row_idx]
+                    show_media_attr_val = st.session_state.get("show_media_attribution", True)
+
+                    preview_bg = "#ffffff" if is_light_ui else "#2f2f31"
+                    preview_fg = "#111d14" if is_light_ui else "#f4faf6"
+                    preview_border = "#cfe0d5" if is_light_ui else "#23362b"
+                    preview_label = "#2d5438" if is_light_ui else "#8da897"
+
+                    def get_obs_value_css(c):
+                        s = st.session_state.obs_col_styles.get(c, {})
+                        css_parts = []
+                        if s.get("bold"): css_parts.append("font-weight: bold")
+                        if s.get("italic"): css_parts.append("font-style: italic")
+                        size = s.get("size", "Výchozí")
+                        if size == "Malé (12px)": css_parts.append("font-size: 12px")
+                        elif size == "Střední (16px)": css_parts.append("font-size: 16px")
+                        elif size == "Velké (20px)": css_parts.append("font-size: 20px")
+                        elif size == "Obrovské (24px)": css_parts.append("font-size: 24px")
+                        return "; ".join(css_parts)
+
+                    tab_prev_front_obs, tab_prev_back_obs = st.tabs(["Líc", "Rub"])
+
+                    with tab_prev_front_obs:
+                        with st.container(border=True):
+                            if not st.session_state.obs_front_cols_ordered:
+                                st.caption("Na líci nejsou vybrány žádné sloupce.")
+                            for c in st.session_state.obs_front_cols_ordered:
+                                val = preview_row[c] if c in preview_row else ""
+                                if pd.isna(val) or str(val).strip() == "":
+                                    continue
+
+                                show_label = True
+                                label_text = c
+                                if c in st.session_state.obs_col_styles:
+                                    show_label = st.session_state.obs_col_styles[c].get("show_label", True)
+                                    label_text = st.session_state.obs_col_styles[c].get("custom_label", c) or c
+
+                                val_css = get_obs_value_css(c)
+                                val_style_attr = f' style="{val_css}; color: {preview_fg} !important;"' if val_css else f' style="color: {preview_fg} !important;"'
+                                label_html = f'<span style="font-size: 11px; font-weight: 600; color: {preview_label}; text-transform: uppercase; border-bottom: 1px solid {preview_border}; display: block; margin-bottom: 4px; padding-bottom: 2px;">{label_text}</span>' if show_label else ''
+
+                                if check_col_is_image(c, df) or is_image_col(c, val):
+                                    raw_entries = [u.strip() for u in str(val).split(';') if u.strip()]
+                                    if label_html:
+                                        st.markdown(label_html, unsafe_allow_html=True)
+                                    for entry in raw_entries:
+                                        u_parts = entry.split('|', 1)
+                                        img_url = u_parts[0].strip()
+                                        attr_txt = u_parts[1].strip() if len(u_parts) > 1 else ""
+                                        img_src = format_img_src_for_html(img_url)
+                                        caption_html = f'<div style="font-size: 10px; color: {preview_label}; margin-top: 3px; text-align: center; opacity: 0.85;">{attr_txt}</div>' if (show_media_attr_val and attr_txt) else ''
+                                        st.markdown(f'<div style="width: 100%; max-width: 450px; border-radius: 6px; overflow: hidden; border: 1px solid {preview_border}; margin: 8px 0; padding-bottom: 4px;"><img src="{img_src}" style="width: 100%; height: auto; object-fit: contain; display: block;">{caption_html}</div>', unsafe_allow_html=True)
+                                elif c in ["[Pladias] Mapa rozšíření", "[Pladias.cz] Mapa rozšíření"]:
+                                    if label_html:
+                                        st.markdown(label_html, unsafe_allow_html=True)
+                                    map_species = ""
+                                    if "distribution/" in str(val):
+                                        map_species = str(val).split("distribution/")[-1].split("?")[0].strip().replace("%20", " ")
+                                    if not map_species and columns:
+                                        map_species = str(preview_row.get(columns[0], "")).strip()
+                                    map_img_path = get_or_render_pladias_map_image(map_species)
+                                    if map_img_path and os.path.isfile(map_img_path):
+                                        img_src = format_img_src_for_html(map_img_path)
+                                        st.markdown(f'<div style="width: 100%; max-width: 450px; border-radius: 6px; overflow: hidden; border: 1px solid {preview_border}; margin: 8px 0; padding-bottom: 4px;"><img src="{img_src}" style="width: 100%; height: auto; object-fit: contain; display: block;"><div style="font-size: 10px; color: {preview_label}; margin-top: 3px; text-align: center; opacity: 0.85;">Pladias.cz • Mapa rozšíření ČR</div></div>', unsafe_allow_html=True)
+                                    else:
+                                        st.markdown(f'<div style="padding: 10px; border-radius: 6px; border: 1px solid {preview_border}; background: rgba(0,0,0,0.04); margin: 6px 0;"><a href="{val}" target="_blank" style="color: #48a973; font-weight: 600; text-decoration: underline;">Zobrazit mapu rozšíření na Pladias.cz ({map_species})</a></div>', unsafe_allow_html=True)
+                                elif c in ["[iNaturalist] Mapa nálezů", "[iNaturalist] Mapa pozorování", "[iNat] Mapa pozorování"] or ("inat" in str(c).lower() and "map" in str(c).lower()):
+                                    if label_html:
+                                        st.markdown(label_html, unsafe_allow_html=True)
+                                    map_species = str(preview_row.get(columns[0], "")).strip() if columns else ""
+                                    map_img_path = get_or_render_inat_map_image(map_species, str(val))
+                                    if map_img_path and os.path.isfile(map_img_path):
+                                        img_src = format_img_src_for_html(map_img_path)
+                                        st.markdown(f'<div style="width: 100%; max-width: 450px; border-radius: 6px; overflow: hidden; border: 1px solid {preview_border}; margin: 8px 0; padding-bottom: 4px;"><img src="{img_src}" style="width: 100%; height: auto; object-fit: contain; display: block;"><div style="font-size: 10px; color: {preview_label}; margin-top: 3px; text-align: center; opacity: 0.85;">iNaturalist.org • Mapa pozorování</div></div>', unsafe_allow_html=True)
+                                    else:
+                                        st.markdown(f'<div style="padding: 10px; border-radius: 6px; border: 1px solid {preview_border}; background: rgba(0,0,0,0.04); margin: 6px 0;"><a href="{val}" target="_blank" style="color: #48a973; font-weight: 600; text-decoration: underline;">Zobrazit mapu pozorování na iNaturalist.org</a></div>', unsafe_allow_html=True)
+                                else:
+                                    if label_html:
+                                        st.markdown(label_html, unsafe_allow_html=True)
+                                    val_str = str(val)
+                                    if val_str.startswith("http://") or val_str.startswith("https://"):
+                                        st.markdown(f'<div{val_style_attr}><a href="{val_str}" target="_blank" style="color: #48a973; font-weight: 600; text-decoration: underline;">{val_str}</a></div>', unsafe_allow_html=True)
+                                    else:
+                                        st.markdown(f'<div{val_style_attr}>{val_str}</div>', unsafe_allow_html=True)
+
+                    with tab_prev_back_obs:
+                        with st.container(border=True):
+                            if not st.session_state.obs_back_cols_ordered:
+                                st.caption("Na rubu nejsou vybrány žádné sloupce.")
+                            for c in st.session_state.obs_back_cols_ordered:
+                                val = preview_row[c] if c in preview_row else ""
+                                if pd.isna(val) or str(val).strip() == "":
+                                    continue
+
+                                show_label = True
+                                label_text = c
+                                if c in st.session_state.obs_col_styles:
+                                    show_label = st.session_state.obs_col_styles[c].get("show_label", True)
+                                    label_text = st.session_state.obs_col_styles[c].get("custom_label", c) or c
+
+                                val_css = get_obs_value_css(c)
+                                val_style_attr = f' style="{val_css}; color: {preview_fg} !important;"' if val_css else f' style="color: {preview_fg} !important;"'
+                                label_html = f'<span style="font-size: 11px; font-weight: 600; color: {preview_label}; text-transform: uppercase; border-bottom: 1px solid {preview_border}; display: block; margin-bottom: 4px; padding-bottom: 2px;">{label_text}</span>' if show_label else ''
+
+                                if check_col_is_image(c, df) or is_image_col(c, val):
+                                    raw_entries = [u.strip() for u in str(val).split(';') if u.strip()]
+                                    if label_html:
+                                        st.markdown(label_html, unsafe_allow_html=True)
+                                    for entry in raw_entries:
+                                        u_parts = entry.split('|', 1)
+                                        img_url = u_parts[0].strip()
+                                        attr_txt = u_parts[1].strip() if len(u_parts) > 1 else ""
+                                        img_src = format_img_src_for_html(img_url)
+                                        caption_html = f'<div style="font-size: 10px; color: {preview_label}; margin-top: 3px; text-align: center; opacity: 0.85;">{attr_txt}</div>' if (show_media_attr_val and attr_txt) else ''
+                                        st.markdown(f'<div style="width: 100%; max-width: 450px; border-radius: 6px; overflow: hidden; border: 1px solid {preview_border}; margin: 8px 0; padding-bottom: 4px;"><img src="{img_src}" style="width: 100%; height: auto; object-fit: contain; display: block;">{caption_html}</div>', unsafe_allow_html=True)
+                                elif c in ["[Pladias] Mapa rozšíření", "[Pladias.cz] Mapa rozšíření"]:
+                                    if label_html:
+                                        st.markdown(label_html, unsafe_allow_html=True)
+                                    map_species = ""
+                                    if "distribution/" in str(val):
+                                        map_species = str(val).split("distribution/")[-1].split("?")[0].strip().replace("%20", " ")
+                                    if not map_species and columns:
+                                        map_species = str(preview_row.get(columns[0], "")).strip()
+                                    map_img_path = get_or_render_pladias_map_image(map_species)
+                                    if map_img_path and os.path.isfile(map_img_path):
+                                        img_src = format_img_src_for_html(map_img_path)
+                                        st.markdown(f'<div style="width: 100%; max-width: 450px; border-radius: 6px; overflow: hidden; border: 1px solid {preview_border}; margin: 8px 0; padding-bottom: 4px;"><img src="{img_src}" style="width: 100%; height: auto; object-fit: contain; display: block;"><div style="font-size: 10px; color: {preview_label}; margin-top: 3px; text-align: center; opacity: 0.85;">Pladias.cz • Mapa rozšíření ČR</div></div>', unsafe_allow_html=True)
+                                    else:
+                                        st.markdown(f'<div style="padding: 10px; border-radius: 6px; border: 1px solid {preview_border}; background: rgba(0,0,0,0.04); margin: 6px 0;"><a href="{val}" target="_blank" style="color: #48a973; font-weight: 600; text-decoration: underline;">Zobrazit mapu rozšíření na Pladias.cz ({map_species})</a></div>', unsafe_allow_html=True)
+                                elif c in ["[iNaturalist] Mapa nálezů", "[iNaturalist] Mapa pozorování", "[iNat] Mapa pozorování"] or ("inat" in str(c).lower() and "map" in str(c).lower()):
+                                    if label_html:
+                                        st.markdown(label_html, unsafe_allow_html=True)
+                                    map_species = str(preview_row.get(columns[0], "")).strip() if columns else ""
+                                    map_img_path = get_or_render_inat_map_image(map_species, str(val))
+                                    if map_img_path and os.path.isfile(map_img_path):
+                                        img_src = format_img_src_for_html(map_img_path)
+                                        st.markdown(f'<div style="width: 100%; max-width: 450px; border-radius: 6px; overflow: hidden; border: 1px solid {preview_border}; margin: 8px 0; padding-bottom: 4px;"><img src="{img_src}" style="width: 100%; height: auto; object-fit: contain; display: block;"><div style="font-size: 10px; color: {preview_label}; margin-top: 3px; text-align: center; opacity: 0.85;">iNaturalist.org • Mapa pozorování</div></div>', unsafe_allow_html=True)
+                                    else:
+                                        st.markdown(f'<div style="padding: 10px; border-radius: 6px; border: 1px solid {preview_border}; background: rgba(0,0,0,0.04); margin: 6px 0;"><a href="{val}" target="_blank" style="color: #48a973; font-weight: 600; text-decoration: underline;">Zobrazit mapu pozorování na iNaturalist.org</a></div>', unsafe_allow_html=True)
+                                else:
+                                    if label_html:
+                                        st.markdown(label_html, unsafe_allow_html=True)
+                                    val_str = str(val)
+                                    if val_str.startswith("http://") or val_str.startswith("https://"):
+                                        st.markdown(f'<div{val_style_attr}><a href="{val_str}" target="_blank" style="color: #48a973; font-weight: 600; text-decoration: underline;">{val_str}</a></div>', unsafe_allow_html=True)
+                                    else:
+                                        st.markdown(f'<div{val_style_attr}>{val_str}</div>', unsafe_allow_html=True)
+
+            st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+            btn_gen_obs_clicked = st.button("Generovat balíček pro Obsidian (.zip)", key="btn_gen_obsidian", use_container_width=True, type="primary")
+
+            if btn_gen_obs_clicked:
+                if not obs_front_cols and not obs_back_cols:
+                    st.error("Musíte vybrat alespoň jeden sloupec pro otázku (líc) nebo odpověď (rub).")
+                else:
+                    temp_dir = tempfile.mkdtemp()
+                    media_dir = os.path.join(temp_dir, "media")
+                    os.makedirs(media_dir, exist_ok=True)
+
+                    progress_bar = st.progress(0.0)
+                    status = st.empty()
+
+                    status.text("Připravuji seznam médií pro Obsidian...")
+                    media_tasks = {}
+                    effective_front = st.session_state.obs_front_cols_ordered
+                    effective_back = st.session_state.obs_back_cols_ordered
+                    active_cols = list(dict.fromkeys(effective_front + effective_back))
+
+                    for idx, row in df.iterrows():
+                        for col in active_cols:
+                            val = row[col]
+                            if pd.isna(val) or str(val).strip() == "" or str(val).lower() == "nan":
+                                continue
+                            if check_col_is_image(col, df) or is_image_col(col, val):
+                                raw_entries = [u.strip() for u in str(val).split(';') if u.strip()]
+                                for pos, entry in enumerate(raw_entries):
+                                    raw_u = entry.split('|')[0].strip()
+                                    if not raw_u: continue
+                                    sp_clean = slugify(str(row.iloc[0])) if len(row) > 0 else f"item_{idx}"
+                                    ext = ".jpg"
+                                    if raw_u.lower().endswith(".png"): ext = ".png"
+                                    elif raw_u.lower().endswith(".webp"): ext = ".webp"
+                                    media_tasks[raw_u] = os.path.join(media_dir, f"{sp_clean}_{slugify(col)}_{pos}{ext}")
+
+                    total_m = len(media_tasks)
+                    if total_m > 0:
+                        status.text(f"Stahuji multimediální soubory (0/{total_m})...")
+                        workers = min(12, os.cpu_count() * 2 if os.cpu_count() else 4)
+                        done_m = 0
+                        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+                            future_to_url = {executor.submit(download_media_file, u, p): u for u, p in media_tasks.items()}
+                            for future in concurrent.futures.as_completed(future_to_url):
+                                done_m += 1
+                                progress_bar.progress(done_m / float(total_m) * 0.7)
+                                status.text(f"Stahuji multimediální soubory ({done_m}/{total_m})...")
+                                try:
+                                    future.result()
+                                except Exception:
+                                    pass
+
+                    progress_bar.progress(0.85)
+                    status.text("Vytvářím Markdown karty a balíček .zip pro Obsidian...")
+
+                    out_zip_filename = f"{slugify(obs_vault_name) or 'Studijni_Karticky'}.zip"
+                    out_zip_path = os.path.join(temp_dir, out_zip_filename)
+
+                    sel_card_sep = "??" if "Obousměrné" in st.session_state.get("obs_card_sep_radio", "") else "?"
+                    generate_obsidian_vault_zip(
+                        df=df,
+                        output_zip_path=out_zip_path,
+                        vault_name=obs_vault_name or "Studijni_Karticky",
+                        front_cols=effective_front,
+                        back_cols=effective_back,
+                        col_styles=st.session_state.obs_col_styles,
+                        media_tasks=media_tasks,
+                        include_guide=obs_include_guide,
+                        include_index=obs_include_index,
+                        card_separator=sel_card_sep
+                    )
+
+                    with open(out_zip_path, "rb") as f_zip:
+                        zip_bytes = f_zip.read()
+
+                    st.session_state.generated_obsidian_data = zip_bytes
+                    st.session_state.generated_obsidian_filename = out_zip_filename
+
+                    progress_bar.progress(1.0)
+                    status.text("Balíček pro Obsidian byl úspěšně vygenerován.")
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                    st.success("Balíček pro Obsidian (.zip) byl úspěšně vytvořen a je připraven ke stažení!")
+                    st.rerun()
 
         with tab_pdf:
             col_pdf_left, col_pdf_right = st.columns([1.1, 0.9], gap="large")
@@ -10331,21 +12002,83 @@ if st.session_state.df is not None:
                 )
                 sync_ordered_cols(pdf_cols_selected, "pdf_cols_ordered")
 
-                with st.expander("Změnit pořadí sloupců v brožuře (▲ / ▼)", expanded=False):
+                with st.expander("↕️ Změnit pořadí sloupců v brožuře", expanded=False):
+                    st.caption("Sloupce se v brožuře zobrazí v tomto pořadí. Pořadí můžete měnit tlačítky na začátek/konec nebo o jednu pozici:")
                     for i_p, c_p in enumerate(st.session_state.pdf_cols_ordered):
-                        c_pn, c_pu, c_pd = st.columns([6, 1, 1])
+                        c_pn, c_pt, c_pu, c_pd, c_pb = st.columns([5, 1, 1, 1, 1])
                         with c_pn:
-                            st.write(f"**{c_p}**")
+                            st.write(f"**{i_p + 1}.** {c_p}")
+                        with c_pt:
+                            if st.button("⇪", key=f"top_pdf_col_{c_p}_{i_p}", help="Přesunout na začátek"):
+                                if i_p > 0:
+                                    val_c = st.session_state.pdf_cols_ordered.pop(i_p)
+                                    st.session_state.pdf_cols_ordered.insert(0, val_c)
+                                    st.rerun()
                         with c_pu:
-                            if st.button("▲", key=f"up_pdf_col_{c_p}_{i_p}"):
+                            if st.button("▲", key=f"up_pdf_col_{c_p}_{i_p}", help="Posunout o 1 výše"):
                                 if i_p > 0:
                                     st.session_state.pdf_cols_ordered[i_p], st.session_state.pdf_cols_ordered[i_p-1] = st.session_state.pdf_cols_ordered[i_p-1], st.session_state.pdf_cols_ordered[i_p]
                                     st.rerun()
                         with c_pd:
-                            if st.button("▼", key=f"down_pdf_col_{c_p}_{i_p}"):
+                            if st.button("▼", key=f"down_pdf_col_{c_p}_{i_p}", help="Posunout o 1 níže"):
                                 if i_p < len(st.session_state.pdf_cols_ordered) - 1:
                                     st.session_state.pdf_cols_ordered[i_p], st.session_state.pdf_cols_ordered[i_p+1] = st.session_state.pdf_cols_ordered[i_p+1], st.session_state.pdf_cols_ordered[i_p]
                                     st.rerun()
+                        with c_pb:
+                            if st.button("⇩", key=f"bot_pdf_col_{c_p}_{i_p}", help="Přesunout na konec"):
+                                if i_p < len(st.session_state.pdf_cols_ordered) - 1:
+                                    val_c = st.session_state.pdf_cols_ordered.pop(i_p)
+                                    st.session_state.pdf_cols_ordered.append(val_c)
+                                    st.rerun()
+
+                if "pdf_col_styles" not in st.session_state:
+                    st.session_state.pdf_col_styles = {}
+
+                with st.expander("⚙️ Formátování sloupců v PDF (tabulka vs. samostatný text, tučně, kurzíva)", expanded=False):
+                    st.caption("Nastavte, zda se má sloupec vložit do přehledové tabulky vlastností nebo jako samostatný odstavec textu, a upravte styl písma či popisek.")
+                    display_opts = ["Automaticky", "Do tabulky vlastností", "Jako samostatný text"]
+                    display_map = {"Automaticky": "auto", "Do tabulky vlastností": "table", "Jako samostatný text": "text"}
+                    display_rev = {"auto": "Automaticky", "table": "Do tabulky vlastností", "text": "Jako samostatný text"}
+
+                    style_opts = ["Normální (výchozí)", "Tučně (bold)", "Kurzívou (italic)", "Tučná kurzíva"]
+                    style_map = {"Normální (výchozí)": "normal", "Tučně (bold)": "bold", "Kurzívou (italic)": "italic", "Tučná kurzíva": "bold_italic"}
+                    style_rev = {"normal": "Normální (výchozí)", "bold": "Tučně (bold)", "italic": "Kurzívou (italic)", "bold_italic": "Tučná kurzíva"}
+
+                    for col in st.session_state.pdf_cols_ordered:
+                        if col not in st.session_state.pdf_col_styles:
+                            st.session_state.pdf_col_styles[col] = {
+                                "display": "auto",
+                                "style": "normal",
+                                "custom_label": col
+                            }
+                        cfg = st.session_state.pdf_col_styles[col]
+                        st.markdown(f"**{col}**")
+                        fc1, fc2, fc3 = st.columns([1.3, 1.2, 1.5])
+                        with fc1:
+                            cur_disp = display_rev.get(cfg.get("display", "auto"), "Automaticky")
+                            new_disp = st.selectbox(
+                                "Zobrazení:",
+                                display_opts,
+                                index=display_opts.index(cur_disp) if cur_disp in display_opts else 0,
+                                key=f"pdf_disp_{col}"
+                            )
+                            cfg["display"] = display_map.get(new_disp, "auto")
+                        with fc2:
+                            cur_style = style_rev.get(cfg.get("style", "normal"), "Normální (výchozí)")
+                            new_style = st.selectbox(
+                                "Styl textu:",
+                                style_opts,
+                                index=style_opts.index(cur_style) if cur_style in style_opts else 0,
+                                key=f"pdf_style_{col}"
+                            )
+                            cfg["style"] = style_map.get(new_style, "normal")
+                        with fc3:
+                            new_lbl = st.text_input(
+                                "Vlastní popisek:",
+                                value=cfg.get("custom_label", col),
+                                key=f"pdf_lbl_{col}"
+                            )
+                            cfg["custom_label"] = new_lbl
 
                 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
                 st.markdown("##### Záhlaví a texty")
@@ -10412,6 +12145,18 @@ if st.session_state.df is not None:
                         key="w_pdf_img_size",
                         help="Umožňuje zvětšit fotografie až na celou plochu stránky nebo je zmenšit ve prospěch textu."
                     )
+                    pdf_max_imgs_choice = st.selectbox(
+                        "Počet fotografií a map na druh:",
+                        [
+                            "Až 6 (doporučeno: 4 fotky + 2 mapy)",
+                            "Až 4 (klasická mřížka 2×2 s předností map)",
+                            "Až 2 (dominantní velká zobrazení)",
+                            "Pouze 1 (hlavní foto / mapa)"
+                        ],
+                        index=0,
+                        key="w_pdf_max_imgs",
+                        help="Zajišťuje, že se mapy rozšíření ČR a pozorování iNaturalist nevynechají na úkor fotografií. Při volbě 'Až 6' se zobrazí až 4 fotografie i obě mapy současně."
+                    )
 
                 st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
                 st.markdown("##### Doplňkové prvky")
@@ -10424,9 +12169,37 @@ if st.session_state.df is not None:
                     pdf_include_attributions = st.checkbox("Zobrazovat autory a licence (CC) pod fotkami", value=True, key="w_pdf_inc_attr")
 
             st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
-            btn_generate_pdf_clicked = st.button("Generovat PDF brožuru (.pdf)", key="btn_generate_pdf", use_container_width=True, type="primary")
+            col_p_btn1, col_p_btn2 = st.columns([1, 1], gap="medium")
+            with col_p_btn1:
+                btn_preview_pdf_clicked = st.button("👁️ Rychlý náhled 1. položky (PDF)", key="btn_preview_pdf", use_container_width=True)
+            with col_p_btn2:
+                btn_generate_pdf_clicked = st.button("📖 Generovat celou PDF brožuru (.pdf)", key="btn_generate_pdf", use_container_width=True, type="primary")
 
-            if btn_generate_pdf_clicked:
+            if st.session_state.get('pdf_preview_data') is not None:
+                with st.expander("👁️ Interaktivní náhled PDF (1. položka)", expanded=True):
+                    col_prev_dl, col_prev_cls = st.columns([3, 1])
+                    with col_prev_dl:
+                        st.download_button(
+                            label="⬇️ Stáhnout náhled v PDF",
+                            data=st.session_state.pdf_preview_data,
+                            file_name=st.session_state.get('pdf_preview_filename', 'nahled_brozury.pdf'),
+                            mime="application/pdf",
+                            key="dl_btn_pdf_preview"
+                        )
+                    with col_prev_cls:
+                        if st.button("❌ Zavřít náhled", key="btn_close_pdf_preview"):
+                            st.session_state.pdf_preview_data = None
+                            st.rerun()
+                    b64_pdf = base64.b64encode(st.session_state.pdf_preview_data).decode('utf-8')
+                    st.markdown(
+                        f'<iframe src="data:application/pdf;base64,{b64_pdf}#toolbar=1&navpanes=0" width="100%" height="700px" style="border: 1px solid #cbd5e1; border-radius: 8px;"></iframe>',
+                        unsafe_allow_html=True
+                    )
+
+            if btn_generate_pdf_clicked or btn_preview_pdf_clicked:
+                is_preview = bool(btn_preview_pdf_clicked)
+                target_df = df.head(1).copy() if is_preview else df
+
                 st.session_state.api_errors = []
                 active_cols_pdf = st.session_state.get('pdf_cols_ordered', list(dict.fromkeys(st.session_state.front_cols_ordered + st.session_state.back_cols_ordered)))
                 if not active_cols_pdf:
@@ -10439,24 +12212,30 @@ if st.session_state.df is not None:
                     progress_bar = st.progress(0.0)
                     status = st.empty()
 
-                    # FÁZE 1: Sběr fotografií a médií
-                    status.text("Připravuji seznam fotografií ke stažení do PDF...")
+                    status.text("Připravuji seznam fotografií ke stažení do PDF..." if not is_preview else "Připravuji média pro náhled...")
                     media_tasks = {}
                     media_attributions = {}
 
-                    for idx, row in df.iterrows():
+                    for idx, row in target_df.iterrows():
                         for col in active_cols_pdf:
                             val = row[col]
                             if pd.isna(val) or str(val).strip() == "" or str(val).lower() == "nan":
                                 continue
-                            # Pladias mapa
+
                             if col in ["[Pladias] Mapa rozšíření", "[Pladias.cz] Mapa rozšíření"]:
                                 species_col = st.session_state.api_config.get("pladias_map_col", columns[0])
                                 raw_species = str(row[species_col]).strip() if species_col in row else str(val).strip()
                                 clean_species = slugify_species_name(raw_species) if raw_species else f"druh_{idx}"
                                 safe_filename = f"{clean_species}_pladias_map_{idx}.jpg"
                                 media_tasks[safe_filename] = (raw_species, 'pladias_map')
-                            # GBIF orgánové fotky
+
+                            elif col in ["[iNaturalist] Mapa nálezů", "[iNaturalist] Mapa pozorování", "[iNat] Mapa pozorování"] or ("inat" in str(col).lower() and "map" in str(col).lower()):
+                                species_col = st.session_state.api_config.get("inat_col", columns[0])
+                                raw_species = str(row[species_col]).strip() if species_col in row else ""
+                                clean_species = slugify_species_name(raw_species) if raw_species else f"druh_{idx}"
+                                safe_filename = f"{clean_species}_inat_map_{idx}.jpg"
+                                media_tasks[safe_filename] = (str(val).strip(), 'inat_map', raw_species)
+
                             elif col in ["[GBIF] Habitus", "[GBIF] Květ", "[GBIF] List", "[GBIF] Plod", "[GBIF] Herbář"] and is_image_col(col, val):
                                 raw_entries = [u.strip() for u in str(val).split(';') if u.strip()]
                                 organ_map = {"[GBIF] Habitus": "habitus", "[GBIF] Květ": "kvet", "[GBIF] List": "list", "[GBIF] Plod": "plod", "[GBIF] Herbář": "herbar"}
@@ -10480,7 +12259,7 @@ if st.session_state.df is not None:
                                         media_tasks[safe_filename] = (url, 'image')
                                         if attr_txt:
                                             media_attributions[safe_filename] = attr_txt
-                            # Běžné fotky (iNaturalist, Wikimedia, GBIF Zoo/Houby...)
+
                             elif is_image_col(col, val):
                                 raw_entries = [u.strip() for u in str(val).split(';') if u.strip()]
                                 raw_sp_name = str(row[columns[0]]).strip() if len(columns) > 0 else f"druh_{idx}"
@@ -10513,20 +12292,26 @@ if st.session_state.df is not None:
                                         if attr_txt:
                                             media_attributions[safe_filename] = attr_txt
 
-                    # FÁZE 2: Paralelní stažení a optimalizace obrázků
                     total_tasks = len(media_tasks)
                     if total_tasks > 0:
                         status.text(f"Stahuji a optimalizuji obrázky pro PDF (0/{total_tasks})...")
                         progress_bar.progress(0.0)
 
                         def _download_pdf_img(item):
-                            fname, (url, mtype) = item
+                            fname, task_data = item
+                            url = task_data[0]
+                            mtype = task_data[1]
                             local_path = os.path.join(media_dir, fname)
                             if os.path.exists(local_path) and os.path.getsize(local_path) > 0:
                                 return fname, local_path, True
                             try:
                                 if mtype == 'pladias_map':
                                     if render_pladias_distribution_map(url, local_path):
+                                        return fname, local_path, True
+                                    return fname, local_path, False
+                                elif mtype == 'inat_map':
+                                    extra_sp = task_data[2] if len(task_data) > 2 else ""
+                                    if render_inat_observation_map(url, local_path, species_name=extra_sp):
                                         return fname, local_path, True
                                     return fname, local_path, False
                                 elif mtype == 'local_image':
@@ -10555,8 +12340,7 @@ if st.session_state.df is not None:
                             except concurrent.futures.TimeoutError:
                                 pass
 
-                    # FÁZE 3: Sestavení PDF dokumentu
-                    status.text("Sázím a generuji PDF brožuru...")
+                    status.text("Sázím a generuji PDF..." if is_preview else "Sázím a generuji PDF brožuru...")
                     progress_bar.progress(1.0)
 
                     if "Dvojstrana" in pdf_layout_choice:
@@ -10575,7 +12359,7 @@ if st.session_state.df is not None:
 
                     try:
                         generate_pdf_booklet(
-                            df=df,
+                            df=target_df,
                             output_pdf_path=pdf_path,
                             title=pdf_title_input,
                             subtitle=pdf_custom_desc,
@@ -10584,31 +12368,35 @@ if st.session_state.df is not None:
                             page_format=page_fmt_param,
                             imposition_mode=pdf_imposition_choice,
                             font_scale=font_scale_val,
-                            include_toc=pdf_include_toc,
+                            include_toc=(False if is_preview else pdf_include_toc),
                             media_dir=media_dir,
                             media_attributions=media_attributions,
                             media_tasks=media_tasks,
-                            include_citations=pdf_include_citations,
+                            include_citations=(False if is_preview else pdf_include_citations),
                             include_media_attribution=pdf_include_attributions,
-                            col_styles=st.session_state.get('col_styles', {}),
+                            col_styles=st.session_state.get('pdf_col_styles', {}),
                             include_qr_codes=pdf_include_qr_codes,
-                            image_size_mode=pdf_img_size_choice
+                            image_size_mode=pdf_img_size_choice,
+                            max_images_mode=pdf_max_imgs_choice
                         )
 
                         with open(pdf_path, "rb") as f:
                             pdf_bytes = f.read()
 
-                        st.session_state.generated_pdf_data = pdf_bytes
-                        st.session_state.generated_pdf_filename = pdf_filename
-                        st.success("Studijní brožura v PDF byla úspěšně vygenerována.")
+                        if is_preview:
+                            st.session_state.pdf_preview_data = pdf_bytes
+                            st.session_state.pdf_preview_filename = f"nahled_{slugify(pdf_title_input)}.pdf"
+                            st.success("Rychlý náhled 1. položky v PDF byl úspěšně vygenerován.")
+                        else:
+                            st.session_state.generated_pdf_data = pdf_bytes
+                            st.session_state.generated_pdf_filename = pdf_filename
+                            st.success("Studijní brožura v PDF byla úspěšně vygenerována.")
                     except Exception as e:
                         st.error(f"Při generování PDF došlo k chybě: {e}")
 
                     shutil.rmtree(temp_dir, ignore_errors=True)
                     gc.collect()
                     st.rerun()
-
-
 
         with tab_docx:
             col_docx_left, col_docx_right = st.columns([1.1, 0.9], gap="large")
@@ -10781,9 +12569,7 @@ if st.session_state.df is not None:
                     gc.collect()
                     st.rerun()
 
-        # --- ZOBRAZENÍ STAHUJÍCÍCH TLAČÍTEK (VŽDY KDYŽ JSOU K DISPOZICI V STATE) ---
-    # --- ZOBRAZENÍ STAHUJÍCÍCH TLAČÍTEK (VŽDY KDYŽ JSOU K DISPOZICI V STATE) ---
-    if st.session_state.generated_apkg_data is not None or st.session_state.generated_pdf_data is not None or st.session_state.generated_docx_data is not None:
+    if st.session_state.generated_apkg_data is not None or st.session_state.get('generated_obsidian_data') is not None or st.session_state.generated_pdf_data is not None or st.session_state.generated_docx_data is not None:
         with st.expander("5. Stažení výsledků", expanded=False):
 
             col_res1, col_res2 = st.columns(2)
@@ -10797,6 +12583,26 @@ if st.session_state.df is not None:
                         key="download_apkg_btn"
                     )
                     st.info(f"Anki balíček obsahuje **{st.session_state.notes_count}** kartiček a **{st.session_state.media_count}** multimediálních souborů.")
+
+                if st.session_state.get('generated_obsidian_data') is not None:
+                    st.download_button(
+                        label="Stáhnout balíček kartiček (.zip – obsahuje i index.html přehrávač)",
+                        data=st.session_state.generated_obsidian_data,
+                        file_name=st.session_state.get('generated_obsidian_filename', 'Studijni_Karticky.zip'),
+                        mime="application/zip",
+                        key="download_obsidian_btn"
+                    )
+                    st.success("Balíček kartiček (.zip) je připraven. Můžete jej otevřít rovnou poklepáním na index.html uvnitř, nebo naimportovat do přehrávače či Obsidianu.")
+                    k_bytes = _read_karty_html_bytes()
+                    if k_bytes:
+                        st.download_button(
+                            label="⬇️ Stáhnout samostatný přehrávač (Karty.html)",
+                            data=k_bytes,
+                            file_name="Karty.html",
+                            mime="text/html",
+                            key="btn_download_karty_standalone_blk5"
+                        )
+                        st.caption("ℹ️ Samostatný webový přehrávač (Karty.html) funguje plně offline a umožňuje pohodlné procvičování na libovolném zařízení.")
 
                 if st.session_state.generated_pdf_data is not None:
                     st.download_button(
@@ -10836,72 +12642,135 @@ if st.session_state.df is not None:
                     for err in st.session_state.api_errors:
                         st.error(err)
 
-    # --- DOPLŇKOVÉ NÁSTROJE & POMOCNÍCI ---
     st.markdown("---")
-    with st.expander("Doplňkové nástroje: Batch Replacer (HTML aplikace)", expanded=False):
-        st.markdown("""
-        **Batch Replacer** je rychlý offline nástroj v HTML/JS pro přípravu a čištění tabulkových dat:
-        - **1. Hromadné nahrazování:** Zpracování textů podle tabulky pravidel (Najít → Nahradit).
-        - **2. Chytré párování:** Párování chyb a synonym s referenčním seznamem (Fuzzy / Levenshtein shoda s procentem jistoty).
-        - **3. Dvousloupcová kontrola:** Rychlé porovnání dvou tabulek a odhalení chybějících položek.
-        - **4. Generátor pravidel:** Automatické vytvoření pravidel ze dvou sloupců.
-        """)
-        
-        batch_replacer_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "BatchReplacer.html")
-        batch_replacer_html = None
-        if os.path.exists(batch_replacer_path):
-            try:
-                with open(batch_replacer_path, "r", encoding="utf-8") as f:
-                    batch_replacer_html = f.read()
-            except Exception:
-                pass
-                
-        if batch_replacer_html:
-            col_br1, col_br2 = st.columns([1, 2])
-            with col_br1:
+    with st.expander("🛠️ Doplňkové nástroje (Karty.html, Batch Replacer)", expanded=False):
+        c_tool1, c_tool2 = st.columns(2, gap="medium")
+
+        with c_tool1:
+            st.markdown("##### 🗂️ Samostatný přehrávač kartiček (Karty.html)")
+            st.markdown("""
+            Kompletní samostatný HTML přehrávač pro offline studium na mobilu, tabletu i počítači:
+            - **100% offline & soukromé:** Nevyžaduje instalaci, registraci ani internet.
+            - **Chytré opakování (SM-2):** Algoritmus s hodnocením Znovu / Těžké / Dobré / Snadné.
+            - **Vlastní denní limit:** Nastavení počtu nových karet za den a odhad doučení.
+            - **Otáčecí i vepisovací karty:** Možnost procvičovat psaním s vizuálním diffem.
+            - **Heatmapa & statistiky:** Kalendářní přehled učení a detailní Anki statistiky.
+            """)
+            k_bytes = _read_karty_html_bytes()
+            if k_bytes:
                 st.download_button(
-                    label="Stáhnout Batch Replacer (.html)",
-                    data=batch_replacer_html,
+                    label="⬇️ Stáhnout samostatný přehrávač (Karty.html)",
+                    data=k_bytes,
+                    file_name="Karty.html",
+                    mime="text/html",
+                    key="tools_dl_karty_html",
+                    help="Stáhne samostatný HTML soubor přehrávače kartiček pro offline použití v prohlížeči.",
+                    use_container_width=True
+                )
+                st.caption("*(Poznámka: Tento přehrávač je také automaticky přibalen uvnitř každého vygenerovaného .zip balíčku jako index.html).*")
+
+        with c_tool2:
+            st.markdown("##### 🧹 Batch Replacer (Čištění a úprava tabulek)")
+            st.markdown("""
+            Rychlý offline nástroj pro přípravu a normalizaci tabulkových dat:
+            - **1. Hromadné nahrazování:** Dávková úprava textů podle tabulky pravidel.
+            - **2. Chytré párování:** Párování synonym s referenčním seznamem (Fuzzy / Levenshtein shoda).
+            - **3. Dvousloupcová kontrola:** Rychlé porovnání tabulek a odhalení chybějících položek.
+            - **4. Generátor pravidel:** Automatické vytvoření pravidel z dvojic sloupců.
+            """)
+            br_html = _read_batch_replacer_html()
+            if br_html:
+                st.download_button(
+                    label="⬇️ Stáhnout Batch Replacer (.html)",
+                    data=br_html,
                     file_name="BatchReplacer.html",
                     mime="text/html",
-                    help="Stáhne samostatný HTML soubor, který můžete kdykoliv otevřít dvojklikem v prohlížeči doma i bez internetu.",
-                    key="download_batch_replacer_btn"
+                    key="tools_dl_batch_replacer",
+                    help="Stáhne samostatný HTML soubor pro čištění dat v prohlížeči bez internetu.",
+                    use_container_width=True
                 )
-            with col_br2:
-                st.caption("*Soubor je kompletně soběstačný (Single-file HTML). Po stažení jej stačí otevřít v libovolném prohlížeči (Chrome, Firefox, Edge).*")
+                st.caption("*(Jednosouborová HTML aplikace bez nutnosti instalace).*")
 
-    # --- BIBLIOGRAFIE, ZDROJE DAT A CITACE ---
-    st.markdown("---")
-    st.markdown("<div style='text-align: center; margin-bottom: 8px;'><span style='font-size: 0.85rem; color: #8da897;'>Dokumentace, licence a návody ke stažení</span></div>", unsafe_allow_html=True)
-    foot_c1, foot_c2, foot_c3 = st.columns([1.2, 1, 1])
-    with foot_c1:
-        cit_pdf_data = generate_citations_pdf()
-        st.download_button(
-            "Citace zdrojů a databází (PDF)",
-            data=cit_pdf_data,
-            file_name="Citace_a_databaze.pdf",
-            mime="application/pdf",
-            key="foot_dl_cit_pdf",
-            **_compat_width()
-        )
-    with foot_c2:
-        if pdf_gen_data:
+    with st.expander("📖 Návody a tipy (PDF příručky, rady pro studium a řešení problémů)", expanded=False):
+        st.markdown("#### 📚 Kompletní uživatelské příručky v PDF ke stažení")
+        st.caption("Všechny příručky jsou zpracovány s plnou podporou české diakritiky, obsahují přehledné kapitoly, postupy a doporučení.")
+
+        col_m1, col_m2, col_m3, col_m4 = st.columns(4, gap="small")
+        with col_m1:
+            if pdf_gen_data:
+                st.download_button(
+                    "📗 Návod: Generátor (PDF)",
+                    data=pdf_gen_data,
+                    file_name="O_generatoru.pdf",
+                    mime="application/pdf",
+                    key="man_dl_gen_pdf",
+                    use_container_width=True
+                )
+        with col_m2:
+            if pdf_anki_data:
+                st.download_button(
+                    "📘 Návod: Jak na Anki (PDF)",
+                    data=pdf_anki_data,
+                    file_name="O_Anki.pdf",
+                    mime="application/pdf",
+                    key="man_dl_anki_pdf",
+                    use_container_width=True
+                )
+        with col_m3:
+            if 'pdf_karty_data' in locals() and pdf_karty_data:
+                st.download_button(
+                    "📙 Návod: Karty.html (PDF)",
+                    data=pdf_karty_data,
+                    file_name="O_Karty_html.pdf",
+                    mime="application/pdf",
+                    key="man_dl_karty_pdf",
+                    use_container_width=True
+                )
+        with col_m4:
+            cit_pdf_data = generate_citations_pdf()
             st.download_button(
-                "Návod: Generátor (PDF)",
-                data=pdf_gen_data,
-                file_name="O_generatoru.pdf",
+                "📄 Citace zdrojů (PDF)",
+                data=cit_pdf_data,
+                file_name="Citace_a_databaze.pdf",
                 mime="application/pdf",
-                key="foot_dl_gen_pdf",
-                **_compat_width()
+                key="man_dl_cit_pdf",
+                use_container_width=True
             )
-    with foot_c3:
-        if pdf_anki_data:
-            st.download_button(
-                "Návod: Jak na Anki (PDF)",
-                data=pdf_anki_data,
-                file_name="O_Anki.pdf",
-                mime="application/pdf",
-                key="foot_dl_anki_pdf",
-                **_compat_width()
-            )
+
+        st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+        st.markdown("#### 💡 Rychlé tipy pro efektivní studium a řešení potíží")
+
+        c_tip_a, c_tip_b = st.columns(2, gap="medium")
+        with c_tip_a:
+            with st.container(border=True):
+                st.markdown("##### 🧠 1. Jak efektivně studovat poznávačky")
+                st.markdown("""
+                - **Aktivní vybavování (Active Recall):** Vždy se snažte vybavit jméno druhu či znaky ještě před otočením kartičky. Pouhé pasivní prohlížení vytváří falešný pocit znalosti.
+                - **Pravidelnost (Spaced Repetition):** 15 minut denně po dobu dvou týdnů je pro dlouhodobou paměť mnohem účinnější než 8 hodin biflování noc před zkouškou.
+                - **Poctivé hodnocení:** Pokud jste váhali, volte *Těžké* nebo *Znovu*. Program se postará o naplánování přesně v momentě, kdy by hrozilo zapomnění.
+                """)
+
+            with st.container(border=True):
+                st.markdown("##### 📱 2. Bezplatné používání na iPhone / iPad")
+                st.markdown("""
+                - **Možnost A (Karty.html – bez instalace):** Stáhněte si balíček pro Obsidian / Karty (.zip), v aplikaci *Soubory* na iPhonu jej rozbalte a klepněte na `index.html`. Otevře se v Safari a můžete se rovnou offline učit.
+                - **Možnost B (Obsidian):** Stáhněte si bezplatnou aplikaci Obsidian z App Store, otevřete složku balíčku jako Vault a zapněte bezplatný komunitní doplněk *Spaced Repetition*.
+                - **Možnost C (AnkiWeb):** Zaregistrujte se zdarma na [ankiweb.net](https://ankiweb.net), synchronizujte balíček z PC a v Safari na mobilu si uložte zástupce na plochu.
+                """)
+
+        with c_tip_b:
+            with st.container(border=True):
+                st.markdown("##### ⚠️ 3. Řešení hlášky 'Prosím aktualizujte na nejnovější verzi Anki'")
+                st.markdown("""
+                - **Proč se hláška objevuje?** Generátor vytváří balíčky podle moderního formátu Anki 24+ s kompresí Zstandard. Starší verze Anki na počítači (např. verze 2.1.x) tento formát nerozeznají a zobrazí upozornění.
+                - **Řešení:** Stáhněte si bezplatnou aktualizaci přímo z oficiálního webu [apps.ankiweb.net](https://apps.ankiweb.net). Aktualizace je zdarma a všechny vaše stávající balíčky i postup učení zůstanou netknuté.
+                """)
+
+            with st.container(border=True):
+                st.markdown("##### 🔄 4. Párování sloupců při slučování s novou tabulkou")
+                st.markdown("""
+                - Pokud máte v Anki rozečtený balíček a chcete k němu přidat nové druhy, nahrajte starý `.apkg` i nový Excel najednou.
+                - Generátor automaticky zachová historii zkoušení u existujících druhů a přidá nové.
+                - Pokud se sloupce jmenují jinak (např. *Poznámky* vs. *Popis*), v sekci *1. Načtení dat → Sloučení a doplnění* si můžete ručně určit propojení a nastavit prioritu, ze kterého souboru se mají data zachovat.
+                """)
 
