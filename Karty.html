@@ -1465,12 +1465,13 @@ async function renderContentToHtml(content, deckId) {
   text = text.replace(/\[(.*?)\]\((https?:\/\/.*?)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
 
   // 5. Tučné písmo **text**
+  text = text.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
+  text = text.replace(/___(.*?)___/g, '<strong><em>$1</em></strong>');
   text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-
-  // 6. Kurzíva *text*
+  text = text.replace(/__(.*?)__/g, '<strong>$1</strong>');
   text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+  text = text.replace(/_([^_]+)_/g, '<em>$1</em>');
 
-  // 7. Odstavce a řádky
   const lines = text.split('\n');
   let html = "";
   let inList = false;
