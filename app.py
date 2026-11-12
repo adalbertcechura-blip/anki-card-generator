@@ -2413,31 +2413,113 @@ def _cached_diatombase_data(species_name: str):
     if not clean_sp:
         clean_sp = str(species_name)
 
+    cz_algae_map = {
+        'diatomea': 'Bacillariophyceae', 'rozsivka': 'Bacillariophyceae', 'rozsivky': 'Bacillariophyceae',
+        'krásnoočko': 'Euglena', 'krasnoocko': 'Euglena',
+        'šroubatka': 'Spirogyra', 'sroubatka': 'Spirogyra',
+        'váleč': 'Volvox globator', 'valec': 'Volvox globator',
+        'váleč koulivý': 'Volvox globator', 'valec koulivy': 'Volvox globator',
+        'pláštěnka': 'Chlamydomonas', 'plastenka': 'Chlamydomonas',
+        'žabí vlas': 'Cladophora', 'zabi vlas': 'Cladophora',
+        'zrněnka': 'Apatococcus', 'zrnenka': 'Apatococcus',
+        'řasanka': 'Ulothrix', 'rasanka': 'Ulothrix',
+        'parožnatka': 'Chara', 'paroznatka': 'Chara',
+        'chaluha': 'Fucus', 'chaluha bublinatá': 'Fucus vesiculosus',
+        'locika mořská': 'Ulva lactuca', 'porost locikový': 'Ulva lactuca'
+    }
+    if clean_sp.lower() in cz_algae_map:
+        clean_sp = cz_algae_map[clean_sp.lower()]
+
+    # 1. Pokud je zadáno české jméno, zkusit dohledat vědecké
+    if any(ord(c) > 127 for c in clean_sp):
+        try:
+            res_sci = resolve_scientific_name(clean_sp, prefer_fungi=False)
+            if res_sci:
+                clean_sp = res_sci
+        except Exception:
+            pass
+
     headers = {'User-Agent': 'Mozilla/5.0'}
-    url_api = f'https://www.marinespecies.org/rest/AphiaRecordsByName/{urllib.parse.quote(clean_sp)}'
+    records = []
+    # 2. Dotaz na WoRMS / DiatomBase API s parametrem marine_only=false (klíčové pro sladkovodní rozsivky a řasy!)
     try:
-        r = requests.get(url_api, headers=headers, timeout=6)
+        url_api = f'https://www.marinespecies.org/rest/AphiaRecordsByName/{urllib.parse.quote(clean_sp)}?like=false&marine_only=false'
+        r = requests.get(url_api, headers=headers, timeout=7)
         if r.status_code == 200:
-            records = r.json()
-            if records and isinstance(records, list):
-                rec = next((x for x in records if x.get('status') == 'accepted'), records[0])
-                aphia_id = rec.get('AphiaID')
-                scientific_name = rec.get('scientificname', '')
-                authority = rec.get('authority', '')
-                tax_order = rec.get('order', '')
-                tax_family = rec.get('family', '')
-                tax_str = f'{tax_order}: {tax_family}' if tax_order and tax_family else (tax_family or tax_order)
-                profile_url = f'https://www.diatombase.org/aphia.php?p=taxdetails&id={aphia_id}'
+            data = r.json()
+            if isinstance(data, list):
+                records = data
+    except Exception:
+        pass
+
+    if not records:
+        try:
+            url_match = f'https://www.marinespecies.org/rest/AphiaRecordsByMatchNames?scientificnames[]={urllib.parse.quote(clean_sp)}&marine_only=false'
+            r_m = requests.get(url_match, headers=headers, timeout=7)
+            if r_m.status_code == 200:
+                data = r_m.json()
+                if isinstance(data, list) and data and isinstance(data[0], list):
+                    records = data[0]
+        except Exception:
+            pass
+
+    if records:
+        rec = next((x for x in records if x.get('status') == 'accepted'), records[0])
+        aphia_id = rec.get('AphiaID')
+        scientific_name = rec.get('scientificname', '')
+        authority = rec.get('authority', '')
+        phylum = rec.get('phylum', '')
+        tax_class = rec.get('class', '')
+        tax_order = rec.get('order', '')
+        tax_family = rec.get('family', '')
+        
+        tax_parts = [p for p in [tax_class, tax_order, tax_family] if p]
+        tax_str = " > ".join(tax_parts) if tax_parts else (tax_order or tax_family or tax_class)
+        
+        is_diatom = (phylum == 'Bacillariophyta' or 'diatom' in str(tax_class).lower() or 'bacillario' in str(tax_class).lower())
+        if is_diatom:
+            profile_url = f'https://www.diatombase.org/aphia.php?p=taxdetails&id={aphia_id}'
+            src_label = 'DiatomBase'
+        else:
+            profile_url = f'https://www.algaebase.org/search/species/?name={urllib.parse.quote(scientific_name or clean_sp)}'
+            src_label = 'AlgaeBase / WoRMS'
+            
+        return {
+            'scientific_name': scientific_name,
+            'authority': authority,
+            'status': rec.get('status', ''),
+            'url': profile_url,
+            'classification': tax_str,
+            'source': src_label
+        }
+
+    # 3. Spolehlivý fallback na GBIF taxonomii pro řasy a rozsivky
+    try:
+        url_gbif = 'https://api.gbif.org/v1/species/match'
+        r_g = requests.get(url_gbif, params={'name': clean_sp}, timeout=5)
+        if r_g.status_code == 200:
+            g = r_g.json()
+            if g.get('matchType') not in ['NONE']:
+                sci_name = g.get('scientificName', clean_sp)
+                phylum_g = g.get('phylum', '')
+                class_g = g.get('class', '')
+                order_g = g.get('order', '')
+                family_g = g.get('family', '')
+                tax_parts = [p for p in [class_g, order_g, family_g] if p]
+                tax_str = " > ".join(tax_parts) if tax_parts else (order_g or family_g or class_g)
+                is_diatom = (phylum_g == 'Bacillariophyta' or class_g == 'Bacillariophyceae')
+                profile_url = f'https://www.algaebase.org/search/species/?name={urllib.parse.quote(clean_sp)}'
                 return {
-                    'scientific_name': scientific_name,
-                    'authority': authority,
-                    'status': rec.get('status', ''),
+                    'scientific_name': sci_name,
+                    'authority': '',
+                    'status': g.get('status', 'ACCEPTED'),
                     'url': profile_url,
                     'classification': tax_str,
-                    'source': 'DiatomBase'
+                    'source': 'GBIF / DiatomBase' if is_diatom else 'GBIF / AlgaeBase'
                 }
     except Exception:
         pass
+
     return res
 
 def fetch_diatombase_data(species_name):
@@ -3087,40 +3169,61 @@ def load_local_flora_databases():
     return db
 
 def get_local_dataset_path(key_name: str) -> str:
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+    data_dir = os.path.join(app_dir, "data")
 
+    # 1. Nejprve zkontrolovat složku data/ uvnitř repozitáře (přenositelnou na GitHub i Streamlit Cloud)
     candidates = {
         "klic_2019": [
+            os.path.join(data_dir, "taxonList_legend_2025_12_15.xls"),
+            os.path.join(data_dir, "taxonList_legend_2021-07-02_MCh.xls"),
+            os.path.join(app_dir, "taxonList_legend_2025_12_15.xls"),
             r"C:\Users\adalb\Downloads\taxonList_legend_2025_12_15.xls",
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "taxonList_legend_2025_12_15.xls"),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "taxonList_legend_2025_12_15.xls")
+            r"C:\Users\adalb\Downloads\taxonList_legend_2021-07-02_MCh.xls"
         ],
         "nepuvodni": [
-            r"C:\Users\adalb\Downloads\P22401PysekSupplTableS3.xlsx",
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "P22401PysekSupplTableS3.xlsx"),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "P22401PysekSupplTableS3.xlsx")
+            os.path.join(data_dir, "P22401PysekSupplTableS3.xlsx"),
+            os.path.join(app_dir, "P22401PysekSupplTableS3.xlsx"),
+            r"C:\Users\adalb\Downloads\P22401PysekSupplTableS3.xlsx"
         ],
         "biotopy": [
-            r"C:\Users\adalb\Downloads\habitats_cz.xlsx",
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "habitats_cz.xlsx"),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "habitats_cz.xlsx")
+            os.path.join(data_dir, "habitats_cz.xlsx"),
+            os.path.join(app_dir, "habitats_cz.xlsx"),
+            r"C:\Users\adalb\Downloads\habitats_cz.xlsx"
         ],
         "ellenberg": [
-            r"C:\Users\adalb\Downloads\ekologicke_indikacni_hodnoty.xlsx",
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "ekologicke_indikacni_hodnoty.xlsx"),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "ekologicke_indikacni_hodnoty.xlsx")
+            os.path.join(data_dir, "ekologicke_indikacni_hodnoty.xlsx"),
+            os.path.join(app_dir, "ekologicke_indikacni_hodnoty.xlsx"),
+            r"C:\Users\adalb\Downloads\ekologicke_indikacni_hodnoty.xlsx"
         ],
         "cerveny_seznam": [
+            os.path.join(data_dir, "cervene-druhy-export.xlsx"),
+            os.path.join(data_dir, "Cerveny_seznam_2017_(narodni_kategorie_ohrozeni).xlsx"),
+            os.path.join(app_dir, "cervene-druhy-export.xlsx"),
+            os.path.join(app_dir, "Cerveny_seznam_2017_(narodni_kategorie_ohrozeni).xlsx"),
             r"C:\Users\adalb\Downloads\cervene-druhy-export.xlsx",
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "cervene-druhy-export.xlsx"),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "cervene-druhy-export.xlsx"),
-            r"C:\Users\adalb\Downloads\Cerveny_seznam_2017_(narodni_kategorie_ohrozeni).xlsx",
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "Cerveny_seznam_2017_(narodni_kategorie_ohrozeni).xlsx"),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "Cerveny_seznam_2017_(narodni_kategorie_ohrozeni).xlsx")
+            r"C:\Users\adalb\Downloads\Cerveny_seznam_2017_(narodni_kategorie_ohrozeni).xlsx"
         ]
     }
     for p in candidates.get(key_name, []):
-        if os.path.exists(p):
+        if p and os.path.exists(p):
             return p
+
+    # 2. Dynamické dohledání v data/ podle vzoru názvu
+    if os.path.isdir(data_dir):
+        patterns = {
+            "klic_2019": "taxonlist",
+            "nepuvodni": "pysek",
+            "biotopy": "habitat",
+            "ellenberg": "indikacni",
+            "cerveny_seznam": "cerven"
+        }
+        pat = patterns.get(key_name, "")
+        if pat:
+            for f in os.listdir(data_dir):
+                if pat in f.lower() and f.endswith(('.xls', '.xlsx', '.csv')):
+                    return os.path.join(data_dir, f)
+
     return ""
 
 def _query_local_db(section_name: str, species_name: str):
@@ -5919,6 +6022,18 @@ st.markdown(f"""
         outline: none !important;
     }}
 
+    /* Zákaz vepisování a vyvolání virtuální klávesnice v rozbalovacích seznamech (selectbox) */
+    div[data-baseweb="select"] input {{
+        pointer-events: none !important;
+        caret-color: transparent !important;
+        cursor: pointer !important;
+        -webkit-user-select: none !important;
+        user-select: none !important;
+    }}
+    div[data-baseweb="select"] {{
+        cursor: pointer !important;
+    }}
+
     .stSelectbox > div > div,
     div[data-baseweb="select"] > div {{
         background-color: {css_input_bg} !important;
@@ -6240,6 +6355,28 @@ st.markdown(f"""
 
 components.html("""
 <script>
+function disableSelectboxTyping() {
+    try {
+        const parentDoc = window.parent.document;
+        if (!parentDoc) return;
+        const selectInputs = parentDoc.querySelectorAll('div[data-baseweb="select"] input');
+        selectInputs.forEach(inp => {
+            if (inp.getAttribute('inputmode') !== 'none') {
+                inp.setAttribute('inputmode', 'none');
+            }
+            if (!inp.readOnly) {
+                inp.readOnly = true;
+            }
+            if (!inp.dataset.readonlyFixed) {
+                inp.dataset.readonlyFixed = 'true';
+                inp.addEventListener('focus', function(e) {
+                    inp.setAttribute('readonly', 'readonly');
+                    inp.setAttribute('inputmode', 'none');
+                }, true);
+            }
+        });
+    } catch (e) {}
+}
 function setupAccordion() {
     try {
         const parentDoc = window.parent.document;
@@ -6265,10 +6402,15 @@ function setupAccordion() {
                 }
             }
         });
+        disableSelectboxTyping();
     } catch (e) {}
 }
 setupAccordion();
-const obs = new MutationObserver(() => setupAccordion());
+disableSelectboxTyping();
+const obs = new MutationObserver(() => {
+    setupAccordion();
+    disableSelectboxTyping();
+});
 obs.observe(window.parent.document.body, { childList: true, subtree: true });
 </script>
 """, height=0)
@@ -6977,9 +7119,10 @@ if st.session_state.df is not None:
                     )
 
                     klic_p = get_local_dataset_path("klic_2019")
-                    source_options = ["Nahrát soubor převodníku (CSV / Excel)..."]
+                    source_options = []
                     if klic_p:
                         source_options.append("Klíč ke květeně ČR (Kaplan et al. 2019)")
+                    source_options.append("Nahrát soubor převodníku (CSV / Excel)...")
                     source_options += [f"Knihovna: {f}" for f in saved_nom_files]
 
                     nom_source_choice = st.selectbox(
@@ -8590,9 +8733,10 @@ if st.session_state.df is not None:
                 with col_ras1:
                     st.markdown("**Rozsivky (DiatomBase / WoRMS):**")
                     cfg["enable_diatombase_taxon"] = st.checkbox(
-                        "Taxonomie & autorita (DiatomBase)",
+                        "Taxonomie & autorita řas a rozsivek (DiatomBase / WoRMS / AlgaeBase)",
                         value=cfg.get("enable_diatombase_taxon", False),
-                        key="w_enable_diatombase_taxon"
+                        key="w_enable_diatombase_taxon",
+                        help="Dohledá taxonomické zařazení (třída > řád > čeleď), platný vědecký taxon a autoritu pro rozsivky, řasy i sinice."
                     )
                     if cfg.get("enable_diatombase_taxon", False):
                         dt_col_val = cfg.get("diatombase_taxon_col", columns[0])
@@ -9788,7 +9932,7 @@ if st.session_state.df is not None:
                                 if raw_val:
                                     break
                         if not raw_val and len(columns) > 0:
-                            raw_val = str(row[columns] if isinstance(columns, str) else columns[0]).strip()
+                            raw_val = str(row[columns[0]]).strip()
 
                         diatom_data = fetch_diatombase_data(raw_val)
                         if diatom_data.get('source') == 'Nenalezeno':
@@ -9807,19 +9951,24 @@ if st.session_state.df is not None:
                         row_unfounds.append({'Řádek': idx + 1, 'Položka': str(raw_val), 'Modul': 'DiatomBase (Chyba)'})
 
                 if enable_algaebase_link:
+                    raw_sp = ""
                     try:
-                        raw_sp = str(row[algaebase_link_col]).strip()
-
-                        is_algae_cand = (
-                            (k5 and any(g in k5.get("group", "").lower() for g in ["řas", "sinic", "algae", "diatom"]))
-                            or (diatom_data and diatom_data.get("source") != "Nenalezeno")
-                        )
-                        if sp_clean and is_algae_cand:
-                            row_updates["[AlgaeBase] Odkaz"] = f"https://www.algaebase.org/search/species/?name={urllib.parse.quote(sp_clean)}"
+                        if algaebase_link_col and algaebase_link_col in row:
+                            raw_sp = str(row[algaebase_link_col]).strip()
+                        if not raw_sp and len(columns) > 0:
+                            raw_sp = str(row[columns[0]]).strip()
+                        alg_clean = re.sub(r'\s*\(.*?\)\s*', ' ', raw_sp).strip()
+                        alg_clean = re.sub(r'\s+sp(p)?\.?$', '', alg_clean).strip()
+                        if alg_clean:
+                            if any(ord(c) > 127 for c in alg_clean):
+                                res_sci = resolve_scientific_name(alg_clean, prefer_fungi=False)
+                                if res_sci:
+                                    alg_clean = res_sci
+                            row_updates["[AlgaeBase] Odkaz"] = f"https://www.algaebase.org/search/species/?name={urllib.parse.quote(alg_clean)}"
                         else:
                             row_updates["[AlgaeBase] Odkaz"] = ""
                     except Exception:
-                        row_unfounds.append({'Řádek': idx + 1, 'Položka': str(row.get(algaebase_link_col, "")), 'Modul': 'AlgaeBase (Chyba)'})
+                        row_unfounds.append({'Řádek': idx + 1, 'Položka': str(raw_sp), 'Modul': 'AlgaeBase (Chyba)'})
 
                 if enable_gbif_fungi:
                     try:
