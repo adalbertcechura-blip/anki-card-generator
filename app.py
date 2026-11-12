@@ -416,6 +416,52 @@ def sync_ordered_cols(selected_cols, state_key):
             new_ordered.append(c)
     st.session_state[state_key] = new_ordered
 
+def render_column_reorder_ui(state_key: str, key_prefix: str, expander_title: str = "Změnit pořadí sloupců (⇧ / ▲ / ▼ / ⇩)"):
+    cols_list = st.session_state.get(state_key, [])
+    if not cols_list:
+        return
+    with st.expander(expander_title, expanded=False):
+        st.caption("Pořadí můžete měnit tlačítky na úplný začátek (⇧), o jednu pozici výše (▲) / níže (▼), nebo na úplný konec (⇩):")
+        for idx, col in enumerate(cols_list):
+            if "col_styles" in st.session_state and col not in st.session_state.col_styles:
+                df_curr = st.session_state.get("df", None)
+                check_fn = globals().get("check_col_is_image")
+                is_img = check_fn(col, df_curr) if callable(check_fn) else False
+                st.session_state.col_styles[col] = {
+                    "bold": False,
+                    "italic": False,
+                    "size": "Výchozí",
+                    "custom_label": col,
+                    "show_label": not is_img
+                }
+
+            c_name, c_top, c_up, c_down, c_bot = st.columns([5, 1, 1, 1, 1])
+            with c_name:
+                st.write(f"**{idx + 1}.** {col}")
+            with c_top:
+                if st.button("⇧", key=f"{key_prefix}_top_{idx}_{col}", help="Přesunout na začátek"):
+                    if idx > 0:
+                        val = st.session_state[state_key].pop(idx)
+                        st.session_state[state_key].insert(0, val)
+                        st.rerun()
+            with c_up:
+                if st.button("▲", key=f"{key_prefix}_up_{idx}_{col}", help="Posunout o 1 výše"):
+                    if idx > 0:
+                        st.session_state[state_key][idx], st.session_state[state_key][idx - 1] = st.session_state[state_key][idx - 1], st.session_state[state_key][idx]
+                        st.rerun()
+            with c_down:
+                if st.button("▼", key=f"{key_prefix}_down_{idx}_{col}", help="Posunout o 1 níže"):
+                    if idx < len(st.session_state[state_key]) - 1:
+                        st.session_state[state_key][idx], st.session_state[state_key][idx + 1] = st.session_state[state_key][idx + 1], st.session_state[state_key][idx]
+                        st.rerun()
+            with c_bot:
+                if st.button("⇩", key=f"{key_prefix}_bot_{idx}_{col}", help="Přesunout na konec"):
+                    if idx < len(st.session_state[state_key]) - 1:
+                        val = st.session_state[state_key].pop(idx)
+                        st.session_state[state_key].append(val)
+                        st.rerun()
+
+
 def is_image_col(col_name, sample_val=None):
 
     col_str = str(col_name).strip()
@@ -3459,9 +3505,14 @@ def build_deck_attribution(active_cols):
 
     sections = []
 
-    has_pladias_photos = any("[Pladias] Fotky" in str(c) for c in active_cols)
-    has_pladias_map = any("[Pladias] Mapa rozšíření" in str(c) for c in active_cols)
-    has_pladias_any = any("[Pladias]" in str(c) for c in active_cols)
+    has_pladias_photos = any(("[Pladias" in str(c) or "pladias.cz" in str(c).lower()) and ("fotk" in str(c).lower() or "obrázk" in str(c).lower() or "foto" in str(c).lower()) for c in active_cols)
+    has_pladias_map = any(
+        ("[Pladias" in str(c) and "Mapa" in str(c))
+        or str(c) in ["[Pladias] Mapa rozšíření", "[Pladias.cz] Mapa rozšíření"]
+        or (("[Pladias" in str(c) or "pladias" in str(c).lower()) and ("mapa" in str(c).lower() or "rozšíření" in str(c).lower()))
+        for c in active_cols
+    )
+    has_pladias_any = any("[Pladias" in str(c) or "pladias.cz" in str(c).lower() for c in active_cols)
 
     if has_pladias_any:
         p_parts = []
@@ -4330,6 +4381,15 @@ def get_active_citations(cols, df=None) -> list:
     if "[GBIF]" in combined_check or "gbif.org" in combined_check:
         citations.append(("GBIF", "Global Biodiversity Information Facility (GBIF.org) Backbone Taxonomy, Occurrences & Multimedia."))
 
+    has_pladias_map = (
+        "[Pladias] Mapa rozšíření" in combined_check
+        or "[Pladias.cz] Mapa rozšíření" in combined_check
+        or "pladias.cz/taxon/distribution" in combined_check
+        or (("[Pladias]" in combined_check or "[Pladias.cz]" in combined_check or "pladias" in combined_check.lower()) and ("mapa" in combined_check.lower() or "rozšíření" in combined_check.lower()))
+    )
+    if has_pladias_map:
+        citations.append(("Pladias.cz – Mapy rozšíření v ČR", "Wild J., Kaplan Z., Danihelka J., Petřík P., Chytrý M., Novotný P. et al. (2019): Plant distribution data for the Czech Republic integrated in the Pladias database. – Preslia 91: 1–24. (doi: 10.23855/preslia.2019.001, pladias.cz)"))
+
     if "[Pladias]" in combined_check or "[Pladias.cz]" in combined_check or "pladias.cz" in combined_check:
         citations.append(("Pladias.cz", "Chytrý M., Danihelka J., Kaplan Z., Koutecký P., Řezníček J., Danihelka J. et al. (2021): Pladias.cz Database of the Czech Flora and Vegetation. – Preslia 93: 1–87. (pladias.cz)"))
 
@@ -4406,6 +4466,7 @@ def generate_citations_pdf():
     ]
     all_citations = [
         ("Pladias.cz", "Pladias.cz – Databáze české flóry a vegetace. Botanický ústav AV ČR, Průhonice. (pladias.cz)"),
+        ("Pladias.cz – Mapy rozšíření v ČR", "Wild J., Kaplan Z., Danihelka J., Petřík P., Chytrý M., Novotný P. et al. (2019): Plant distribution data for the Czech Republic integrated in the Pladias database. – Preslia 91: 1–24. (doi: 10.23855/preslia.2019.001)"),
         ("Klíč 2019", "Kaplan Z. et al. (2019): Klíč ke květeně České republiky. Academia, Praha, 1168 s."),
         ("Červený seznam ČR", "Grulich V. (2012): Red List of vascular plants of the Czech Republic: 3rd edition. Preslia 84: 631–645."),
         ("iNaturalist", "iNaturalist Community. Observation data & photos licensed under Creative Commons. (inaturalist.org)"),
@@ -4427,7 +4488,20 @@ def register_pdf_fonts():
     from reportlab.pdfbase.ttfonts import TTFont
     from reportlab.pdfbase.pdfmetrics import registerFontFamily
 
+    app_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else os.getcwd()
     font_candidates = [
+        (
+            os.path.join(app_dir, "data", "fonts", "NotoSans-Regular.ttf"),
+            os.path.join(app_dir, "data", "fonts", "NotoSans-Bold.ttf"),
+            os.path.join(app_dir, "data", "fonts", "NotoSans-Italic.ttf"),
+            os.path.join(app_dir, "data", "fonts", "NotoSans-BoldItalic.ttf"),
+        ),
+        (
+            os.path.join(app_dir, "data", "fonts", "DejaVuSans.ttf"),
+            os.path.join(app_dir, "data", "fonts", "DejaVuSans-Bold.ttf"),
+            os.path.join(app_dir, "data", "fonts", "DejaVuSans-Oblique.ttf"),
+            os.path.join(app_dir, "data", "fonts", "DejaVuSans-BoldOblique.ttf"),
+        ),
         ("C:/Windows/Fonts/arial.ttf", "C:/Windows/Fonts/arialbd.ttf", "C:/Windows/Fonts/ariali.ttf", "C:/Windows/Fonts/arialbi.ttf"),
         ("C:/Windows/Fonts/calibri.ttf", "C:/Windows/Fonts/calibrib.ttf", "C:/Windows/Fonts/calibrii.ttf", "C:/Windows/Fonts/calibriz.ttf"),
         ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/segoeuib.ttf", "C:/Windows/Fonts/segoeuii.ttf", "C:/Windows/Fonts/segoeuiz.ttf"),
@@ -4456,13 +4530,18 @@ def register_pdf_fonts():
                 else:
                     fn_bold_italic = fn_bold
 
-                registerFontFamily(
-                    "CustomSans",
-                    normal="CustomSans",
-                    bold=fn_bold,
-                    italic=fn_italic,
-                    boldItalic=fn_bold_italic
-                )
+                for fn_key in set(["CustomSans", fn_normal, fn_bold, fn_italic, fn_bold_italic]):
+                    if fn_key and fn_key != "Helvetica":
+                        try:
+                            registerFontFamily(
+                                fn_key,
+                                normal=fn_normal,
+                                bold=fn_bold,
+                                italic=fn_italic,
+                                boldItalic=fn_bold_italic
+                            )
+                        except Exception:
+                            pass
                 break
             except Exception:
                 pass
@@ -4551,7 +4630,7 @@ def generate_pdf_booklet(
     sp_title_style = ParagraphStyle(
         'SpeciesTitle',
         parent=styles['Normal'],
-        fontName=fn_bold,
+        fontName=fn_normal,
         fontSize=(14 if is_atlas_page else 12.5) * fs if page_format == "A4" else (12 if is_atlas_page else 11) * fs,
         leading=(17 if is_atlas_page else 15.5) * fs if page_format == "A4" else (15 if is_atlas_page else 13.5) * fs,
         textColor=colors.HexColor('#1b4332'),
@@ -4687,8 +4766,12 @@ def generate_pdf_booklet(
                     t_cfg_toc = col_styles.get(title_col, {}) if (title_col and col_styles) else (col_styles.get(df.columns[0], {}) if col_styles else {})
                     t_st_toc = t_cfg_toc.get("style", "normal")
                     item_n_clean = html_to_reportlab(item_n)
-                    if (t_st_toc in ["italic", "bold_italic"]) or t_cfg_toc.get("italic", False):
+                    if t_st_toc == "bold_italic":
+                        item_n_clean = f"<b><i>{item_n_clean}</i></b>"
+                    elif t_st_toc == "italic" or t_cfg_toc.get("italic", False):
                         item_n_clean = f"<i>{item_n_clean}</i>"
+                    elif t_st_toc == "bold" or t_cfg_toc.get("bold", False):
+                        item_n_clean = f"<b>{item_n_clean}</b>"
                     p_left = Paragraph(f"<b>{idx_t+1}.</b> {item_n_clean}", toc_style)
                     p_right = Paragraph(p_str, toc_page_style)
                     toc_table_rows.append([p_left, p_right])
@@ -4722,8 +4805,12 @@ def generate_pdf_booklet(
                         t_cfg_toc1 = col_styles.get(title_col, {}) if (title_col and col_styles) else (col_styles.get(df.columns[0], {}) if col_styles else {})
                         t_st_toc1 = t_cfg_toc1.get("style", "normal")
                         n1_clean = html_to_reportlab(n1)
-                        if (t_st_toc1 in ["italic", "bold_italic"]) or t_cfg_toc1.get("italic", False):
+                        if t_st_toc1 == "bold_italic":
+                            n1_clean = f"<b><i>{n1_clean}</i></b>"
+                        elif t_st_toc1 == "italic" or t_cfg_toc1.get("italic", False):
                             n1_clean = f"<i>{n1_clean}</i>"
+                        elif t_st_toc1 == "bold" or t_cfg_toc1.get("bold", False):
+                            n1_clean = f"<b>{n1_clean}</b>"
                         c1_item = Paragraph(f"<b>{it1+1}.</b> {n1_clean}", toc_style)
                         c1_page = Paragraph(p1_str, toc_page_style)
                     else:
@@ -4739,8 +4826,12 @@ def generate_pdf_booklet(
                         t_cfg_toc2 = col_styles.get(title_col, {}) if (title_col and col_styles) else (col_styles.get(df.columns[0], {}) if col_styles else {})
                         t_st_toc2 = t_cfg_toc2.get("style", "normal")
                         n2_clean = html_to_reportlab(n2)
-                        if (t_st_toc2 in ["italic", "bold_italic"]) or t_cfg_toc2.get("italic", False):
+                        if t_st_toc2 == "bold_italic":
+                            n2_clean = f"<b><i>{n2_clean}</i></b>"
+                        elif t_st_toc2 == "italic" or t_cfg_toc2.get("italic", False):
                             n2_clean = f"<i>{n2_clean}</i>"
+                        elif t_st_toc2 == "bold" or t_cfg_toc2.get("bold", False):
+                            n2_clean = f"<b>{n2_clean}</b>"
                         c2_item = Paragraph(f"<b>{it2+1}.</b> {n2_clean}", toc_style)
                         c2_page = Paragraph(p2_str, toc_page_style)
                     else:
@@ -4795,20 +4886,31 @@ def generate_pdf_booklet(
 
             t_cfg = col_styles.get(title_col_used, {}) if col_styles else {}
             t_style = t_cfg.get("style", "normal")
-            is_t_italic = (t_style in ["italic", "bold_italic"]) or t_cfg.get("italic", False)
             clean_primary = html_to_reportlab(primary_name)
-            if is_t_italic:
-                clean_primary = f"<i>{clean_primary}</i>"
+            if t_style == "bold_italic":
+                formatted_primary = f"<b><i>{clean_primary}</i></b>"
+            elif t_style == "italic" or t_cfg.get("italic", False):
+                formatted_primary = f"<i>{clean_primary}</i>"
+            elif t_style == "bold" or t_cfg.get("bold", False):
+                formatted_primary = f"<b>{clean_primary}</b>"
+            else:
+                formatted_primary = f"<b>{clean_primary}</b>"
 
-            title_text = f"{idx + 1}. {clean_primary}"
+            title_text = f"<b>{idx + 1}.</b> {formatted_primary}"
             if secondary_name:
                 sec_col = df.columns[0] if len(df.columns) > 0 else ""
                 s_cfg = col_styles.get(sec_col, {}) if col_styles else {}
                 s_style = s_cfg.get("style", "normal")
                 clean_sec = html_to_reportlab(secondary_name)
-                if (s_style in ["italic", "bold_italic"]) or s_cfg.get("italic", False):
-                    clean_sec = f"<i>{clean_sec}</i>"
-                title_text += f" ({clean_sec})"
+                if s_style == "bold_italic":
+                    formatted_sec = f"<b><i>{clean_sec}</i></b>"
+                elif s_style == "italic" or s_cfg.get("italic", False):
+                    formatted_sec = f"<i>{clean_sec}</i>"
+                elif s_style == "bold" or s_cfg.get("bold", False):
+                    formatted_sec = f"<b>{clean_sec}</b>"
+                else:
+                    formatted_sec = f"{clean_sec}"
+                title_text += f" ({formatted_sec})"
 
             species_header.append(Paragraph(title_text, sp_title_style))
             sp_pronun = ""
@@ -10285,31 +10387,7 @@ if st.session_state.df is not None:
                     )
                     sync_ordered_cols(front_cols, "front_cols_ordered")
 
-                    with st.expander("Změnit pořadí sloupců na líci (▲ / ▼)", expanded=False):
-                        for i, col in enumerate(st.session_state.front_cols_ordered):
-                            if col not in st.session_state.col_styles:
-                                is_img = check_col_is_image(col, st.session_state.df)
-                                st.session_state.col_styles[col] = {
-                                    "bold": False,
-                                    "italic": False,
-                                    "size": "Výchozí",
-                                    "custom_label": col,
-                                    "show_label": not is_img
-                                }
-
-                            c_name, c_up, c_down = st.columns([6, 1, 1])
-                            with c_name:
-                                st.write(f"**{col}**")
-                            with c_up:
-                                if st.button("▲", key=f"up_front_{col}_{i}"):
-                                    if i > 0:
-                                        st.session_state.front_cols_ordered[i], st.session_state.front_cols_ordered[i-1] = st.session_state.front_cols_ordered[i-1], st.session_state.front_cols_ordered[i]
-                                        st.rerun()
-                            with c_down:
-                                if st.button("▼", key=f"down_front_{col}_{i}"):
-                                    if i < len(st.session_state.front_cols_ordered) - 1:
-                                        st.session_state.front_cols_ordered[i], st.session_state.front_cols_ordered[i+1] = st.session_state.front_cols_ordered[i+1], st.session_state.front_cols_ordered[i]
-                                        st.rerun()
+                    render_column_reorder_ui("front_cols_ordered", "front", "Změnit pořadí sloupců na líci (⇧ / ▲ / ▼ / ⇩)")
 
                 with col_lay2:
                     st.markdown("#### 2. Rubová strana")
@@ -10324,31 +10402,7 @@ if st.session_state.df is not None:
                     )
                     sync_ordered_cols(back_cols, "back_cols_ordered")
 
-                    with st.expander("Změnit pořadí sloupců na rubu (▲ / ▼)", expanded=False):
-                        for i, col in enumerate(st.session_state.back_cols_ordered):
-                            if col not in st.session_state.col_styles:
-                                is_img = check_col_is_image(col, st.session_state.df)
-                                st.session_state.col_styles[col] = {
-                                    "bold": False,
-                                    "italic": False,
-                                    "size": "Výchozí",
-                                    "custom_label": col,
-                                    "show_label": not is_img
-                                }
-
-                            c_name, c_up, c_down = st.columns([6, 1, 1])
-                            with c_name:
-                                st.write(f"**{col}**")
-                            with c_up:
-                                if st.button("▲", key=f"up_back_{col}_{i}"):
-                                    if i > 0:
-                                        st.session_state.back_cols_ordered[i], st.session_state.back_cols_ordered[i-1] = st.session_state.back_cols_ordered[i-1], st.session_state.back_cols_ordered[i]
-                                        st.rerun()
-                            with c_down:
-                                if st.button("▼", key=f"down_back_{col}_{i}"):
-                                    if i < len(st.session_state.back_cols_ordered) - 1:
-                                        st.session_state.back_cols_ordered[i], st.session_state.back_cols_ordered[i+1] = st.session_state.back_cols_ordered[i+1], st.session_state.back_cols_ordered[i]
-                                        st.rerun()
+                    render_column_reorder_ui("back_cols_ordered", "back", "Změnit pořadí sloupců na rubu (⇧ / ▲ / ▼ / ⇩)")
 
                 st.markdown("#### Vzhled a rozvržení")
                 c_theme1, c_theme2 = st.columns(2)
@@ -11437,21 +11491,7 @@ if st.session_state.df is not None:
                     )
                     sync_ordered_cols(obs_front_cols, "obs_front_cols_ordered")
 
-                    with st.expander("Změnit pořadí sloupců na líci (▲ / ▼)", expanded=False):
-                        for i, col in enumerate(st.session_state.obs_front_cols_ordered):
-                            c_name, c_up, c_down = st.columns([6, 1, 1])
-                            with c_name:
-                                st.write(f"**{col}**")
-                            with c_up:
-                                if st.button("▲", key=f"obs_up_front_{col}_{i}"):
-                                    if i > 0:
-                                        st.session_state.obs_front_cols_ordered[i], st.session_state.obs_front_cols_ordered[i-1] = st.session_state.obs_front_cols_ordered[i-1], st.session_state.obs_front_cols_ordered[i]
-                                        st.rerun()
-                            with c_down:
-                                if st.button("▼", key=f"obs_down_front_{col}_{i}"):
-                                    if i < len(st.session_state.obs_front_cols_ordered) - 1:
-                                        st.session_state.obs_front_cols_ordered[i], st.session_state.obs_front_cols_ordered[i+1] = st.session_state.obs_front_cols_ordered[i+1], st.session_state.obs_front_cols_ordered[i]
-                                        st.rerun()
+                    render_column_reorder_ui("obs_front_cols_ordered", "obs_front", "Změnit pořadí sloupců na líci (⇧ / ▲ / ▼ / ⇩)")
 
                 with col_obs_back:
                     st.markdown("##### 2. Odpověď / Rub kartičky")
@@ -11464,21 +11504,7 @@ if st.session_state.df is not None:
                     )
                     sync_ordered_cols(obs_back_cols, "obs_back_cols_ordered")
 
-                    with st.expander("Změnit pořadí sloupců na rubu (▲ / ▼)", expanded=False):
-                        for i, col in enumerate(st.session_state.obs_back_cols_ordered):
-                            c_name, c_up, c_down = st.columns([6, 1, 1])
-                            with c_name:
-                                st.write(f"**{col}**")
-                            with c_up:
-                                if st.button("▲", key=f"obs_up_back_{col}_{i}"):
-                                    if i > 0:
-                                        st.session_state.obs_back_cols_ordered[i], st.session_state.obs_back_cols_ordered[i-1] = st.session_state.obs_back_cols_ordered[i-1], st.session_state.obs_back_cols_ordered[i]
-                                        st.rerun()
-                            with c_down:
-                                if st.button("▼", key=f"obs_down_back_{col}_{i}"):
-                                    if i < len(st.session_state.obs_back_cols_ordered) - 1:
-                                        st.session_state.obs_back_cols_ordered[i], st.session_state.obs_back_cols_ordered[i+1] = st.session_state.obs_back_cols_ordered[i+1], st.session_state.obs_back_cols_ordered[i]
-                                        st.rerun()
+                    render_column_reorder_ui("obs_back_cols_ordered", "obs_back", "Změnit pořadí sloupců na rubu (⇧ / ▲ / ▼ / ⇩)")
 
                 obs_selected_cols = list(dict.fromkeys(st.session_state.obs_front_cols_ordered + st.session_state.obs_back_cols_ordered))
                 obs_text_cols = [
@@ -11804,34 +11830,7 @@ if st.session_state.df is not None:
                 )
                 sync_ordered_cols(pdf_cols_selected, "pdf_cols_ordered")
 
-                with st.expander("↕Změnit pořadí sloupců v brožuře", expanded=False):
-                    st.caption("Sloupce se v brožuře zobrazí v tomto pořadí. Pořadí můžete měnit tlačítky na začátek/konec nebo o jednu pozici:")
-                    for i_p, c_p in enumerate(st.session_state.pdf_cols_ordered):
-                        c_pn, c_pt, c_pu, c_pd, c_pb = st.columns([5, 1, 1, 1, 1])
-                        with c_pn:
-                            st.write(f"**{i_p + 1}.** {c_p}")
-                        with c_pt:
-                            if st.button("⇪", key=f"top_pdf_col_{c_p}_{i_p}", help="Přesunout na začátek"):
-                                if i_p > 0:
-                                    val_c = st.session_state.pdf_cols_ordered.pop(i_p)
-                                    st.session_state.pdf_cols_ordered.insert(0, val_c)
-                                    st.rerun()
-                        with c_pu:
-                            if st.button("▲", key=f"up_pdf_col_{c_p}_{i_p}", help="Posunout o 1 výše"):
-                                if i_p > 0:
-                                    st.session_state.pdf_cols_ordered[i_p], st.session_state.pdf_cols_ordered[i_p-1] = st.session_state.pdf_cols_ordered[i_p-1], st.session_state.pdf_cols_ordered[i_p]
-                                    st.rerun()
-                        with c_pd:
-                            if st.button("▼", key=f"down_pdf_col_{c_p}_{i_p}", help="Posunout o 1 níže"):
-                                if i_p < len(st.session_state.pdf_cols_ordered) - 1:
-                                    st.session_state.pdf_cols_ordered[i_p], st.session_state.pdf_cols_ordered[i_p+1] = st.session_state.pdf_cols_ordered[i_p+1], st.session_state.pdf_cols_ordered[i_p]
-                                    st.rerun()
-                        with c_pb:
-                            if st.button("⇩", key=f"bot_pdf_col_{c_p}_{i_p}", help="Přesunout na konec"):
-                                if i_p < len(st.session_state.pdf_cols_ordered) - 1:
-                                    val_c = st.session_state.pdf_cols_ordered.pop(i_p)
-                                    st.session_state.pdf_cols_ordered.append(val_c)
-                                    st.rerun()
+                render_column_reorder_ui("pdf_cols_ordered", "pdf", "↕ Změnit pořadí sloupců v brožuře (⇧ / ▲ / ▼ / ⇩)")
 
                 if "pdf_col_styles" not in st.session_state:
                     st.session_state.pdf_col_styles = {}
@@ -12255,21 +12254,7 @@ if st.session_state.df is not None:
                 )
                 sync_ordered_cols(docx_cols_selected, "docx_cols_ordered")
 
-                with st.expander("Změnit pořadí sloupců ve Wordu (▲ / ▼)", expanded=False):
-                    for i_d, c_d in enumerate(st.session_state.docx_cols_ordered):
-                        c_dn, c_du, c_dd = st.columns([6, 1, 1])
-                        with c_dn:
-                            st.write(f"**{c_d}**")
-                        with c_du:
-                            if st.button("▲", key=f"up_docx_col_{c_d}_{i_d}"):
-                                if i_d > 0:
-                                    st.session_state.docx_cols_ordered[i_d], st.session_state.docx_cols_ordered[i_d-1] = st.session_state.docx_cols_ordered[i_d-1], st.session_state.docx_cols_ordered[i_d]
-                                    st.rerun()
-                        with c_dd:
-                            if st.button("▼", key=f"down_docx_col_{c_d}_{i_d}"):
-                                if i_d < len(st.session_state.docx_cols_ordered) - 1:
-                                    st.session_state.docx_cols_ordered[i_d], st.session_state.docx_cols_ordered[i_d+1] = st.session_state.docx_cols_ordered[i_d+1], st.session_state.docx_cols_ordered[i_d]
-                                    st.rerun()
+                render_column_reorder_ui("docx_cols_ordered", "docx", "Změnit pořadí sloupců ve Wordu (⇧ / ▲ / ▼ / ⇩)")
 
                 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
                 st.markdown("##### Záhlaví a texty")
