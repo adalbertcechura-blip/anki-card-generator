@@ -1709,7 +1709,7 @@ def fetch_dalibor_data(species_name, max_photos=3):
 @functools.lru_cache(maxsize=4096)
 def resolve_scientific_name(name: str, prefer_fungi: bool = False) -> str:
     """
-    Vyhledá vědecké (latinské) jméno druhu ze zadaného českého i lidového jména
+    Vyhledá vědecké jméno druhu ze zadaného českého i lidového jména
     (např. 'Sedmikráska obecná' -> 'Bellis perennis', 'Žampion polní' -> 'Agaricus campestris',
     'Hřib smrkový' -> 'Boletus edulis', 'Liška obecná' -> 'Cantharellus cibarius' nebo 'Vulpes vulpes').
     Využívá Mykologie.net (pro houby), iNaturalist API a Wikidata P225.
@@ -3497,11 +3497,19 @@ def fetch_kvetena_cr_description(species_name: str, max_chars: int = 450) -> str
 
     return sub_chunk if len(sub_chunk) > 20 else fetch_pladias_description(species_name)
 
-def build_deck_attribution(active_cols):
-\
-\
-\
-\
+def build_deck_attribution(active_cols=None, selected_sources=None):
+    if selected_sources is not None:
+        cits = [(src, ALL_AVAILABLE_CITATIONS[src]) for src in selected_sources if src in ALL_AVAILABLE_CITATIONS]
+        if not cits:
+            return ""
+        p_parts = ["<hr/><h3>Použité zdroje dat, licence a citace:</h3><ul>"]
+        for src, text in cits:
+            p_parts.append(f"<li><strong>{src}:</strong> {text}</li>")
+        p_parts.append("</ul>")
+        return "\n".join(p_parts)
+
+    if not active_cols:
+        return ""
 
     sections = []
 
@@ -3649,7 +3657,8 @@ def generate_obsidian_vault_zip(
     media_tasks: dict = None,
     include_guide: bool = True,
     include_index: bool = True,
-    card_separator: str = "?"
+    card_separator: str = "?",
+    selected_citations: list = None
 ) -> int:
     import zipfile, io, re, html, json, time
 
@@ -3855,6 +3864,14 @@ tags:
                 zf.writestr(f"{v_slug}/Karty.html", karty_bytes)
             except Exception:
                 pass
+
+        if selected_citations:
+            cits = [(src, ALL_AVAILABLE_CITATIONS[src]) for src in selected_citations if src in ALL_AVAILABLE_CITATIONS]
+            if cits:
+                cit_lines = ["# Použité zdroje dat, literatura a licence\n\n"]
+                for s_title, s_text in cits:
+                    cit_lines.append(f"- **{s_title}:** {s_text}\n")
+                zf.writestr(f"{v_slug}/Zdroje_a_licence.md", "".join(cit_lines).encode("utf-8"))
 
         if media_tasks:
             added_media = set()
@@ -4341,7 +4358,34 @@ def impose_booklet_pdf(input_pdf_path: str, output_pdf_path: str, sheets_per_sig
     except Exception:
         return False
 
-def get_active_citations(cols, df=None) -> list:
+ALL_AVAILABLE_CITATIONS = {
+    "Pladias.cz": "Chytrý M., Danihelka J., Kaplan Z., Koutecký P., Řezníček J., Danihelka J. et al. (2021): Pladias.cz Database of the Czech Flora and Vegetation. – Preslia 93: 1–87. (pladias.cz)",
+    "Pladias.cz – Mapy rozšíření v ČR": "Wild J., Kaplan Z., Danihelka J., Petřík P., Chytrý M., Novotný P. et al. (2019): Plant distribution data for the Czech Republic integrated in the Pladias database. – Preslia 91: 1–24. (doi: 10.23855/preslia.2019.001, pladias.cz)",
+    "Klíč ke květeně ČR (2019)": "Kaplan Z., Danihelka J., Chrtek J., Kirschner J., Kubát K., Štech M. & Štěpánek J. (eds) (2019): Klíč ke květeně České republiky. Ed. 2. – Academia, Praha, 1168 s.",
+    "Květena ČR": "Hejný S. & Slavík B. (eds) (1988–2010): Květena České republiky. Vol. 1–8. – Academia, Praha. (ibot.cas.cz)",
+    "Katalog nepůvodních druhů ČR": "Pyšek P., Sádlo J., Chrtek J. Jr., Chytrý M., Kaplan Z., Pergl J. et al. (2022): Catalogue of alien plants of the Czech Republic (3rd edition). – Preslia 94: 447–577.",
+    "Biotopy ČR": "Chytrý M. & Rafajová M. (2003): Czech National Phytosociological Database. – Preslia 75: 1–15; Sádlo J. et al. (2007): Preslia 79: 81–96.",
+    "Ellenbergovy indikační hodnoty": "Chytrý M., Tichý L., Dřevojan P., Sádlo J. & Zelený D. (2018): Ellenberg-type indicator values for the Czech flora. – Preslia 90: 83–103.",
+    "Červený seznam ČR (AOPK ČR)": "Agentura ochrany přírody a krajiny ČR (AOPK ČR): Červené seznamy ohrožených druhů ČR. – Příroda, Praha / portal23.nature.cz.",
+    "iNaturalist": "iNaturalist Community. Pozorování, mapy a fotografie pod licencemi Creative Commons. (inaturalist.org)",
+    "GBIF": "Global Biodiversity Information Facility (GBIF.org) Backbone Taxonomy, Occurrences & Multimedia.",
+    "Mykologie.net": "Vavřinec V. a kol. (2026): Mykologická databáze mykologie.net – popisy, fotografie a určování hub v ČR. (mykologie.net)",
+    "DaLiBor": "Botanický ústav AV ČR & Masarykova univerzita: DaLiBor – Databáze lišejníků České republiky / Atlas českých lišejníků. (dalib.cz)",
+    "Mushroom Color Atlas": "Beeler J. (2024): The Mushroom Color Atlas – A Guide to Dyes and Pigments Made from Fungi. (mushroomcoloratlas.com)",
+    "Wikimedia Commons": "Multimediální repozitář Wikimedia Foundation pod volnými licencemi Creative Commons.",
+    "BioLib.cz": "Zicha O. et al. (1999–2026): BioLib – Biological Library. (biolib.cz)",
+    "Xeno-canto": "Xeno-canto Foundation: Sharing bird sounds from around the world. (xeno-canto.org)",
+    "DiatomBase": "Kociolek J.P. et al. (2026): DiatomBase / WoRMS. (diatombase.org)",
+    "AlgaeBase": "Guiry M.D. & Guiry G.M. (2026): AlgaeBase. National University of Ireland, Galway. (algaebase.org)",
+    "POWO Kew": "Plants of the World Online. Royal Botanic Gardens, Kew. (powo.science.kew.org)",
+    "Animal Diversity Web": "Myers P. et al. (2024): The Animal Diversity Web. University of Michigan Museum of Zoology. (animaldiversity.org)",
+    "Encyclopedia of Life": "Encyclopedia of Life. (eol.org)"
+}
+
+def get_active_citations(cols=None, df=None, selected_sources=None) -> list:
+    if selected_sources is not None:
+        return [(src, ALL_AVAILABLE_CITATIONS[src]) for src in selected_sources if src in ALL_AVAILABLE_CITATIONS]
+
     if cols:
         target_cols = [str(c) for c in cols]
     elif df is not None:
@@ -4370,16 +4414,16 @@ def get_active_citations(cols, df=None) -> list:
     citations = []
 
     if "[iNat]" in combined_check or "[iNaturalist]" in combined_check or "inaturalist.org" in combined_check:
-        citations.append(("iNaturalist", "iNaturalist Community. Pozorování, mapy a fotografie pod licencemi Creative Commons. (inaturalist.org)"))
+        citations.append(("iNaturalist", ALL_AVAILABLE_CITATIONS["iNaturalist"]))
 
     if "[Mykologie.net]" in combined_check or "mykologie.net" in combined_check:
-        citations.append(("Mykologie.net", "Vavřinec V. a kol. (2026): Mykologická databáze mykologie.net – popisy, fotografie a určování hub v ČR. (mykologie.net)"))
+        citations.append(("Mykologie.net", ALL_AVAILABLE_CITATIONS["Mykologie.net"]))
 
     if "[DaLiBor]" in combined_check or "dalib.cz" in combined_check:
-        citations.append(("DaLiBor", "Botanický ústav AV ČR & Masarykova univerzita: DaLiBor – Databáze lišejníků České republiky / Atlas českých lišejníků. (dalib.cz)"))
+        citations.append(("DaLiBor", ALL_AVAILABLE_CITATIONS["DaLiBor"]))
 
     if "[GBIF]" in combined_check or "gbif.org" in combined_check:
-        citations.append(("GBIF", "Global Biodiversity Information Facility (GBIF.org) Backbone Taxonomy, Occurrences & Multimedia."))
+        citations.append(("GBIF", ALL_AVAILABLE_CITATIONS["GBIF"]))
 
     has_pladias_map = (
         "[Pladias] Mapa rozšíření" in combined_check
@@ -4388,55 +4432,92 @@ def get_active_citations(cols, df=None) -> list:
         or (("[Pladias]" in combined_check or "[Pladias.cz]" in combined_check or "pladias" in combined_check.lower()) and ("mapa" in combined_check.lower() or "rozšíření" in combined_check.lower()))
     )
     if has_pladias_map:
-        citations.append(("Pladias.cz – Mapy rozšíření v ČR", "Wild J., Kaplan Z., Danihelka J., Petřík P., Chytrý M., Novotný P. et al. (2019): Plant distribution data for the Czech Republic integrated in the Pladias database. – Preslia 91: 1–24. (doi: 10.23855/preslia.2019.001, pladias.cz)"))
+        citations.append(("Pladias.cz – Mapy rozšíření v ČR", ALL_AVAILABLE_CITATIONS["Pladias.cz – Mapy rozšíření v ČR"]))
 
     if "[Pladias]" in combined_check or "[Pladias.cz]" in combined_check or "pladias.cz" in combined_check:
-        citations.append(("Pladias.cz", "Chytrý M., Danihelka J., Kaplan Z., Koutecký P., Řezníček J., Danihelka J. et al. (2021): Pladias.cz Database of the Czech Flora and Vegetation. – Preslia 93: 1–87. (pladias.cz)"))
+        citations.append(("Pladias.cz", ALL_AVAILABLE_CITATIONS["Pladias.cz"]))
 
     if "[Klíč 2019]" in combined_check or "[Klíč]" in combined_check:
-        citations.append(("Klíč ke květeně ČR (2019)", "Kaplan Z., Danihelka J., Chrtek J., Kirschner J., Kubát K., Štech M. & Štěpánek J. (eds) (2019): Klíč ke květeně České republiky. Ed. 2. – Academia, Praha, 1168 s."))
+        citations.append(("Klíč ke květeně ČR (2019)", ALL_AVAILABLE_CITATIONS["Klíč ke květeně ČR (2019)"]))
 
     if "[Nepůvodní flóra]" in combined_check or "[Nepůvodní]" in combined_check:
-        citations.append(("Katalog nepůvodních druhů ČR", "Pyšek P., Sádlo J., Chrtek J. Jr., Chytrý M., Kaplan Z., Pergl J. et al. (2022): Catalogue of alien plants of the Czech Republic (3rd edition). – Preslia 94: 447–577."))
+        citations.append(("Katalog nepůvodních druhů ČR", ALL_AVAILABLE_CITATIONS["Katalog nepůvodních druhů ČR"]))
 
     if "[Biotopy]" in combined_check:
-        citations.append(("Biotopy ČR", "Chytrý M. & Rafajová M. (2003): Czech National Phytosociological Database. – Preslia 75: 1–15; Sádlo J. et al. (2007): Preslia 79: 81–96."))
+        citations.append(("Biotopy ČR", ALL_AVAILABLE_CITATIONS["Biotopy ČR"]))
 
     if "[Ekologie]" in combined_check or "[Ellenberg]" in combined_check:
-        citations.append(("Ellenbergovy indikační hodnoty", "Chytrý M., Tichý L., Dřevojan P., Sádlo J. & Zelený D. (2018): Ellenberg-type indicator values for the Czech flora. – Preslia 90: 83–103."))
+        citations.append(("Ellenbergovy indikační hodnoty", ALL_AVAILABLE_CITATIONS["Ellenbergovy indikační hodnoty"]))
 
     if "[Červený seznam]" in combined_check or "[AOPK]" in combined_check:
-        citations.append(("Červený seznam ČR (AOPK ČR)", "Agentura ochrany přírody a krajiny ČR (AOPK ČR): Červené seznamy ohrožených druhů ČR. – Příroda, Praha / portal23.nature.cz."))
+        citations.append(("Červený seznam ČR (AOPK ČR)", ALL_AVAILABLE_CITATIONS["Červený seznam ČR (AOPK ČR)"]))
 
     if "[Květena ČR]" in combined_check or "[Květena]" in combined_check:
-        citations.append(("Květena ČR", "Hejný S. & Slavík B. (eds) (1988–2010): Květena České republiky. Vol. 1–8. – Academia, Praha. (ibot.cas.cz)"))
+        citations.append(("Květena ČR", ALL_AVAILABLE_CITATIONS["Květena ČR"]))
 
     if "[Mushroom Color Atlas]" in combined_check or "mushroomcoloratlas.com" in combined_check:
-        citations.append(("Mushroom Color Atlas", "Beeler J. (2024): The Mushroom Color Atlas – A Guide to Dyes and Pigments Made from Fungi. (mushroomcoloratlas.com)"))
+        citations.append(("Mushroom Color Atlas", ALL_AVAILABLE_CITATIONS["Mushroom Color Atlas"]))
 
     if "[Wikimedia]" in combined_check or "wikimedia.org" in combined_check:
-        citations.append(("Wikimedia Commons", "Multimediální repozitář Wikimedia Foundation pod volnými licencemi Creative Commons."))
+        citations.append(("Wikimedia Commons", ALL_AVAILABLE_CITATIONS["Wikimedia Commons"]))
 
     if "[BioLib]" in combined_check or "biolib.cz" in combined_check:
-        citations.append(("BioLib.cz", "Zicha O. et al. (1999–2026): BioLib – Biological Library. (biolib.cz)"))
+        citations.append(("BioLib.cz", ALL_AVAILABLE_CITATIONS["BioLib.cz"]))
 
     if "[Xeno-canto]" in combined_check or "[Zvuky]" in combined_check or "xeno-canto.org" in combined_check:
-        citations.append(("Xeno-canto", "Xeno-canto Foundation: Sharing bird sounds from around the world. (xeno-canto.org)"))
+        citations.append(("Xeno-canto", ALL_AVAILABLE_CITATIONS["Xeno-canto"]))
 
     if "[DiatomBase]" in combined_check or "diatombase.org" in combined_check:
-        citations.append(("DiatomBase", "Kociolek J.P. et al. (2026): DiatomBase / WoRMS. (diatombase.org)"))
+        citations.append(("DiatomBase", ALL_AVAILABLE_CITATIONS["DiatomBase"]))
 
     if "[AlgaeBase]" in combined_check or "algaebase.org" in combined_check:
-        citations.append(("AlgaeBase", "Guiry M.D. & Guiry G.M. (2026): AlgaeBase. National University of Ireland, Galway. (algaebase.org)"))
+        citations.append(("AlgaeBase", ALL_AVAILABLE_CITATIONS["AlgaeBase"]))
 
     if "[POWO Kew]" in combined_check or "[POWO]" in combined_check or "powo.science.kew.org" in combined_check:
-        citations.append(("POWO Kew", "Plants of the World Online. Royal Botanic Gardens, Kew. (powo.science.kew.org)"))
+        citations.append(("POWO Kew", ALL_AVAILABLE_CITATIONS["POWO Kew"]))
 
     if "[ADW]" in combined_check or "animaldiversity.org" in combined_check:
-        citations.append(("Animal Diversity Web", "Myers P. et al. (2024): The Animal Diversity Web. University of Michigan Museum of Zoology. (animaldiversity.org)"))
+        citations.append(("Animal Diversity Web", ALL_AVAILABLE_CITATIONS["Animal Diversity Web"]))
 
     if "[EOL]" in combined_check or "eol.org" in combined_check:
-        citations.append(("Encyclopedia of Life", "Encyclopedia of Life. (eol.org)"))
+        citations.append(("Encyclopedia of Life", ALL_AVAILABLE_CITATIONS["Encyclopedia of Life"]))
+
+    return citations
+
+def render_citations_selector_ui(key_prefix: str = "export") -> list:
+    if "user_selected_sources" not in st.session_state:
+        df_curr = st.session_state.get("df", None)
+        cols_curr = list(df_curr.columns) if df_curr is not None else []
+        auto_detected = [c[0] for c in get_active_citations(cols_curr, df_curr, selected_sources=None)]
+        st.session_state.user_selected_sources = auto_detected
+
+    with st.expander("Výběr zdrojů dat a citací do bibliografie (volitelné)", expanded=False):
+        st.caption("Můžete ručně naklikat nebo upravit zdroje, které se mají uvést na konci výstupu (ideální např. při nahrání tabulky, která byla obohacena dříve):")
+        
+        c_btn1, c_btn2, c_btn3 = st.columns([1, 1, 1])
+        with c_btn1:
+            if st.button("Vybrat vše", key=f"{key_prefix}_cit_all"):
+                st.session_state.user_selected_sources = list(ALL_AVAILABLE_CITATIONS.keys())
+                st.rerun()
+        with c_btn2:
+            if st.button("Dle sloupců (auto)", key=f"{key_prefix}_cit_auto"):
+                df_curr = st.session_state.get("df", None)
+                cols_curr = list(df_curr.columns) if df_curr is not None else []
+                st.session_state.user_selected_sources = [c[0] for c in get_active_citations(cols_curr, df_curr, selected_sources=None)]
+                st.rerun()
+        with c_btn3:
+            if st.button("Zrušit vše", key=f"{key_prefix}_cit_none"):
+                st.session_state.user_selected_sources = []
+                st.rerun()
+
+        chosen = st.multiselect(
+            "Uvést tyto zdroje a citace v závěrečném přehledu:",
+            options=list(ALL_AVAILABLE_CITATIONS.keys()),
+            default=[s for s in st.session_state.user_selected_sources if s in ALL_AVAILABLE_CITATIONS],
+            key=f"{key_prefix}_sources_multiselect"
+        )
+        st.session_state.user_selected_sources = chosen
+        return chosen
 
     return citations
 
@@ -4562,6 +4643,7 @@ def generate_pdf_booklet(
     media_attributions: dict = None,
     media_tasks: dict = None,
     include_citations: bool = True,
+    selected_citations: list = None,
     include_media_attribution: bool = True,
     col_styles: dict = None,
     include_qr_codes: bool = True,
@@ -4722,9 +4804,18 @@ def generate_pdf_booklet(
         story.append(Paragraph(clean_title, title_style))
 
         count_str = f"Počet zpracovaných položek: {len(df)}"
-        desc_str = subtitle.strip() if subtitle else "Výukový materiál a studijní atlas vygenerovaný z databáze"
-        story.append(Paragraph(f"{desc_str} • {count_str}", subtitle_style))
-        story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#1b4332"), spaceBefore=0, spaceAfter=8))
+        if subtitle and subtitle.strip():
+            raw_paras = [p.strip() for p in re.split(r'\n\s*\n', subtitle.strip()) if p.strip()]
+            for p_idx, para in enumerate(raw_paras):
+                clean_p = html_to_reportlab(para).replace('\n', '<br/>')
+                if p_idx == len(raw_paras) - 1:
+                    clean_p = f"{clean_p} &bull; <font color='#64748b'>{count_str}</font>"
+                story.append(Paragraph(clean_p, subtitle_style))
+                if p_idx < len(raw_paras) - 1:
+                    story.append(Spacer(1, 6 * fs))
+        else:
+            story.append(Paragraph(f"Výukový materiál a studijní atlas vygenerovaný z databáze &bull; <font color='#64748b'>{count_str}</font>", subtitle_style))
+        story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#1b4332"), spaceBefore=2, spaceAfter=8))
 
         if include_toc and len(df) >= 2:
             story.append(Paragraph("Obsah a rejstřík položek", desc_title_style))
@@ -5022,13 +5113,13 @@ def generate_pdf_booklet(
                     s_type = parts[1].strip() if len(parts) > 1 else "song"
                     s_attr = parts[2].strip() if len(parts) > 2 else ""
                     if s_url.startswith('http'):
-                        qr_size_snd = 32 if is_atlas_page else 40
+                        qr_size_snd = 56 if is_atlas_page else 64
                         qr_d = create_pdf_qr_drawing(s_url, size=qr_size_snd) if include_qr_codes else None
                         t_lbl = "Zpěv" if s_type == "song" else "Hlas"
                         attr_sub = f'<br/><font size="6.5" color="#64748b">Autor nahrávky: {s_attr}</font>' if (include_media_attribution and s_attr) else ""
                         if include_qr_codes and qr_d:
                             desc_p = Paragraph(f'<b>Poslechnout nahrávku ({t_lbl}) – QR kód:</b><br/><font size="7.0" color="#166534"><a href="{s_url}">{s_url[:42]}...</a></font>{attr_sub}', body_style)
-                            snd_w = (qr_size_snd / 28.35) * cm + 0.4 * cm
+                            snd_w = (qr_size_snd / 28.35) * cm + 0.5 * cm
                             t_snd = Table([[qr_d, desc_p]], colWidths=[snd_w, available_width - snd_w])
                             t_snd.setStyle(TableStyle([
                                 ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
@@ -5048,7 +5139,7 @@ def generate_pdf_booklet(
 
             if include_qr_codes and raw_links_data:
                 qr_link_cells = []
-                qr_sz = 28 if is_atlas_page else 36
+                qr_sz = 52 if is_atlas_page else 58
                 for l_url, l_name in raw_links_data:
                     l_qr = create_pdf_qr_drawing(l_url, size=qr_sz)
                     action_txt = "Otevřít mapu" if "inaturalist.org" in l_url else "Otevřít odkaz"
@@ -5067,7 +5158,7 @@ def generate_pdf_booklet(
                         else:
                             grid_rows.append([pair[0][0], pair[0][1], "", ""])
                     half_w = available_width / 2.0
-                    qr_w = (qr_sz / 28.35) * cm + 0.3 * cm
+                    qr_w = (qr_sz / 28.35) * cm + 0.35 * cm
                     desc_w = half_w - qr_w
                     t_links_grid = Table(grid_rows, colWidths=[qr_w, desc_w, qr_w, desc_w])
                     t_links_grid.setStyle(TableStyle([
@@ -5521,7 +5612,7 @@ def generate_pdf_booklet(
                     story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#cbd5e1"), spaceBefore=4, spaceAfter=6))
 
         if include_citations:
-            citations_data = get_active_citations(active_cols, df)
+            citations_data = get_active_citations(active_cols, df, selected_sources=selected_citations)
             if citations_data:
                 story.append(PageBreak())
                 story.append(Paragraph("Použitá literatura, zdroje dat a licence", biblio_title_style))
@@ -5616,6 +5707,7 @@ def generate_docx_booklet(
     media_dir: str = "",
     media_attributions: dict = None,
     include_citations: bool = True,
+    selected_citations: list = None,
     include_media_attribution: bool = True,
     col_styles: dict = None,
     title_col: str = None
@@ -5920,7 +6012,7 @@ def generate_docx_booklet(
             r_sep.font.color.rgb = RGBColor(203, 213, 225)
 
     if include_citations:
-        citations_data = get_active_citations(active_cols, df)
+        citations_data = get_active_citations(active_cols, df, selected_sources=selected_citations)
         if citations_data:
             doc.add_page_break()
             p_cit_h = doc.add_paragraph()
@@ -10787,26 +10879,22 @@ if st.session_state.df is not None:
                 key="w_deck_custom_desc"
             )
 
-            auto_attach_citations = True
-            if has_attribution:
-                auto_attach_citations = st.checkbox(
-                    "Automaticky připojit oficiální citace a licence použitých zdrojů",
-                    value=True,
-                    key="w_auto_attach_citations"
-                )
-                src_names = []
-                if has_pladias: src_names.append("Pladias.cz")
-                if has_myko: src_names.append("Mykologie.net")
-                if has_dalibor: src_names.append("DaLiBor (dalib.cz)")
-                if has_diatom: src_names.append("DiatomBase")
-                if has_algae: src_names.append("AlgaeBase")
-                st.caption(f"*Do popisu balíčku budou automaticky připojeny citace a uvedení zdrojů ({', '.join(src_names)}).*")
+            auto_attach_citations = st.checkbox(
+                "Připojit oficiální citace a licence použitých zdrojů k popisu balíčku",
+                value=st.session_state.get("w_auto_attach_citations", True),
+                key="w_auto_attach_citations"
+            )
+            if auto_attach_citations:
+                render_citations_selector_ui(key_prefix="anki")
+
+            user_cits = st.session_state.get("user_selected_sources")
+            attribution_desc = build_deck_attribution(active_cols_for_desc, selected_sources=user_cits) if (auto_attach_citations and user_cits) else (default_attribution_desc if auto_attach_citations else "")
 
             full_desc_parts = []
             if deck_custom_desc and deck_custom_desc.strip():
                 full_desc_parts.append(deck_custom_desc.strip())
-            if auto_attach_citations and default_attribution_desc:
-                full_desc_parts.append(default_attribution_desc)
+            if auto_attach_citations and attribution_desc:
+                full_desc_parts.append(attribution_desc)
             deck_desc_input = "\n\n".join(full_desc_parts)
 
             if deck_desc_input.strip():
@@ -11548,6 +11636,8 @@ if st.session_state.df is not None:
                 with c_opt2:
                     obs_include_guide = st.checkbox("Připojit návod pro iPhone (00_NAVOD_JAK_POUZIVAT.md)", value=True, key="obs_include_guide_cb")
 
+                render_citations_selector_ui(key_prefix="obs")
+
                 with st.expander("Dvě možnosti použití zdarma (Obsidian & Karty.html)", expanded=False):
                     st.markdown("""
                     **1. Samostatný přehrávač (Karty.html):**
@@ -11796,7 +11886,8 @@ if st.session_state.df is not None:
                         media_tasks=media_tasks,
                         include_guide=obs_include_guide,
                         include_index=obs_include_index,
-                        card_separator=sel_card_sep
+                        card_separator=sel_card_sep,
+                        selected_citations=st.session_state.get("user_selected_sources")
                     )
 
                     with open(out_zip_path, "rb") as f_zip:
@@ -11997,6 +12088,9 @@ if st.session_state.df is not None:
                 with col_popt2:
                     pdf_include_citations = st.checkbox("Automaticky připojit závěrečnou bibliografii", value=True, key="w_pdf_inc_cit")
                     pdf_include_attributions = st.checkbox("Zobrazovat autory a licence (CC) pod fotkami", value=True, key="w_pdf_inc_attr")
+
+                if pdf_include_citations:
+                    render_citations_selector_ui(key_prefix="pdf")
 
             st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
             col_p_btn1, col_p_btn2 = st.columns([1, 1], gap="medium")
@@ -12207,6 +12301,7 @@ if st.session_state.df is not None:
                             media_attributions=media_attributions,
                             media_tasks=media_tasks,
                             include_citations=(False if is_preview else pdf_include_citations),
+                            selected_citations=st.session_state.get("user_selected_sources"),
                             include_media_attribution=pdf_include_attributions,
                             col_styles=st.session_state.get('pdf_col_styles', {}),
                             include_qr_codes=pdf_include_qr_codes,
@@ -12296,6 +12391,9 @@ if st.session_state.df is not None:
                 docx_include_toc = st.checkbox("Vložit na začátek obsah / rejstřík položek", value=True, key="w_docx_inc_toc")
                 docx_include_citations = st.checkbox("Automaticky připojit závěrečnou bibliografii", value=True, key="w_docx_inc_cit")
                 docx_include_attributions = st.checkbox("Zobrazovat autory a licence (CC) pod fotkami", value=True, key="w_docx_inc_attr")
+
+                if docx_include_citations:
+                    render_citations_selector_ui(key_prefix="docx")
 
             st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
             btn_generate_docx_clicked = st.button("Generovat dokument ve Wordu (.docx)", key="btn_generate_docx", use_container_width=True, type="primary")
@@ -12388,6 +12486,7 @@ if st.session_state.df is not None:
                             media_dir=media_dir,
                             media_attributions=media_attributions,
                             include_citations=docx_include_citations,
+                            selected_citations=st.session_state.get("user_selected_sources"),
                             include_media_attribution=docx_include_attributions,
                             col_styles=st.session_state.get('col_styles', {}),
                             title_col=chosen_docx_title_col
