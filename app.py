@@ -25,10 +25,10 @@ from bs4 import BeautifulSoup
 from PIL import Image, ImageOps, ImageDraw
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, Table, TableStyle, PageBreak, KeepTogether, HRFlowable, Flowable
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import cm, mm, inch
+from reportlab.lib.units import cm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase.pdfmetrics import registerFontFamily
@@ -66,12 +66,15 @@ def _read_batch_replacer_html():
     return ""
 
 @st.cache_data(show_spinner=False)
+def _read_karty_html_bytes_cached(path: str, mtime: float):
+    with open(path, "rb") as f:
+        return f.read()
+
 def _read_karty_html_bytes():
     p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Karty.html")
     if os.path.exists(p):
         try:
-            with open(p, "rb") as f:
-                return f.read()
+            return _read_karty_html_bytes_cached(p, os.path.getmtime(p))
         except Exception:
             pass
     return b""
@@ -350,22 +353,6 @@ def save_optimized_image(img_bytes: bytes, target_path: str, max_dim: int = 800,
     except Exception:
         return False
 
-def detect_audio_extension(content: bytes, default_ext: str = ".mp3") -> str:
-
-    if not content:
-        return default_ext
-    if content.startswith(b'RIFF') and b'WAVE' in content[:16]:
-        return ".wav"
-    if content.startswith(b'ID3') or content.startswith(b'\xff\xfb') or content.startswith(b'\xff\xf3') or content.startswith(b'\xff\xf2'):
-        return ".mp3"
-    if content.startswith(b'fLaC'):
-        return ".flac"
-    if content.startswith(b'OggS'):
-        return ".ogg"
-    if content.startswith(b'ftyp') or b'M4A' in content[:16]:
-        return ".m4a"
-    return default_ext
-
 def slugify(value):
 
     value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore').decode('ascii')
@@ -469,7 +456,7 @@ def is_image_col(col_name, sample_val=None):
 
     if col_str.startswith(("[Pladias] Celá rostlina", "[Pladias] Květ", "[Pladias] Plod",
                            "[Pladias] List", "[Pladias] Stonek", "[Pladias] Kmen",
-                           "[Pladias] Herbář", "[Pladias] Mikrofoto", "[Pladias] Fotky")):
+                           "[Pladias] Herbář", "[Pladias] Mikrofoto", "[Pladias] Fotky")) or "[vlastní]" in col_low or "[vlastni]" in col_low:
         return True
 
     text_indicators = [
@@ -481,7 +468,10 @@ def is_image_col(col_name, sample_val=None):
     ]
     if any(k in col_low for k in text_indicators):
         return False
-    if col_str.startswith(("[Pladias.cz] Odkaz", "[Pladias] Oddělení", "[Pladias] Třída", "[Pladias] Řád", "[Pladias] Čeleď", "[Pladias] Rod",
+    if col_str.startswith(("[Pladias.cz] Odkaz", "[Pladias.cz] Výška", "[Pladias.cz] Růstová forma", "[Pladias.cz] Životní forma",
+                           "[Pladias.cz] Listy", "[Pladias.cz] Čepel listu", "[Pladias.cz] Doba kvetení",
+                           "[Pladias.cz] Barva květu", "[Pladias.cz] Květenství", "[Pladias.cz] Plod", "[Pladias.cz] Popis druhu",
+                           "[Pladias] Oddělení", "[Pladias] Třída", "[Pladias] Řád", "[Pladias] Čeleď", "[Pladias] Rod",
                            "[Mykologie.net] Odkaz", "[DaLiBor] Odkaz", "[Mechorosty] Odkaz",
                            "[DiatomBase] Odkaz", "[AlgaeBase] Odkaz", "[ADW] Odkaz", "[POWO Kew] Odkaz", "[EOL] Odkaz",
                            "[ADW] Biologický popis", "[GBIF] Vědecký popis", "[POWO Kew] Popis flóry",
@@ -517,21 +507,31 @@ def is_image_col(col_name, sample_val=None):
                     return True
 
 def format_img_src_for_html(src_str: str) -> str:
-
     if not src_str:
         return ""
     src_str = str(src_str).strip()
     if src_str.startswith("http://") or src_str.startswith("https://") or src_str.startswith("data:image"):
         return src_str
 
-    local_candidates = [
-        src_str,
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), src_str),
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "custom_media", os.path.basename(src_str)),
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_media", os.path.basename(src_str))
-    ]
-    for cand in local_candidates:
-        if os.path.isfile(cand):
+    cand = resolve_local_media_path(src_str)
+    if cand and os.path.isfile(cand):
+        try:
+            from PIL import Image, ImageOps
+            import io
+            with Image.open(cand) as img:
+                img = ImageOps.exif_transpose(img)
+                if max(img.size) > 900:
+                    img.thumbnail((900, 900), Image.Resampling.LANCZOS)
+                buf = io.BytesIO()
+                if img.mode in ("RGBA", "LA"):
+                    img.save(buf, format="PNG", optimize=True)
+                    mime = "image/png"
+                else:
+                    img.convert("RGB").save(buf, format="JPEG", quality=82, optimize=True)
+                    mime = "image/jpeg"
+                b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+                return f"data:{mime};base64,{b64}"
+        except Exception:
             try:
                 with open(cand, "rb") as f:
                     b64 = base64.b64encode(f.read()).decode("utf-8")
@@ -540,7 +540,7 @@ def format_img_src_for_html(src_str: str) -> str:
                 return f"data:{mime};base64,{b64}"
             except Exception:
                 pass
-    return src_str
+    return ""
 
 def download_media_file(url: str, local_path: str) -> bool:
     if not url or not local_path:
@@ -629,25 +629,49 @@ def download_media_file(url: str, local_path: str) -> bool:
     return False
 
 def resolve_local_media_path(raw_path: str) -> str:
-
     if not raw_path:
         return ""
-    clean = str(raw_path).strip()
+    clean = str(raw_path).strip().strip('"').strip("'")
     if clean.startswith("file:///"):
         clean = urllib.parse.unquote(clean[8:])
     elif clean.startswith("file://"):
         clean = urllib.parse.unquote(clean[7:])
+    if not clean:
+        return ""
+
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+    clean_norm = clean.replace("\\", "/")
+    bname = os.path.basename(clean_norm)
+    bname_unq = urllib.parse.unquote(bname)
+
     candidates = [
         clean,
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), clean),
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "custom_media", os.path.basename(clean)),
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_media", os.path.basename(clean)),
-        os.path.join("custom_media", os.path.basename(clean)),
-        os.path.join("test_media", os.path.basename(clean)),
+        clean_norm,
+        os.path.join(app_dir, clean),
+        os.path.join(app_dir, clean_norm),
+        os.path.join(app_dir, "custom_media", bname),
+        os.path.join(app_dir, "custom_media", bname_unq),
+        os.path.join(app_dir, "test_media", bname),
+        os.path.join(app_dir, "test_media", bname_unq),
+        os.path.join("custom_media", bname),
+        os.path.join("test_media", bname),
     ]
     for c in candidates:
-        if os.path.isfile(c):
+        if c and os.path.isfile(c):
             return os.path.abspath(c)
+
+    targets_low = {bname.lower(), bname_unq.lower()}
+    for folder_name in ("custom_media", "test_media"):
+        folder_path = os.path.join(app_dir, folder_name)
+        if os.path.isdir(folder_path):
+            try:
+                for fn in os.listdir(folder_path):
+                    if fn.lower() in targets_low:
+                        full_p = os.path.join(folder_path, fn)
+                        if os.path.isfile(full_p):
+                            return os.path.abspath(full_p)
+            except Exception:
+                pass
     return ""
 
 def load_countries_db():
@@ -1352,6 +1376,31 @@ PLADIAS_CATEGORY_MAPPING = {
     "Všechny fotky dohromady (obecný sloupec)": ("[Pladias] Fotky", None)
 }
 
+PLADIAS_DESC_FIELDS_MAPPING = {
+    "Výška": ("[Pladias.cz] Výška", "Výška", "Výška"),
+    "Růstová forma": ("[Pladias.cz] Růstová forma", "Růstová forma", "Růstová forma"),
+    "Životní forma": ("[Pladias.cz] Životní forma", "Životní forma", "Životní forma"),
+    "Listy (uspořádání na stonku)": ("[Pladias.cz] Listy", "Uspořádání listů na stonku", "Listy"),
+    "Čepel listu (tvar listu)": ("[Pladias.cz] Čepel listu", "Tvar listu", "Čepel listu"),
+    "Doba kvetení": ("[Pladias.cz] Doba kvetení", "Doba kvetení", "Kvetení"),
+    "Barva květu": ("[Pladias.cz] Barva květu", "Barva květu", "Barva květu"),
+    "Květenství": ("[Pladias.cz] Květenství", "Květenství", "Květenství"),
+    "Typ plodu": ("[Pladias.cz] Plod", "Typ plodu", "Plod"),
+    "Všechny vlastnosti dohromady (obecný sloupec)": ("[Pladias.cz] Popis druhu", None, None),
+}
+
+PLADIAS_DESC_DEFAULT_FIELDS = [
+    "Výška",
+    "Růstová forma",
+    "Životní forma",
+    "Listy (uspořádání na stonku)",
+    "Čepel listu (tvar listu)",
+    "Doba kvetení",
+    "Barva květu",
+    "Květenství",
+    "Typ plodu",
+]
+
 PLADIAS_PARTS_MAPPING = {
     'celek': {1},
     'kvet': {2},
@@ -1362,18 +1411,6 @@ PLADIAS_PARTS_MAPPING = {
     'herbar': {None, 7},
     'mikrofoto': {8}
 }
-
-def fetch_pladias_photos(species_name, max_photos=3, parts=None, fallback=True):
-    if not species_name or pd.isna(species_name):
-        return []
-    items = fetch_pladias_species_images(species_name)
-    target_succ = None
-    if parts:
-        if isinstance(parts, (set, list, tuple)):
-            target_succ = set(parts)
-        elif parts in PLADIAS_PARTS_MAPPING:
-            target_succ = PLADIAS_PARTS_MAPPING[parts]
-    return extract_pladias_category_photos(items, target_succ, max_photos=max_photos, fallback=fallback)
 
 def render_pladias_distribution_map(species_name, output_path, place_filter=None):
     if not species_name:
@@ -1547,9 +1584,10 @@ def get_or_render_pladias_map_image(species_name, place_filter=None):
         return cache_path
     return ""
 
-def extract_pladias_category_photos(all_items, target_succ, max_photos=3, fallback=False):
+def extract_pladias_category_photos(all_items, target_succ, max_photos=3, fallback=False, exclude_urls=None):
     if not all_items:
         return []
+    excluded = set(exclude_urls) if exclude_urls else set()
     matched = all_items
     if target_succ is not None:
         filtered = [it for it in all_items if it.get('succession') in target_succ]
@@ -1570,7 +1608,7 @@ def extract_pladias_category_photos(all_items, target_succ, max_photos=3, fallba
             u = f"https://files.ibot.cas.cz/cevs/images/taxa/clopla/large/{fn}"
         else:
             u = f"https://files.ibot.cas.cz/cevs/images/taxa/large/{fn}"
-        if u not in photos:
+        if u not in photos and u not in excluded:
             photos.append(u)
             if len(photos) >= max_photos:
                 break
@@ -1765,13 +1803,11 @@ def resolve_scientific_name(name: str, prefer_fungi: bool = False) -> str:
             pass
         return ""
 
-    # 1. Pro houby zkusit přednostně českou databázi Mykologie.net
     if is_fungus_candidate:
         myk_res = _query_mykologie(clean_name)
         if myk_res:
             return myk_res
 
-    # 2. iNaturalist Taxa API (podpora všech organismů v češtině)
     try:
         url_inat = "https://api.inaturalist.org/v1/taxa"
         r_inat = requests.get(url_inat, params={'q': clean_name, 'locale': 'cs', 'per_page': 10}, headers=headers, timeout=6)
@@ -1786,7 +1822,6 @@ def resolve_scientific_name(name: str, prefer_fungi: bool = False) -> str:
                 for t in results:
                     if t.get('iconic_taxon_name') == 'Fungi' and t.get('rank') in ['species', 'genus', 'subspecies', 'variety']:
                         return t.get('name', '').strip()
-            # Přesná shoda na české jméno s prioritou pro druh (species)
             for t in results:
                 comm = t.get('preferred_common_name', '')
                 if comm and comm.lower() == clean_name.lower() and t.get('rank') == 'species':
@@ -1801,13 +1836,11 @@ def resolve_scientific_name(name: str, prefer_fungi: bool = False) -> str:
     except Exception:
         pass
 
-    # 3. Dodatečný pokus v Mykologie.net pro ostatní potenciální houby
     if not is_fungus_candidate:
         myk_res2 = _query_mykologie(clean_name)
         if myk_res2:
             return myk_res2
 
-    # 4. Wikidata Taxon (P225) přes českou Wikipedii s normalizací názvu
     try:
         url_wd = "https://www.wikidata.org/w/api.php"
         params_wd = {
@@ -1831,7 +1864,6 @@ def resolve_scientific_name(name: str, prefer_fungi: bool = False) -> str:
     except Exception:
         pass
 
-    # 5. Vyhledání na české Wikipedii pro případy synonym a přesměrování
     try:
         url_wiki_search = "https://cs.wikipedia.org/w/api.php"
         p_search = {
@@ -1847,7 +1879,6 @@ def resolve_scientific_name(name: str, prefer_fungi: bool = False) -> str:
             if s_results:
                 top_title = s_results[0].get('title', '')
                 if top_title and top_title.lower() != clean_name.lower():
-                    # Zkusit Wikidata pro nalezený název článku
                     params_wd2 = {
                         'action': 'wbgetentities',
                         'sites': 'cswiki',
@@ -1883,7 +1914,6 @@ def fetch_gbif_taxonomy(species_name, prefer_fungi: bool = False):
     if not species_name:
         return res
 
-    # 1. Zkusit přímé vědecké zařazení přes GBIF
     try:
         url = f"https://api.gbif.org/v1/species/match?name={urllib.parse.quote(species_name)}&strict=true"
         r = requests.get(url, timeout=5)
@@ -1902,7 +1932,6 @@ def fetch_gbif_taxonomy(species_name, prefer_fungi: bool = False):
     except Exception:
         pass
 
-    # 2. Pokud se nenašlo (např. zadáno české jméno), dohledat vědecké jméno univerzálně + Mykologie.net
     resolved_sci = resolve_scientific_name(species_name, prefer_fungi=prefer_fungi)
     if resolved_sci:
         res["scientific_name"] = resolved_sci
@@ -1924,7 +1953,6 @@ def fetch_gbif_taxonomy(species_name, prefer_fungi: bool = False):
         except Exception:
             pass
 
-        # 3. Sekundární pokus přes obecné vyhledání GBIF species
         try:
             url3 = f"https://api.gbif.org/v1/species?name={urllib.parse.quote(resolved_sci)}"
             r3 = requests.get(url3, timeout=5)
@@ -2476,7 +2504,6 @@ def _cached_diatombase_data(species_name: str):
     if clean_sp.lower() in cz_algae_map:
         clean_sp = cz_algae_map[clean_sp.lower()]
 
-    # 1. Pokud je zadáno české jméno, zkusit dohledat vědecké
     if any(ord(c) > 127 for c in clean_sp):
         try:
             res_sci = resolve_scientific_name(clean_sp, prefer_fungi=False)
@@ -2487,7 +2514,6 @@ def _cached_diatombase_data(species_name: str):
 
     headers = {'User-Agent': 'Mozilla/5.0'}
     records = []
-    # 2. Dotaz na WoRMS / DiatomBase API s parametrem marine_only=false (klíčové pro sladkovodní rozsivky a řasy!)
     try:
         url_api = f'https://www.marinespecies.org/rest/AphiaRecordsByName/{urllib.parse.quote(clean_sp)}?like=false&marine_only=false'
         r = requests.get(url_api, headers=headers, timeout=7)
@@ -2539,7 +2565,6 @@ def _cached_diatombase_data(species_name: str):
             'source': src_label
         }
 
-    # 3. Spolehlivý fallback na GBIF taxonomii pro řasy a rozsivky
     try:
         url_gbif = 'https://api.gbif.org/v1/species/match'
         r_g = requests.get(url_gbif, params={'name': clean_sp}, timeout=5)
@@ -2648,7 +2673,6 @@ def fetch_wiki_description(species_name):
     DESC_KEYS = {'description', 'morphology', 'appearance', 'physical', 'plumage', 'identification', 'popis', 'vzhled', 'morfologie'}
     HABITAT_KEYS = {'habitat', 'distribution', 'ecology', 'range', 'behaviour', 'behavior', 'diet', 'feeding', 'vyskyt', 'rozsireni', 'ekologie'}
 
-    # 1. Anglicka Wikipedie (strukturovane vedecke sekce)
     try:
         encoded_slug = urllib.parse.quote(clean_sp.replace(' ', '_'))
         url_wiki_en = (
@@ -2705,7 +2729,6 @@ def fetch_wiki_description(species_name):
     except Exception:
         pass
 
-    # 2. Zalozni: Ceska Wikipedie
     try:
         encoded_slug = urllib.parse.quote(clean_sp.replace(' ', '_'))
         url_wiki_cs = f"https://cs.wikipedia.org/api/rest_v1/page/summary/{encoded_slug}"
@@ -3218,7 +3241,6 @@ def get_local_dataset_path(key_name: str) -> str:
     app_dir = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(app_dir, "data")
 
-    # 1. Nejprve zkontrolovat složku data/ uvnitř repozitáře (přenositelnou na GitHub i Streamlit Cloud)
     candidates = {
         "klic_2019": [
             os.path.join(data_dir, "taxonList_legend_2025_12_15.xls"),
@@ -3255,7 +3277,6 @@ def get_local_dataset_path(key_name: str) -> str:
         if p and os.path.exists(p):
             return p
 
-    # 2. Dynamické dohledání v data/ podle vzoru názvu
     if os.path.isdir(data_dir):
         patterns = {
             "klic_2019": "taxonlist",
@@ -3332,42 +3353,36 @@ def get_genus_pdf_text(genus: str) -> str:
     except Exception:
         return ""
 
-def fetch_pladias_description(species_name: str) -> str:
+def fetch_pladias_traits(species_name: str) -> dict:
     """
     Stáhne podrobné morfologické a fenologické vlastnosti druhu přímo z portálu Pladias.cz
-    (habitus, výška, listy, květy, plody, doba kvetení apod.).
+    a vrátí slovník {krátký_popisek: hodnota}.
     """
     if not species_name or pd.isna(species_name):
-        return ""
+        return {}
     clean_sp = re.sub(r'\s*\(.*\)\s*', '', str(species_name)).strip()
     clean_sp = re.sub(r'\s+sp(p)?\.?$', '', clean_sp).strip()
     if not clean_sp:
-        return ""
+        return {}
     enc = urllib.parse.quote(clean_sp)
     url = f"https://pladias.cz/taxon/data/{enc}"
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AnkiSpeciesGenerator/1.0'}
     try:
         r = requests.get(url, headers=headers, timeout=8)
         if r.status_code != 200:
-            return ""
+            return {}
         soup = BeautifulSoup(r.text, 'html.parser')
         target_keys = [
-            ('Výška', 'Výška'),
-            ('Růstová forma', 'Růstová forma'),
-            ('Životní forma', 'Životní forma'),
-            ('Uspořádání listů na stonku', 'Listy'),
-            ('Tvar listu', 'Čepel listu'),
-            ('Doba kvetení', 'Kvetení'),
-            ('Barva květu', 'Barva květu'),
-            ('Květenství', 'Květenství'),
-            ('Typ plodu', 'Plod')
+            (match_sub, short_lbl)
+            for _, (_, match_sub, short_lbl) in PLADIAS_DESC_FIELDS_MAPPING.items()
+            if match_sub and short_lbl
         ]
         extracted = {}
         for li in soup.find_all('li', class_='featureDetail'):
-            df = li.find('div', class_='d-flex')
-            if not df:
+            df_el = li.find('div', class_='d-flex')
+            if not df_el:
                 continue
-            first_col = df.find('div')
+            first_col = df_el.find('div')
             if not first_col:
                 continue
             for btn in first_col.find_all(['button', 'a', 'span.cursor-pointer']):
@@ -3383,10 +3398,18 @@ def fetch_pladias_description(species_name: str) -> str:
                     if match_sub.lower() in k.lower() and lbl not in extracted and v:
                         extracted[lbl] = v
                         break
-        if extracted:
-            return "<br/>".join([f"<b>{lbl}:</b> {val}" for lbl, val in extracted.items()])
+        return extracted
     except Exception:
-        pass
+        return {}
+
+def fetch_pladias_description(species_name: str) -> str:
+    """
+    Stáhne podrobné morfologické a fenologické vlastnosti druhu přímo z portálu Pladias.cz
+    (habitus, výška, listy, květy, plody, doba kvetení apod.).
+    """
+    extracted = fetch_pladias_traits(species_name)
+    if extracted:
+        return "<br/>".join([f"<b>{lbl}:</b> {val}" for lbl, val in extracted.items()])
     return ""
 
 def fetch_kvetena_cr_description(species_name: str, max_chars: int = 450) -> str:
@@ -3808,6 +3831,21 @@ Tento balíček obsahuje kompletní studijní kartičky a poznámky s fotografie
             front_md = "\n".join(front_parts) if front_parts else f"**{primary_name}**"
             back_md = "\n".join(back_parts) if back_parts else "Popis není k dispozici"
 
+            def _extract_first_text_answer(cols_list):
+                for c_ans in cols_list:
+                    v_ans = row.get(c_ans)
+                    if pd.isna(v_ans) or str(v_ans).strip() == "" or str(v_ans).lower() == "nan":
+                        continue
+                    if check_col_is_image(c_ans, df) or is_image_col(c_ans, v_ans):
+                        continue
+                    txt_clean = re.sub(r'<[^>]*>', '', clean_html(str(v_ans))).strip()
+                    if txt_clean:
+                        return txt_clean.splitlines()[0].strip()
+                return ""
+
+            target_answer_back = _extract_first_text_answer(back_cols) or primary_name
+            target_answer_front = _extract_first_text_answer(front_cols) or primary_name
+
             clean_tag_slug = re.sub(r'[^a-zA-Z0-9_\\-\\u00C0-\\u017F]', '_', v_slug).strip('_') or "Karticky"
             deck_tag = f"#flashcards/{clean_tag_slug}"
 
@@ -3831,6 +3869,8 @@ tags:
                 "title": primary_name,
                 "front": front_md,
                 "back": back_md,
+                "answer": target_answer_back,
+                "answerReverse": target_answer_front,
                 "interval": 0,
                 "reps": 0,
                 "ease": 2.5,
@@ -4369,8 +4409,8 @@ ALL_AVAILABLE_CITATIONS = {
     "Červený seznam ČR (AOPK ČR)": "Agentura ochrany přírody a krajiny ČR (AOPK ČR): Červené seznamy ohrožených druhů ČR. – Příroda, Praha / portal23.nature.cz.",
     "iNaturalist": "iNaturalist Community. Pozorování, mapy a fotografie pod licencemi Creative Commons. (inaturalist.org)",
     "GBIF": "Global Biodiversity Information Facility (GBIF.org) Backbone Taxonomy, Occurrences & Multimedia.",
-    "Mykologie.net": "Vavřinec V. a kol. (2026): Mykologická databáze mykologie.net – popisy, fotografie a určování hub v ČR. (mykologie.net)",
-    "DaLiBor": "Botanický ústav AV ČR & Masarykova univerzita: DaLiBor – Databáze lišejníků České republiky / Atlas českých lišejníků. (dalib.cz)",
+    "Mykologie.net": "Mykologická databáze mykologie.net – popisy, fotografie a určování hub v ČR. (mykologie.net)",
+    "DaLiBor": "Botanický ústav AV ČR: DaLiBor – Atlas českých lišejníků. (dalib.cz)",
     "Mushroom Color Atlas": "Beeler J. (2024): The Mushroom Color Atlas – A Guide to Dyes and Pigments Made from Fungi. (mushroomcoloratlas.com)",
     "Wikimedia Commons": "Multimediální repozitář Wikimedia Foundation pod volnými licencemi Creative Commons.",
     "BioLib.cz": "Zicha O. et al. (1999–2026): BioLib – Biological Library. (biolib.cz)",
@@ -4552,8 +4592,8 @@ def generate_citations_pdf():
         ("Červený seznam ČR", "Grulich V. (2012): Red List of vascular plants of the Czech Republic: 3rd edition. Preslia 84: 631–645."),
         ("iNaturalist", "iNaturalist Community. Observation data & photos licensed under Creative Commons. (inaturalist.org)"),
         ("Mushroom Color Atlas", "Beeler J. (2024): The Mushroom Color Atlas – A Guide to Dyes and Pigments Made from Fungi. (mushroomcoloratlas.com)"),
-        ("Mykologie.net", "Vavřinec V. a kol. (2026): Mykologická databáze mykologie.net – popisy, fotografie a určování hub v ČR. (mykologie.net)"),
-        ("DaLiBor", "Botanický ústav AV ČR & Masarykova univerzita: DaLiBor – Databáze lišejníků České republiky / Atlas českých lišejníků. (dalib.cz)"),
+        ("Mykologie.net", "Mykologická databáze mykologie.net – popisy, fotografie a určování hub v ČR. (mykologie.net)"),
+        ("DaLiBor", "Botanický ústav AV ČR: DaLiBor – Atlas českých lišejníků. (dalib.cz)"),
         ("GBIF", "Global Biodiversity Information Facility (GBIF.org) Backbone Taxonomy, Occurrences & Multimedia."),
         ("Wikimedia Commons", "Multimediální repozitář Wikimedia Foundation pod volnými licencemi Creative Commons.")
     ]
@@ -5229,14 +5269,19 @@ def generate_pdf_booklet(
 
                         loc_cand = resolve_local_media_path(url) if (not url.startswith('http://') and not url.startswith('https://')) else None
                         if loc_cand and os.path.isfile(loc_cand):
-                            lpath = loc_cand
-                            attr = attr_item or media_attributions.get(url, "") or media_attributions.get(os.path.basename(url), "") or media_attributions.get(loc_cand, "")
+                            ext = ".png" if loc_cand.lower().endswith(".png") else ".jpg"
+                            safe_col = slugify(col)[:12]
+                            url_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()[:6]
+                            safe_fn = f"{clean_sp}_{safe_col}_{idx}_{img_idx}_{url_hash}{ext}"
+                            opt_lpath = os.path.join(media_dir, safe_fn) if media_dir else ""
+                            lpath = opt_lpath if (opt_lpath and os.path.exists(opt_lpath) and os.path.getsize(opt_lpath) > 0) else loc_cand
+                            attr = attr_item or media_attributions.get(safe_fn, "") or media_attributions.get(url, "") or media_attributions.get(os.path.basename(url.replace("\\", "/")), "") or media_attributions.get(loc_cand, "")
                             _w, _h = _get_image_dims(lpath)
                             if _w > 0 and _h > 0 and not any(img[0] == lpath for img in gathered_photos):
                                 gathered_photos.append((lpath, col, attr))
                         elif os.path.isfile(url):
                             lpath = url
-                            attr = attr_item or media_attributions.get(url, "") or media_attributions.get(os.path.basename(url), "")
+                            attr = attr_item or media_attributions.get(url, "") or media_attributions.get(os.path.basename(url.replace("\\", "/")), "")
                             _w, _h = _get_image_dims(lpath)
                             if _w > 0 and _h > 0 and not any(img[0] == lpath for img in gathered_photos):
                                 gathered_photos.append((lpath, col, attr))
@@ -6628,29 +6673,6 @@ with col_head2:
         st.rerun()
 
 @st.cache_data(show_spinner=False)
-@st.cache_data(show_spinner=False)
-def _read_batch_replacer_html():
-    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "BatchReplacer.html")
-    if os.path.exists(p):
-        try:
-            with open(p, "r", encoding="utf-8") as f:
-                return f.read()
-        except Exception:
-            pass
-    return ""
-
-@st.cache_data(show_spinner=False)
-def _read_karty_html_bytes():
-    karty_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Karty.html")
-    if os.path.exists(karty_path):
-        try:
-            with open(karty_path, "rb") as f_k:
-                return f_k.read()
-        except Exception:
-            pass
-    return b""
-
-@st.cache_data(show_spinner=False)
 def _read_pdf_data(file_candidates):
     for f in file_candidates:
         if os.path.exists(f):
@@ -7998,6 +8020,7 @@ if st.session_state.df is not None:
                 "pladias_col": columns[0] if columns else "",
                 "enable_pladias_desc": False,
                 "pladias_desc_col": columns[0] if columns else "",
+                "pladias_desc_fields": list(PLADIAS_DESC_DEFAULT_FIELDS),
                 "enable_pladias_tax": False,
                 "enable_pladias_czech_name": True,
                 "pladias_tax_col": columns[0] if columns else "",
@@ -8649,6 +8672,18 @@ if st.session_state.df is not None:
                         options=columns,
                         index=pladias_desc_col_idx,
                         key="w_pladias_desc_col"
+                    )
+                    _raw_def_desc_fields = cfg.get("pladias_desc_fields", list(PLADIAS_DESC_DEFAULT_FIELDS))
+                    _valid_desc_opts = list(PLADIAS_DESC_FIELDS_MAPPING.keys())
+                    _clean_def_desc_fields = [f for f in _raw_def_desc_fields if f in _valid_desc_opts]
+                    if not _clean_def_desc_fields:
+                        _clean_def_desc_fields = list(PLADIAS_DESC_DEFAULT_FIELDS)
+                    cfg["pladias_desc_fields"] = st.multiselect(
+                        "Vyberte vlastnosti druhu (vytvoří se samostatné sloupce):",
+                        options=_valid_desc_opts,
+                        default=_clean_def_desc_fields,
+                        key="w_pladias_desc_fields",
+                        help="Každá vybraná vlastnost se uloží do vlastního sloupce (např. [Pladias.cz] Doba kvetení, [Pladias.cz] Životní forma), případně je můžete stáhnout všechny najednou do jednoho obecného sloupce."
                     )
 
             with tab_mechorosty:
@@ -9384,6 +9419,9 @@ if st.session_state.df is not None:
             enable_pladias = cfg.get("enable_pladias", False)
             enable_pladias_desc = cfg.get("enable_pladias_desc", False)
             pladias_desc_col = cfg.get("pladias_desc_col", columns[0] if columns else "")
+            pladias_desc_fields = cfg.get("pladias_desc_fields", list(PLADIAS_DESC_DEFAULT_FIELDS))
+            if not pladias_desc_fields:
+                pladias_desc_fields = list(PLADIAS_DESC_DEFAULT_FIELDS)
             enable_klic_2019 = cfg.get("enable_klic_2019", False)
             enable_nepuvodni = cfg.get("enable_nepuvodni", False)
             enable_biotopy = cfg.get("enable_biotopy", False)
@@ -9549,7 +9587,9 @@ if st.session_state.df is not None:
             if enable_pladias:
                 _ensure_new_col("[Pladias] Odkaz")
             if enable_pladias_desc:
-                _ensure_new_col("[Pladias.cz] Popis druhu")
+                for desc_opt in pladias_desc_fields:
+                    if desc_opt in PLADIAS_DESC_FIELDS_MAPPING:
+                        _ensure_new_col(PLADIAS_DESC_FIELDS_MAPPING[desc_opt][0])
             if enable_pladias_tax:
                 if enable_pladias_czech_name:
                     _ensure_new_col("[Pladias] České jméno")
@@ -9839,6 +9879,9 @@ if st.session_state.df is not None:
                         species_items = fetch_pladias_species_images(raw_sp)
                         target_cats = pladias_photos_parts if pladias_photos_parts else ["Všechny fotky dohromady (obecný sloupec)"]
                         has_any_photo = False
+                        used_pladias_urls = set()
+                        missing_cats = []
+
                         for cat_opt in target_cats:
                             if cat_opt in PLADIAS_CATEGORY_MAPPING:
                                 col_name, succs = PLADIAS_CATEGORY_MAPPING[cat_opt]
@@ -9846,11 +9889,30 @@ if st.session_state.df is not None:
                                     species_items,
                                     succs,
                                     max_photos=pladias_photos_max,
-                                    fallback=pladias_photos_fallback
+                                    fallback=False,
+                                    exclude_urls=used_pladias_urls if succs is not None else None
                                 )
                                 if cat_photos:
                                     has_any_photo = True
                                     row_updates[col_name] = ";".join(cat_photos)
+                                    if succs is not None:
+                                        used_pladias_urls.update(cat_photos)
+                                elif pladias_photos_fallback and succs is not None:
+                                    missing_cats.append((col_name, succs))
+
+                        for col_name, succs in missing_cats:
+                            cat_photos = extract_pladias_category_photos(
+                                species_items,
+                                succs,
+                                max_photos=pladias_photos_max,
+                                fallback=True,
+                                exclude_urls=used_pladias_urls
+                            )
+                            if cat_photos:
+                                has_any_photo = True
+                                row_updates[col_name] = ";".join(cat_photos)
+                                used_pladias_urls.update(cat_photos)
+
                         if has_any_photo:
                             is_flora_plant = True
                         else:
@@ -9958,20 +10020,35 @@ if st.session_state.df is not None:
                     except Exception:
                         pass
 
-                if enable_pladias_desc and not _is_target_filled("[Pladias.cz] Popis druhu"):
-                    try:
-                        raw_sp = str(row[pladias_desc_col]).strip()
-                        sp_clean = re.sub(r'\s*\(.*\)\s*', '', raw_sp).strip()
-                        sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp_clean).strip()
-                        p_desc = fetch_pladias_description(sp_clean)
-                        if not p_desc:
-                            p_desc = fetch_kvetena_cr_description(sp_clean)
-                        if p_desc:
-                            row_updates["[Pladias.cz] Popis druhu"] = p_desc
-                        else:
-                            row_unfounds.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'Pladias.cz Popis druhu'})
-                    except Exception:
-                        row_unfounds.append({'Řádek': idx + 1, 'Položka': str(row.get(pladias_desc_col, "")), 'Modul': 'Pladias.cz Popis druhu (Chyba)'})
+                if enable_pladias_desc:
+                    target_desc_entries = [
+                        (desc_opt, PLADIAS_DESC_FIELDS_MAPPING[desc_opt])
+                        for desc_opt in pladias_desc_fields
+                        if desc_opt in PLADIAS_DESC_FIELDS_MAPPING
+                        and not _is_target_filled(PLADIAS_DESC_FIELDS_MAPPING[desc_opt][0])
+                    ]
+                    if target_desc_entries:
+                        try:
+                            raw_sp = str(row[pladias_desc_col]).strip()
+                            sp_clean = re.sub(r'\s*\(.*\)\s*', '', raw_sp).strip()
+                            sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp_clean).strip()
+                            traits = fetch_pladias_traits(sp_clean)
+                            any_written = False
+                            for desc_opt, (col_name, _, short_lbl) in target_desc_entries:
+                                if short_lbl is None:
+                                    p_desc = "<br/>".join([f"<b>{lbl}:</b> {val}" for lbl, val in traits.items()]) if traits else fetch_kvetena_cr_description(sp_clean)
+                                    if p_desc:
+                                        row_updates[col_name] = p_desc
+                                        any_written = True
+                                else:
+                                    val_t = traits.get(short_lbl, "")
+                                    if val_t:
+                                        row_updates[col_name] = val_t
+                                        any_written = True
+                            if not any_written:
+                                row_unfounds.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'Pladias.cz Popis druhu'})
+                        except Exception:
+                            row_unfounds.append({'Řádek': idx + 1, 'Položka': str(row.get(pladias_desc_col, "")), 'Modul': 'Pladias.cz Popis druhu (Chyba)'})
 
                 if enable_cerveny_seznam:
                     try:
@@ -10533,9 +10610,20 @@ if st.session_state.df is not None:
                 is_type_in = "Vepisovací" in anki_card_test_type
                 st.session_state.is_type_in = is_type_in
                 type_target_col = None
+                type_options = st.session_state.back_cols_ordered if st.session_state.back_cols_ordered else columns
+                if type_options:
+                    non_img_back = [
+                        c for c in type_options
+                        if not (check_col_is_image(c, st.session_state.df) or is_image_col(c))
+                    ]
+                    first_back_col = non_img_back[0] if non_img_back else type_options[0]
+                    if st.session_state.get("_last_anki_back_first_col") != first_back_col:
+                        st.session_state["anki_type_target_col"] = first_back_col
+                        st.session_state["_last_anki_back_first_col"] = first_back_col
+                    elif st.session_state.get("anki_type_target_col") not in type_options:
+                        st.session_state["anki_type_target_col"] = first_back_col
                 with c_mode2:
                     if is_type_in:
-                        type_options = st.session_state.back_cols_ordered if st.session_state.back_cols_ordered else columns
                         type_target_col = st.selectbox(
                             "Pole, které má uživatel vepsat z klávesnice:",
                             options=type_options,
@@ -10674,7 +10762,11 @@ if st.session_state.df is not None:
                                             attr_txt = ""
                                         img_src = format_img_src_for_html(img_url)
                                         caption_html = f'<div style="font-size: 10px; color: {preview_label}; margin-top: 3px; text-align: center; opacity: 0.85;">{attr_txt}</div>' if (show_media_attr_val and attr_txt) else ''
-                                        st.markdown(f'<div style="width: 100%; max-width: 450px; border-radius: 6px; overflow: hidden; border: 1px solid {preview_border}; margin: 8px 0; padding-bottom: 4px;"><img src="{img_src}" style="width: 100%; height: auto; object-fit: contain; display: block;">{caption_html}</div>', unsafe_allow_html=True)
+                                        if img_src:
+                                            st.markdown(f'<div style="width: 100%; max-width: 450px; border-radius: 6px; overflow: hidden; border: 1px solid {preview_border}; margin: 8px 0; padding-bottom: 4px;"><img src="{img_src}" style="width: 100%; height: auto; object-fit: contain; display: block;">{caption_html}</div>', unsafe_allow_html=True)
+                                        else:
+                                            miss_bn = os.path.basename(img_url.replace("\\", "/"))
+                                            st.markdown(f'<div style="padding: 8px 10px; border-radius: 6px; border: 1px dashed {preview_border}; margin: 6px 0; font-size: 12px; color: {preview_label};">Lokální obrázek nenalezen: <code>{miss_bn}</code>{caption_html}</div>', unsafe_allow_html=True)
                                 elif str(c).startswith("[TTS]"):
                                     st.info(f"Výslovnost (Audio): {str(val).split(';')[0]}")
                                 elif c == "[Zvuky] Hlasy ptáků":
@@ -10789,7 +10881,11 @@ if st.session_state.df is not None:
                                             attr_txt = ""
                                         img_src = format_img_src_for_html(img_url)
                                         caption_html = f'<div style="font-size: 10px; color: {preview_label}; margin-top: 3px; text-align: center; opacity: 0.85;">{attr_txt}</div>' if (show_media_attr_val and attr_txt) else ''
-                                        st.markdown(f'<div style="width: 100%; max-width: 450px; border-radius: 6px; overflow: hidden; border: 1px solid {preview_border}; margin: 8px 0; padding-bottom: 4px;"><img src="{img_src}" style="width: 100%; height: auto; object-fit: contain; display: block;">{caption_html}</div>', unsafe_allow_html=True)
+                                        if img_src:
+                                            st.markdown(f'<div style="width: 100%; max-width: 450px; border-radius: 6px; overflow: hidden; border: 1px solid {preview_border}; margin: 8px 0; padding-bottom: 4px;"><img src="{img_src}" style="width: 100%; height: auto; object-fit: contain; display: block;">{caption_html}</div>', unsafe_allow_html=True)
+                                        else:
+                                            miss_bn = os.path.basename(img_url.replace("\\", "/"))
+                                            st.markdown(f'<div style="padding: 8px 10px; border-radius: 6px; border: 1px dashed {preview_border}; margin: 6px 0; font-size: 12px; color: {preview_label};">Lokální obrázek nenalezen: <code>{miss_bn}</code>{caption_html}</div>', unsafe_allow_html=True)
                                 elif str(c).startswith("[TTS]"):
                                     st.info(f"Výslovnost (Audio): {str(val).split(';')[0]}")
                                 elif c == "[Zvuky] Hlasy ptáků":
@@ -11063,6 +11159,15 @@ if st.session_state.df is not None:
                         status.text(f"Stahuji a optimalizuji média (0/{total_tasks})...")
                         progress_bar.progress(0.0)
 
+                        app_base_dir_anki = os.path.dirname(os.path.abspath(__file__))
+                        cache_media_dir_anki = os.path.join(app_base_dir_anki, "custom_media")
+                        os.makedirs(cache_media_dir_anki, exist_ok=True)
+
+                        anki_http_session = requests.Session()
+                        anki_adapter = requests.adapters.HTTPAdapter(pool_connections=32, pool_maxsize=32, max_retries=1)
+                        anki_http_session.mount("http://", anki_adapter)
+                        anki_http_session.mount("https://", anki_adapter)
+
                         def _download_task(item):
                             fname, task_data = item
                             url = task_data[0]
@@ -11070,14 +11175,27 @@ if st.session_state.df is not None:
                             local_path = os.path.join(media_dir, fname)
                             if os.path.exists(local_path) and os.path.getsize(local_path) > 0:
                                 return fname, local_path, True
+
+                            cache_path = os.path.join(cache_media_dir_anki, fname)
+                            if os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
+                                try:
+                                    shutil.copy2(cache_path, local_path)
+                                    return fname, local_path, True
+                                except Exception:
+                                    pass
+
                             try:
                                 if mtype == 'pladias_map':
                                     if render_pladias_distribution_map(url, local_path):
+                                        try: shutil.copy2(local_path, cache_path)
+                                        except Exception: pass
                                         return fname, local_path, True
                                     return fname, local_path, False
                                 elif mtype == 'inat_map':
                                     extra_sp = task_data[2] if len(task_data) > 2 else ""
                                     if render_inat_observation_map(url, local_path, species_name=extra_sp):
+                                        try: shutil.copy2(local_path, cache_path)
+                                        except Exception: pass
                                         return fname, local_path, True
                                     return fname, local_path, False
                                 elif mtype == 'local_image':
@@ -11086,20 +11204,38 @@ if st.session_state.df is not None:
                                             fcontent = rf.read()
                                         if not save_optimized_image(fcontent, local_path, max_dim=1600, quality=88):
                                             shutil.copy2(url, local_path)
+                                        try: shutil.copy2(local_path, cache_path)
+                                        except Exception: pass
                                         return fname, local_path, True
                                     return fname, local_path, False
-                                r_resp = requests.get(
-                                    url,
-                                    headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'},
-                                    timeout=(2.5, 5.0)
+
+                                req_headers = {
+                                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                                    'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+                                }
+                                if 'mykologie.net' in url:
+                                    req_headers['Referer'] = 'https://www.mykologie.net/'
+                                elif 'dalib.cz' in url:
+                                    req_headers['Referer'] = 'https://dalib.cz/'
+
+                                req_url = url
+                                if " " in req_url:
+                                    parts = list(urllib.parse.urlsplit(req_url))
+                                    parts[2] = urllib.parse.quote(parts[2])
+                                    req_url = urllib.parse.urlunsplit(parts)
+
+                                r_resp = anki_http_session.get(
+                                    req_url,
+                                    headers=req_headers,
+                                    timeout=(3.0, 7.0)
                                 )
-                                if r_resp.status_code == 404 and 'cevs/images/taxa/' in url:
-                                    alt_url = url.replace('/taxa/large/', '/taxa/clopla/large/') if '/taxa/clopla/' not in url else url.replace('/taxa/clopla/large/', '/taxa/large/')
+                                if r_resp.status_code == 404 and 'cevs/images/taxa/' in req_url:
+                                    alt_url = req_url.replace('/taxa/large/', '/taxa/clopla/large/') if '/taxa/clopla/' not in req_url else req_url.replace('/taxa/clopla/large/', '/taxa/large/')
                                     try:
-                                        alt_resp = requests.get(
+                                        alt_resp = anki_http_session.get(
                                             alt_url,
-                                            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'},
-                                            timeout=(2.5, 5.0)
+                                            headers=req_headers,
+                                            timeout=(3.0, 7.0)
                                         )
                                         if alt_resp.status_code == 200:
                                             r_resp = alt_resp
@@ -11109,35 +11245,44 @@ if st.session_state.df is not None:
                                     if mtype == 'image':
                                         if save_optimized_image(r_resp.content, local_path, max_dim=1600, quality=88):
                                             if check_image_quality(local_path):
+                                                try: shutil.copy2(local_path, cache_path)
+                                                except Exception: pass
                                                 return fname, local_path, True
                                             else:
                                                 if os.path.exists(local_path):
                                                     os.remove(local_path)
+                                        else:
+                                            with open(local_path, 'wb') as f:
+                                                f.write(r_resp.content)
+                                            try: shutil.copy2(local_path, cache_path)
+                                            except Exception: pass
+                                            return fname, local_path, True
                                     else:
                                         with open(local_path, 'wb') as f:
                                             f.write(r_resp.content)
                                         if os.path.exists(local_path) and os.path.getsize(local_path) > 0:
+                                            try: shutil.copy2(local_path, cache_path)
+                                            except Exception: pass
                                             return fname, local_path, True
                             except Exception:
                                 pass
                             return fname, local_path, False
 
                         completed_count = 0
-                        with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
+                        workers = min(20, max(4, (os.cpu_count() or 4) * 3))
+                        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
                             futures = {executor.submit(_download_task, item): item for item in media_tasks.items()}
-                            try:
-                                for future in concurrent.futures.as_completed(futures, timeout=75):
-                                    completed_count += 1
+                            for future in concurrent.futures.as_completed(futures):
+                                completed_count += 1
+                                if completed_count % 10 == 0 or completed_count == total_tasks:
                                     progress_bar.progress(completed_count / total_tasks)
-                                    status.text(f"Stahuji a optimalizuji média: {completed_count}/{total_tasks} hotovo...")
-                                    try:
-                                        fname, local_path, success = future.result(timeout=1.0)
-                                        if success:
-                                            downloaded_media.append(local_path)
-                                    except Exception:
-                                        pass
-                            except concurrent.futures.TimeoutError:
-                                status.text(f"Časový limit pro pomalá média vypršel ({completed_count}/{total_tasks}). Pokračuji v sestavování balíčku...")
+                                    status.text(f"Stahuji a optimalizuji média ({completed_count}/{total_tasks})...")
+                                try:
+                                    fname, local_path, success = future.result()
+                                    if success:
+                                        downloaded_media.append(local_path)
+                                except Exception:
+                                    pass
 
                     status.text("Sestavuji kartičky...")
                     progress_bar.progress(1.0)
@@ -11720,7 +11865,11 @@ if st.session_state.df is not None:
                                         attr_txt = u_parts[1].strip() if len(u_parts) > 1 else ""
                                         img_src = format_img_src_for_html(img_url)
                                         caption_html = f'<div style="font-size: 10px; color: {preview_label}; margin-top: 3px; text-align: center; opacity: 0.85;">{attr_txt}</div>' if (show_media_attr_val and attr_txt) else ''
-                                        st.markdown(f'<div style="width: 100%; max-width: 450px; border-radius: 6px; overflow: hidden; border: 1px solid {preview_border}; margin: 8px 0; padding-bottom: 4px;"><img src="{img_src}" style="width: 100%; height: auto; object-fit: contain; display: block;">{caption_html}</div>', unsafe_allow_html=True)
+                                        if img_src:
+                                            st.markdown(f'<div style="width: 100%; max-width: 450px; border-radius: 6px; overflow: hidden; border: 1px solid {preview_border}; margin: 8px 0; padding-bottom: 4px;"><img src="{img_src}" style="width: 100%; height: auto; object-fit: contain; display: block;">{caption_html}</div>', unsafe_allow_html=True)
+                                        else:
+                                            miss_bn = os.path.basename(img_url.replace("\\", "/"))
+                                            st.markdown(f'<div style="padding: 8px 10px; border-radius: 6px; border: 1px dashed {preview_border}; margin: 6px 0; font-size: 12px; color: {preview_label};">Lokální obrázek nenalezen: <code>{miss_bn}</code>{caption_html}</div>', unsafe_allow_html=True)
                                 elif c in ["[Pladias] Mapa rozšíření", "[Pladias.cz] Mapa rozšíření"]:
                                     if label_html:
                                         st.markdown(label_html, unsafe_allow_html=True)
@@ -11783,7 +11932,11 @@ if st.session_state.df is not None:
                                         attr_txt = u_parts[1].strip() if len(u_parts) > 1 else ""
                                         img_src = format_img_src_for_html(img_url)
                                         caption_html = f'<div style="font-size: 10px; color: {preview_label}; margin-top: 3px; text-align: center; opacity: 0.85;">{attr_txt}</div>' if (show_media_attr_val and attr_txt) else ''
-                                        st.markdown(f'<div style="width: 100%; max-width: 450px; border-radius: 6px; overflow: hidden; border: 1px solid {preview_border}; margin: 8px 0; padding-bottom: 4px;"><img src="{img_src}" style="width: 100%; height: auto; object-fit: contain; display: block;">{caption_html}</div>', unsafe_allow_html=True)
+                                        if img_src:
+                                            st.markdown(f'<div style="width: 100%; max-width: 450px; border-radius: 6px; overflow: hidden; border: 1px solid {preview_border}; margin: 8px 0; padding-bottom: 4px;"><img src="{img_src}" style="width: 100%; height: auto; object-fit: contain; display: block;">{caption_html}</div>', unsafe_allow_html=True)
+                                        else:
+                                            miss_bn = os.path.basename(img_url.replace("\\", "/"))
+                                            st.markdown(f'<div style="padding: 8px 10px; border-radius: 6px; border: 1px dashed {preview_border}; margin: 6px 0; font-size: 12px; color: {preview_label};">Lokální obrázek nenalezen: <code>{miss_bn}</code>{caption_html}</div>', unsafe_allow_html=True)
                                 elif c in ["[Pladias] Mapa rozšíření", "[Pladias.cz] Mapa rozšíření"]:
                                     if label_html:
                                         st.markdown(label_html, unsafe_allow_html=True)
@@ -12114,11 +12267,14 @@ if st.session_state.df is not None:
                         if st.button("Zavřít náhled", key="btn_close_pdf_preview"):
                             st.session_state.pdf_preview_data = None
                             st.rerun()
-                    b64_pdf = base64.b64encode(st.session_state.pdf_preview_data).decode('utf-8')
-                    st.markdown(
-                        f'<iframe src="data:application/pdf;base64,{b64_pdf}#toolbar=1&navpanes=0" width="100%" height="700px" style="border: 1px solid #cbd5e1; border-radius: 8px;"></iframe>',
-                        unsafe_allow_html=True
-                    )
+                    if hasattr(st, "pdf"):
+                        st.pdf(st.session_state.pdf_preview_data, height=700)
+                    else:
+                        b64_pdf = base64.b64encode(st.session_state.pdf_preview_data).decode('utf-8')
+                        st.markdown(
+                            f'<iframe src="data:application/pdf;base64,{b64_pdf}#toolbar=1&navpanes=0" width="100%" height="700px" style="border: 1px solid #cbd5e1; border-radius: 8px;"></iframe>',
+                            unsafe_allow_html=True
+                        )
 
             if btn_generate_pdf_clicked or btn_preview_pdf_clicked:
                 is_preview = bool(btn_preview_pdf_clicked)
@@ -12196,12 +12352,13 @@ if st.session_state.df is not None:
                                     else:
                                         url = entry.strip()
                                         attr_txt = ""
-                                    if os.path.isfile(url):
-                                        ext = os.path.splitext(url)[1].lower() or ".jpg"
+                                    loc_src = resolve_local_media_path(url) if (not url.startswith('http://') and not url.startswith('https://')) else ""
+                                    if loc_src and os.path.isfile(loc_src):
+                                        ext = ".png" if loc_src.lower().endswith(".png") else ".jpg"
                                         safe_col = slugify(col)[:12]
                                         url_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()[:6]
                                         safe_filename = f"{clean_sp}_{safe_col}_{idx}_{img_idx}_{url_hash}{ext}"
-                                        media_tasks[safe_filename] = (url, 'local_image')
+                                        media_tasks[safe_filename] = (loc_src, 'local_image')
                                         if attr_txt:
                                             media_attributions[safe_filename] = attr_txt
                                     elif url.startswith('http://') or url.startswith('https://'):
@@ -12221,6 +12378,15 @@ if st.session_state.df is not None:
                         status.text(f"Stahuji a optimalizuji obrázky pro PDF (0/{total_tasks})...")
                         progress_bar.progress(0.0)
 
+                        app_base_dir = os.path.dirname(os.path.abspath(__file__))
+                        cache_media_dir = os.path.join(app_base_dir, "custom_media")
+                        os.makedirs(cache_media_dir, exist_ok=True)
+
+                        pdf_http_session = requests.Session()
+                        pdf_adapter = requests.adapters.HTTPAdapter(pool_connections=32, pool_maxsize=32, max_retries=1)
+                        pdf_http_session.mount("http://", pdf_adapter)
+                        pdf_http_session.mount("https://", pdf_adapter)
+
                         def _download_pdf_img(item):
                             fname, task_data = item
                             url = task_data[0]
@@ -12228,14 +12394,27 @@ if st.session_state.df is not None:
                             local_path = os.path.join(media_dir, fname)
                             if os.path.exists(local_path) and os.path.getsize(local_path) > 0:
                                 return fname, local_path, True
+
+                            cache_path = os.path.join(cache_media_dir, fname)
+                            if os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
+                                try:
+                                    shutil.copy2(cache_path, local_path)
+                                    return fname, local_path, True
+                                except Exception:
+                                    pass
+
                             try:
                                 if mtype == 'pladias_map':
                                     if render_pladias_distribution_map(url, local_path):
+                                        try: shutil.copy2(local_path, cache_path)
+                                        except Exception: pass
                                         return fname, local_path, True
                                     return fname, local_path, False
                                 elif mtype == 'inat_map':
                                     extra_sp = task_data[2] if len(task_data) > 2 else ""
                                     if render_inat_observation_map(url, local_path, species_name=extra_sp):
+                                        try: shutil.copy2(local_path, cache_path)
+                                        except Exception: pass
                                         return fname, local_path, True
                                     return fname, local_path, False
                                 elif mtype == 'local_image':
@@ -12243,26 +12422,64 @@ if st.session_state.df is not None:
                                         with open(url, "rb") as rf:
                                             fcontent = rf.read()
                                         if save_optimized_image(fcontent, local_path, max_dim=800, quality=80):
+                                            try: shutil.copy2(local_path, cache_path)
+                                            except Exception: pass
                                             return fname, local_path, True
                                     return fname, local_path, False
-                                r_resp = requests.get(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}, timeout=(2.5, 5.0))
+
+                                req_headers = {
+                                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                                    'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+                                }
+                                if 'mykologie.net' in url:
+                                    req_headers['Referer'] = 'https://www.mykologie.net/'
+                                elif 'dalib.cz' in url:
+                                    req_headers['Referer'] = 'https://dalib.cz/'
+
+                                req_url = url
+                                if " " in req_url:
+                                    parts = list(urllib.parse.urlsplit(req_url))
+                                    parts[2] = urllib.parse.quote(parts[2])
+                                    req_url = urllib.parse.urlunsplit(parts)
+
+                                r_resp = pdf_http_session.get(req_url, headers=req_headers, timeout=(3.0, 7.0))
+                                if r_resp.status_code == 404 and 'cevs/images/taxa/' in req_url:
+                                    alt_url = req_url.replace('/taxa/large/', '/taxa/clopla/large/') if '/taxa/clopla/' not in req_url else req_url.replace('/taxa/clopla/large/', '/taxa/large/')
+                                    try:
+                                        alt_resp = pdf_http_session.get(alt_url, headers=req_headers, timeout=(3.0, 7.0))
+                                        if alt_resp.status_code == 200:
+                                            r_resp = alt_resp
+                                    except Exception:
+                                        pass
+
                                 if r_resp.status_code == 200 and len(r_resp.content) > 0:
                                     if save_optimized_image(r_resp.content, local_path, max_dim=800, quality=80):
+                                        try: shutil.copy2(local_path, cache_path)
+                                        except Exception: pass
+                                        return fname, local_path, True
+                                    else:
+                                        with open(local_path, "wb") as f_out:
+                                            f_out.write(r_resp.content)
+                                        try: shutil.copy2(local_path, cache_path)
+                                        except Exception: pass
                                         return fname, local_path, True
                             except Exception:
                                 pass
                             return fname, local_path, False
 
+                        workers = min(20, max(4, (os.cpu_count() or 4) * 3))
                         completed_count = 0
-                        with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
+                        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
                             futures = {executor.submit(_download_pdf_img, item): item for item in media_tasks.items()}
-                            try:
-                                for future in concurrent.futures.as_completed(futures, timeout=75):
-                                    completed_count += 1
+                            for future in concurrent.futures.as_completed(futures):
+                                completed_count += 1
+                                if completed_count % 10 == 0 or completed_count == total_tasks:
                                     progress_bar.progress(completed_count / total_tasks)
-                                    status.text(f"Stahuji a optimalizuji obrázky: {completed_count}/{total_tasks} hotovo...")
-                            except concurrent.futures.TimeoutError:
-                                pass
+                                    status.text(f"Stahuji a optimalizuji obrázky pro PDF ({completed_count}/{total_tasks})...")
+                                try:
+                                    future.result()
+                                except Exception:
+                                    pass
 
                     status.text("Sázím a generuji PDF..." if is_preview else "Sázím a generuji PDF brožuru...")
                     progress_bar.progress(1.0)
@@ -12437,7 +12654,16 @@ if st.session_state.df is not None:
                                     else:
                                         url = entry.strip()
                                         attr_txt = ""
-                                    if url.startswith('http://') or url.startswith('https://'):
+                                    loc_src = resolve_local_media_path(url) if (not url.startswith('http://') and not url.startswith('https://')) else ""
+                                    if loc_src and os.path.isfile(loc_src):
+                                        ext = ".png" if loc_src.lower().endswith(".png") else ".jpg"
+                                        safe_col = slugify(col)[:12]
+                                        url_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()[:6]
+                                        safe_filename = f"{clean_species}_{safe_col}_{idx}_{img_idx}_{url_hash}{ext}"
+                                        media_tasks[safe_filename] = (loc_src, 'local_image')
+                                        if attr_txt:
+                                            media_attributions[safe_filename] = attr_txt
+                                    elif url.startswith('http://') or url.startswith('https://'):
                                         ext = ".jpg"
                                         if ".png" in url.lower(): ext = ".png"
                                         elif ".jpeg" in url.lower(): ext = ".jpeg"
@@ -12450,20 +12676,96 @@ if st.session_state.df is not None:
                                             media_attributions[safe_filename] = attr_txt
 
                     total_tasks = len(media_tasks)
-                    completed_tasks = 0
-                    for safe_fn, (source_val, task_type) in media_tasks.items():
-                        target_file = os.path.join(media_dir, safe_fn)
-                        try:
-                            if task_type == 'pladias_map':
-                                render_pladias_distribution_map(source_val, target_file)
-                            elif task_type == 'image':
-                                r_img = requests.get(source_val, headers={'User-Agent': 'Mozilla/5.0'}, timeout=8)
-                                if r_img.status_code == 200:
-                                    save_optimized_image(r_img.content, target_file, max_dim=1200, quality=85)
-                        except Exception:
-                            pass
-                        completed_tasks += 1
-                        progress_bar.progress(float(completed_tasks) / float(max(1, total_tasks)))
+                    if total_tasks > 0:
+                        status.text(f"Stahuji a optimalizuji obrázky pro Word (0/{total_tasks})...")
+                        progress_bar.progress(0.0)
+
+                        app_base_dir_docx = os.path.dirname(os.path.abspath(__file__))
+                        cache_media_dir_docx = os.path.join(app_base_dir_docx, "custom_media")
+                        os.makedirs(cache_media_dir_docx, exist_ok=True)
+
+                        docx_http_session = requests.Session()
+                        docx_adapter = requests.adapters.HTTPAdapter(pool_connections=32, pool_maxsize=32, max_retries=1)
+                        docx_http_session.mount("http://", docx_adapter)
+                        docx_http_session.mount("https://", docx_adapter)
+
+                        def _download_docx_img(item):
+                            safe_fn, (source_val, task_type) = item
+                            target_file = os.path.join(media_dir, safe_fn)
+                            if os.path.exists(target_file) and os.path.getsize(target_file) > 0:
+                                return True
+
+                            cache_file = os.path.join(cache_media_dir_docx, safe_fn)
+                            if os.path.exists(cache_file) and os.path.getsize(cache_file) > 0:
+                                try:
+                                    shutil.copy2(cache_file, target_file)
+                                    return True
+                                except Exception:
+                                    pass
+
+                            try:
+                                if task_type == 'pladias_map':
+                                    if render_pladias_distribution_map(source_val, target_file):
+                                        try: shutil.copy2(target_file, cache_file)
+                                        except Exception: pass
+                                        return True
+                                elif task_type == 'local_image':
+                                    if os.path.isfile(source_val):
+                                        with open(source_val, "rb") as rf:
+                                            fcontent = rf.read()
+                                        if not save_optimized_image(fcontent, target_file, max_dim=1200, quality=85):
+                                            shutil.copy2(source_val, target_file)
+                                        try: shutil.copy2(target_file, cache_file)
+                                        except Exception: pass
+                                        return True
+                                elif task_type == 'image':
+                                    req_headers = {
+                                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                                        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+                                    }
+                                    if 'mykologie.net' in source_val:
+                                        req_headers['Referer'] = 'https://www.mykologie.net/'
+                                    elif 'dalib.cz' in source_val:
+                                        req_headers['Referer'] = 'https://dalib.cz/'
+
+                                    r_img = docx_http_session.get(source_val, headers=req_headers, timeout=(3.0, 7.0))
+                                    if r_img.status_code == 404 and 'cevs/images/taxa/' in source_val:
+                                        alt_url = source_val.replace('/taxa/large/', '/taxa/clopla/large/') if '/taxa/clopla/' not in source_val else source_val.replace('/taxa/clopla/large/', '/taxa/large/')
+                                        try:
+                                            alt_resp = docx_http_session.get(alt_url, headers=req_headers, timeout=(3.0, 7.0))
+                                            if alt_resp.status_code == 200:
+                                                r_img = alt_resp
+                                        except Exception:
+                                            pass
+
+                                    if r_img.status_code == 200 and len(r_img.content) > 0:
+                                        if save_optimized_image(r_img.content, target_file, max_dim=1200, quality=85):
+                                            try: shutil.copy2(target_file, cache_file)
+                                            except Exception: pass
+                                            return True
+                                        else:
+                                            with open(target_file, "wb") as f_out:
+                                                f_out.write(r_img.content)
+                                            try: shutil.copy2(target_file, cache_file)
+                                            except Exception: pass
+                                            return True
+                            except Exception:
+                                pass
+                            return False
+
+                        workers = min(20, max(4, (os.cpu_count() or 4) * 3))
+                        completed_tasks = 0
+                        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+                            futures = {executor.submit(_download_docx_img, item): item for item in media_tasks.items()}
+                            for future in concurrent.futures.as_completed(futures):
+                                completed_tasks += 1
+                                if completed_tasks % 10 == 0 or completed_tasks == total_tasks:
+                                    progress_bar.progress(completed_tasks / float(total_tasks))
+                                    status.text(f"Stahuji a optimalizuji obrázky pro Word ({completed_tasks}/{total_tasks})...")
+                                try:
+                                    future.result()
+                                except Exception:
+                                    pass
 
                     status.text("Sestavuji dokument Microsoft Word (.docx)...")
                     docx_filename = f"{slugify(docx_title_input)}.docx"

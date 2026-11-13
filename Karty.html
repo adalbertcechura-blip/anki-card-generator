@@ -1442,35 +1442,47 @@ function formatDays(days) {
 // --- RENDER MARKDOWN & IMAGES ---
 async function renderContentToHtml(content, deckId) {
   if (!content) return "";
-  
+
+  const protectedTags = [];
+  const protectTag = (htmlTag) => {
+    const token = `@@HTMLTAG_${protectedTags.length}@@`;
+    protectedTags.push(htmlTag);
+    return token;
+  };
+
   // 1. Nahrazení Obsidian obrázků ![[nazev.jpg]]
   let text = content.replace(/!\[\[(.*?)\]\]/g, (match, fn) => {
     const cleanFn = fn.trim().split('/').pop().split('\\').pop();
-    return `<img src="" data-src="${cleanFn}" class="card-img-thumb pending-media" alt="${cleanFn}">`;
+    return protectTag(`<img src="" data-src="${cleanFn}" class="card-img-thumb pending-media" alt="${cleanFn}">`);
   });
 
   // 2. Nahrazení standardních markdown obrázků ![alt](nazev.jpg)
   text = text.replace(/!\[(.*?)\]\((.*?)\)/g, (match, alt, src) => {
     const cleanSrc = src.trim().split('/').pop().split('\\').pop();
-    return `<img src="" data-src="${cleanSrc}" class="card-img-thumb pending-media" alt="${alt}">`;
+    return protectTag(`<img src="" data-src="${cleanSrc}" class="card-img-thumb pending-media" alt="${alt}">`);
   });
 
   // 3. HTML img tagy: <img src="...">
   text = text.replace(/<img[^>]+src=["'](.*?)["'][^>]*>/gi, (match, src) => {
     const cleanSrc = src.trim().split('/').pop().split('\\').pop();
-    return `<img src="" data-src="${cleanSrc}" class="card-img-thumb pending-media" alt="${cleanSrc}">`;
+    return protectTag(`<img src="" data-src="${cleanSrc}" class="card-img-thumb pending-media" alt="${cleanSrc}">`);
   });
 
   // 4. Odkazy [text](url)
-  text = text.replace(/\[(.*?)\]\((https?:\/\/.*?)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  text = text.replace(/\[(.*?)\]\((https?:\/\/.*?)\)/g, (match, lbl, url) => {
+    return protectTag(`<a href="${url}" target="_blank" rel="noopener">${lbl}</a>`);
+  });
 
-  // 5. Tučné písmo **text**
+  // 5. Tučné písmo a kurzíva (bezpečně mimo chráněné HTML tagy)
   text = text.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
   text = text.replace(/___(.*?)___/g, '<strong><em>$1</em></strong>');
   text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
   text = text.replace(/__(.*?)__/g, '<strong>$1</strong>');
   text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
-  text = text.replace(/_([^_]+)_/g, '<em>$1</em>');
+  text = text.replace(/(^|[\s(>])_([^_]+)_([\s)<.,!?;:]|$)/g, '$1<em>$2</em>$3');
+
+  // Obnovení chráněných HTML tagů
+  text = text.replace(/@@HTMLTAG_(\d+)@@/g, (_, idx) => protectedTags[Number(idx)] || "");
 
   const lines = text.split('\n');
   let html = "";
@@ -2169,18 +2181,44 @@ async function startStudy(deckId, quickMode = false) {
 // Extrakce očekávaného textu pro vepisovací režim
 function extractTargetAnswer(card, isReverse) {
   if (!card) return "";
+  const cleanFirstField = (raw) => {
+    const cleanText = (raw || "")
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/!\[.*?\]\(.*?\)/g, '')
+      .replace(/!\[\[.*?\]\]/g, '')
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '$1')
+      .trim();
+    if (!cleanText) return "";
+    const lines = cleanText
+      .split('\n')
+      .map(l => l
+        .replace(/^\s*(?:[-*+]|\d+\.)\s+/, '')
+        .replace(/^\s*\*{1,2}[^*\n]+?:\*{1,2}\s*/, '')
+        .replace(/^\s*\*{1,2}[^*\n]+?\*{1,2}:\s*/, '')
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/\*(.*?)\*/g, '$1')
+        .replace(/\*/g, '')
+        .trim()
+      )
+      .filter(l => l.length > 0);
+    return lines[0] || "";
+  };
   if (isReverse) {
-    const cleanFront = (card.front || "").replace(/<[^>]+>/g, '').replace(/!\[.*?\]\(.*?\)/g, '').replace(/!\[\[.*?\]\]/g, '').trim();
-    if (cleanFront) return cleanFront.split('\n')[0].trim();
+    if (card.answerReverse && card.answerReverse.trim()) {
+      return card.answerReverse.trim();
+    }
+    const firstFront = cleanFirstField(card.front);
+    if (firstFront) return firstFront;
     return (card.title || "").trim();
   } else {
+    if (card.answer && card.answer.trim()) {
+      return card.answer.trim();
+    }
+    const firstBack = cleanFirstField(card.back);
+    if (firstBack) return firstBack;
     if (card.title && card.title.trim()) {
       return card.title.trim();
-    }
-    const cleanBack = (card.back || "").replace(/<[^>]+>/g, '').replace(/!\[.*?\]\(.*?\)/g, '').replace(/!\[\[.*?\]\]/g, '').trim();
-    if (cleanBack) {
-      const firstLine = cleanBack.split('\n').map(l => l.trim()).filter(l => l.length > 0)[0];
-      if (firstLine) return firstLine;
     }
     return "Odpověď";
   }
