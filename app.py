@@ -10315,7 +10315,8 @@ if st.session_state.df is not None:
                         sp_clean = re.sub(r'\s*\(.*\)\s*', '', raw_sp).strip()
                         sp_clean = re.sub(r'\s+sp(p)?\.?$', '', sp_clean).strip()
                         if sp_clean:
-                            row_updates["[TTS] Latina"] = f"{sp_clean};la"
+                            phon_tts = transcribe_latin_to_czech_phonetics(sp_clean).strip("[]").strip()
+                            row_updates["[TTS] Latina"] = f"{phon_tts or sp_clean};cs"
                     except Exception:
                         pass
 
@@ -11432,6 +11433,31 @@ if st.session_state.df is not None:
                     key="anki_subdeck_choice"
                 )
 
+            col_ord1, col_ord2 = st.columns(2)
+            with col_ord1:
+                anki_sort_mode = st.selectbox(
+                    "Pořadí kartiček při učení v Anki:",
+                    [
+                        "Podle pořadí v tabulce (od 1. řádku)",
+                        "Obráceně (od posledního řádku)",
+                        "Abecedně podle sloupce (A → Z)",
+                        "Abecedně podle sloupce (Z → A)",
+                        "Náhodně zamíchat"
+                    ],
+                    index=0,
+                    key="anki_sort_mode_sel",
+                    help="Nastaví pořadí nových karet (due = 1, 2, 3...) při importu do Anki."
+                )
+            with col_ord2:
+                anki_sort_col = None
+                if "Abecedně" in anki_sort_mode:
+                    anki_sort_col = st.selectbox(
+                        "Sloupec pro abecední seřazení:",
+                        options=columns,
+                        index=0,
+                        key="anki_sort_col_sel"
+                    )
+
             enable_tagging = st.checkbox("Přidat štítky (tags) ke kartičkám podle hodnoty ve sloupci", value=False, key="anki_enable_tagging")
             tag_col = ""
             tag_match_val = ""
@@ -11880,7 +11906,14 @@ if st.session_state.df is not None:
                                         safe_filename = f"tts_{row_idx}_{safe_txt}_{lang_code}.mp3"
                                         local_path = os.path.join(media_dir, safe_filename)
                                         if os.path.exists(local_path):
-                                            html_parts.append(f"[sound:{safe_filename}]")
+                                            html_parts.append(
+                                                f'<div class="card-field field-{slugify(col)}">'
+                                                f'{label_html}'
+                                                f'<div class="field-value">'
+                                                f'<audio controls controlslist="nodownload" preload="none" src="{safe_filename}" style="height: 34px; max-width: 260px;"></audio>'
+                                                f'</div>'
+                                                f'</div>'
+                                            )
                                 continue
 
                             if col == "[Zvuky] Hlasy ptáků":
@@ -12103,7 +12136,8 @@ if st.session_state.df is not None:
                             'guid_src': str(row[columns[0]]) if columns else str(idx),
                             'anki_guid': anki_guid_val,
                             'subdeck_val': subdeck_val,
-                            'tags': card_tags
+                            'tags': card_tags,
+                            'row_idx': row_idx
                         })
 
                     status.text("Zapisuji balíček Anki (.apkg)...")
@@ -12188,7 +12222,21 @@ if st.session_state.df is not None:
                     parent_deck = genanki.Deck(parent_deck_id, deck_name_input, description=formatted_deck_desc or "")
                     decks[deck_name_input] = parent_deck
 
-                    for note_data in processed_notes:
+                    sort_mode_val = st.session_state.get("anki_sort_mode_sel", "Podle pořadí v tabulce (od 1. řádku)")
+                    sort_col_val = st.session_state.get("anki_sort_col_sel")
+                    if sort_mode_val == "Obráceně (od posledního řádku)":
+                        processed_notes = list(reversed(processed_notes))
+                    elif "Abecedně" in sort_mode_val and sort_col_val and sort_col_val in df.columns:
+                        reverse_alpha = "Z → A" in sort_mode_val
+                        def _sort_key_fn(nd):
+                            v = df.loc[nd['row_idx'], sort_col_val] if nd.get('row_idx') in df.index else ""
+                            return ("" if pd.isna(v) else str(v)).strip().lower()
+                        processed_notes = sorted(processed_notes, key=_sort_key_fn, reverse=reverse_alpha)
+                    elif sort_mode_val == "Náhodně zamíchat":
+                        import random as _rand_anki
+                        _rand_anki.shuffle(processed_notes)
+
+                    for note_pos, note_data in enumerate(processed_notes):
                         content_hash = hashlib.sha256((note_data['front'] + "|" + note_data['back']).encode('utf-8')).hexdigest()[:8]
                         note_fields = [note_data['front'], note_data['back']]
                         if is_type_in and type_target_col:
@@ -12205,7 +12253,8 @@ if st.session_state.df is not None:
                             model=anki_model,
                             fields=note_fields,
                             tags=note_data.get('tags', []),
-                            guid=final_guid
+                            guid=final_guid,
+                            due=note_pos + 1
                         )
 
                         target_deck_name = deck_name_input

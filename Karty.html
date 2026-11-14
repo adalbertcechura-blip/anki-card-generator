@@ -529,6 +529,25 @@ main {
 }
 
 /* Card images */
+.card-img-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 6px 0;
+}
+.flashcard.img-layout-2col .card-img-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+.flashcard.img-layout-2col .card-img-grid .card-img-thumb {
+  width: 100%;
+  max-height: 320px;
+  min-height: 140px;
+  margin: 0;
+  object-fit: contain;
+}
 .card-img-thumb {
   display: block;
   margin: 8px auto;
@@ -1044,6 +1063,10 @@ main {
           <button class="btn-mode-tgl active" id="btnBackStacked" title="Zobrazit líc i rub pod sebou">📄 Pod sebe</button>
           <button class="btn-mode-tgl" id="btnBackSeparate" title="Zobrazit rub na druhé straně karty">🃏 Na druhou stranu</button>
         </div>
+        <div class="mode-toggle-group" title="Rozložení obrázků">
+          <button class="btn-mode-tgl active" id="btnImg1Col" title="Obrázky pod sebou (1 sloupec)">↕️ 1 sloupec</button>
+          <button class="btn-mode-tgl" id="btnImg2Col" title="Obrázky vedle sebe (2 sloupce)">◫ 2 sloupce</button>
+        </div>
         <label class="switch-label">
           <input type="checkbox" id="chkReverseStudy">
           <span>Otočit směr</span>
@@ -1410,6 +1433,7 @@ let sessionStats = { newCount: 0, dueCount: 0, doneCount: 0 };
 let currentCard = null;
 let cardStudyMode = "flip"; // "flip" or "type"
 let backLayoutMode = localStorage.getItem("karty_back_layout") || "stacked"; // "stacked" or "separate"
+let imgLayoutMode = localStorage.getItem("karty_img_layout") || (window.innerWidth > 768 ? "2col" : "1col"); // "1col" or "2col"
 let heatmapYear = new Date().getFullYear();
 let statsModalDeck = null;
 let extraNewCardsGranted = 0;
@@ -1515,13 +1539,28 @@ async function renderContentToHtml(content, deckId) {
   const lines = text.split('\n');
   let html = "";
   let inList = false;
+  let imgGroup = [];
+
+  const flushImgGroup = () => {
+    if (imgGroup.length > 0) {
+      html += `<div class="card-img-grid">${imgGroup.join("")}</div>`;
+      imgGroup = [];
+    }
+  };
 
   for (let l of lines) {
     l = l.trim();
     if (!l) {
+      flushImgGroup();
       if (inList) { html += "</ul>"; inList = false; }
       continue;
     }
+    if (/^(?:<img\b[^>]*>\s*)+$/i.test(l)) {
+      if (inList) { html += "</ul>"; inList = false; }
+      imgGroup.push(l);
+      continue;
+    }
+    flushImgGroup();
     if (l.startsWith('# ')) {
       if (inList) { html += "</ul>"; inList = false; }
       html += `<h2 style="font-size:1.4rem; color:#fff; margin-bottom:8px;">${l.substring(2)}</h2>`;
@@ -1536,6 +1575,7 @@ async function renderContentToHtml(content, deckId) {
       html += `<p style="margin-bottom:8px;">${l}</p>`;
     }
   }
+  flushImgGroup();
   if (inList) html += "</ul>";
 
   return html;
@@ -2545,6 +2585,39 @@ if (btnSidePeek) {
     showingFrontOnFlipped = !showingFrontOnFlipped;
     applyBackLayoutVisibility();
     document.getElementById("flashcardBox").scrollTop = 0;
+  };
+}
+
+// --- IMAGE LAYOUT TOGGLES (1 SLOUPEC VS 2 SLOUPCE) ---
+const btnImg1Col = document.getElementById("btnImg1Col");
+const btnImg2Col = document.getElementById("btnImg2Col");
+
+function applyImgLayoutMode() {
+  const flashcardBox = document.getElementById("flashcardBox");
+  if (imgLayoutMode === "2col") {
+    flashcardBox.classList.add("img-layout-2col");
+    if (btnImg2Col) btnImg2Col.classList.add("active");
+    if (btnImg1Col) btnImg1Col.classList.remove("active");
+  } else {
+    flashcardBox.classList.remove("img-layout-2col");
+    if (btnImg1Col) btnImg1Col.classList.add("active");
+    if (btnImg2Col) btnImg2Col.classList.remove("active");
+  }
+}
+applyImgLayoutMode();
+
+if (btnImg1Col) {
+  btnImg1Col.onclick = () => {
+    imgLayoutMode = "1col";
+    localStorage.setItem("karty_img_layout", imgLayoutMode);
+    applyImgLayoutMode();
+  };
+}
+if (btnImg2Col) {
+  btnImg2Col.onclick = () => {
+    imgLayoutMode = "2col";
+    localStorage.setItem("karty_img_layout", imgLayoutMode);
+    applyImgLayoutMode();
   };
 }
 
