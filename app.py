@@ -22,7 +22,7 @@ import math
 import base64
 import streamlit.components.v1 as components
 from bs4 import BeautifulSoup
-from PIL import Image, ImageOps, ImageDraw
+from PIL import Image, ImageOps, ImageDraw, ImageFont
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -333,7 +333,7 @@ def save_optimized_image(img_bytes: bytes, target_path: str, max_dim: int = 800,
     if not img_bytes or len(img_bytes) < 32:
         return False
     try:
-        from PIL import Image, ImageOps, ImageDraw
+        from PIL import Image, ImageOps, ImageDraw, ImageFont
         import io
         with Image.open(io.BytesIO(img_bytes)) as img:
             img = ImageOps.exif_transpose(img)
@@ -1087,10 +1087,13 @@ def resolve_pladias_region_bbox(place_query: str):
     return minx, miny, maxx, maxy, "", False
 
 def get_map_font(size=12, bold=False):
+    base_dir = os.path.dirname(os.path.abspath(__file__))
     candidates = [
+        os.path.join(base_dir, "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf"),
         "C:/Windows/Fonts/arialbd.ttf" if bold else "C:/Windows/Fonts/arial.ttf",
         "C:/Windows/Fonts/segoeuib.ttf" if bold else "C:/Windows/Fonts/segoeui.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
     ]
     for p in candidates:
         if os.path.exists(p):
@@ -1631,18 +1634,25 @@ def render_pladias_distribution_map(species_name, output_path, place_filter=None
         except Exception:
             pass
 
+    map_font = get_map_font(12, bold=False)
     draw.rectangle([0, h, w, h + 46], fill=(238, 242, 239, 255), outline=(210, 220, 215, 255))
-    draw.ellipse([18, h + 14, 26, h + 22], fill=(20, 110, 50, 240), outline=(10, 60, 25, 255))
+    draw.ellipse([18, h + 16, 26, h + 24], fill=(20, 110, 50, 240), outline=(10, 60, 25, 255))
     jisty_lbl = f"Ověřený výskyt ({drawn_jisty})" if is_cropped else "Ověřený výskyt"
-    draw.text((32, h + 11), jisty_lbl, fill=(30, 40, 35, 255))
+    draw.text((32, h + 13), jisty_lbl, font=map_font, fill=(30, 40, 35, 255))
 
-    draw.ellipse([160, h + 14, 168, h + 22], fill=(160, 160, 160, 220), outline=(120, 120, 120, 255))
+    dot2_x = 190 if is_cropped else 160
+    draw.ellipse([dot2_x, h + 16, dot2_x + 8, h + 24], fill=(160, 160, 160, 220), outline=(120, 120, 120, 255))
     neurc_lbl = f"Nerevidovaný údaj ({drawn_neurceny})" if is_cropped else "Nerevidovaný údaj"
-    draw.text((174, h + 11), neurc_lbl, fill=(60, 70, 65, 255))
+    draw.text((dot2_x + 14, h + 13), neurc_lbl, font=map_font, fill=(60, 70, 65, 255))
 
     attr_extra = f" • Oblast: {place_name}" if place_name else ""
     attribution = f"Zdroj dat: Pladias • pladias.cz{attr_extra}"
-    draw.text((w - 320, h + 11), attribution, fill=(70, 90, 80, 255))
+    try:
+        attr_w = draw.textlength(attribution, font=map_font)
+        attr_x = max(dot2_x + 165, w - int(attr_w) - 16)
+    except Exception:
+        attr_x = w - 320
+    draw.text((attr_x, h + 13), attribution, font=map_font, fill=(70, 90, 80, 255))
 
     final_img = canvas.convert("RGB")
     final_img.save(output_path, format="JPEG", quality=85, optimize=True)
