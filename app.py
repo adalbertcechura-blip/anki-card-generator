@@ -1026,7 +1026,7 @@ def get_topographic_base_map(minx=1335000, miny=6190000, maxx=2105000, maxy=6640
 
 import threading as _threading
 _PLADIAS_BASE_MAP_LOCK = _threading.Lock()
-_PLADIAS_MAP_SEMAPHORE = _threading.Semaphore(4)
+_PLADIAS_MAP_SEMAPHORE = _threading.Semaphore(6)
 
 def get_pladias_base_map():
     global _PLADIAS_BASE_MAP_CACHE
@@ -1509,31 +1509,31 @@ def render_pladias_distribution_map(species_name, output_path, place_filter=None
     taxon_id = None
     with _PLADIAS_MAP_SEMAPHORE:
         for q_name in q_candidates:
-            url_dist = f"https://pladias.cz/taxon/distribution/{urllib.parse.quote(q_name)}"
-            for attempt in range(3):
-                try:
-                    r = requests.get(url_dist, headers=headers, timeout=10)
-                    if r.status_code == 200:
-                        soup = BeautifulSoup(r.text, 'html.parser')
-                        map_div = soup.find('div', id='map') or soup.find('div', class_='distributionMap')
-                        if map_div and map_div.get('data-taxon-id'):
-                            taxon_id = map_div.get('data-taxon-id')
-                        break
-                    elif r.status_code == 404:
-                        break
-                except Exception:
-                    pass
-                if attempt < 2:
-                    time.sleep(0.5 * (attempt + 1))
+            try:
+                r_api = requests.get(f"https://api.pladias.cz/prest/taxa?name_lat=eq.{urllib.parse.quote(q_name)}&select=id", headers=headers, timeout=(2.5, 4.0))
+                if r_api.status_code == 200:
+                    rows_api = r_api.json()
+                    if isinstance(rows_api, list) and rows_api and rows_api[0].get('id'):
+                        taxon_id = str(rows_api[0]['id'])
+            except Exception:
+                pass
             if not taxon_id:
-                try:
-                    r_api = requests.get(f"https://api.pladias.cz/prest/taxa?name_lat=eq.{urllib.parse.quote(q_name)}&select=id", headers=headers, timeout=6)
-                    if r_api.status_code == 200:
-                        rows_api = r_api.json()
-                        if isinstance(rows_api, list) and rows_api and rows_api[0].get('id'):
-                            taxon_id = str(rows_api[0]['id'])
-                except Exception:
-                    pass
+                url_dist = f"https://pladias.cz/taxon/distribution/{urllib.parse.quote(q_name)}"
+                for attempt in range(2):
+                    try:
+                        r = requests.get(url_dist, headers=headers, timeout=(2.5, 5.0))
+                        if r.status_code == 200:
+                            soup = BeautifulSoup(r.text, 'html.parser')
+                            map_div = soup.find('div', id='map') or soup.find('div', class_='distributionMap')
+                            if map_div and map_div.get('data-taxon-id'):
+                                taxon_id = map_div.get('data-taxon-id')
+                            break
+                        elif r.status_code == 404:
+                            break
+                    except Exception:
+                        pass
+                    if attempt == 0:
+                        time.sleep(0.3)
             if taxon_id:
                 break
 
@@ -11461,12 +11461,10 @@ if st.session_state.df is not None:
                             try:
                                 if mtype == 'pladias_map':
                                     p_filter = task_data[2] if len(task_data) > 2 else None
-                                    ok_map = False
-                                    for _m_try in range(3):
+                                    ok_map = render_pladias_distribution_map(url, local_path, place_filter=p_filter)
+                                    if not ok_map:
+                                        time.sleep(0.3)
                                         ok_map = render_pladias_distribution_map(url, local_path, place_filter=p_filter)
-                                        if ok_map:
-                                            break
-                                        time.sleep(0.6 * (_m_try + 1))
                                     if ok_map:
                                         try: shutil.copy2(local_path, cache_path)
                                         except Exception: pass
@@ -11555,7 +11553,7 @@ if st.session_state.df is not None:
                             futures = {executor.submit(_download_task, item): item for item in media_tasks.items()}
                             for future in concurrent.futures.as_completed(futures):
                                 completed_count += 1
-                                if completed_count % 10 == 0 or completed_count == total_tasks:
+                                if completed_count % 10 == 0 or completed_count >= total_tasks - 25 or completed_count == total_tasks:
                                     progress_bar.progress(completed_count / total_tasks)
                                     status.text(f"Stahuji a optimalizuji média ({completed_count}/{total_tasks})...")
                                 try:
@@ -12767,12 +12765,10 @@ if st.session_state.df is not None:
                             try:
                                 if mtype == 'pladias_map':
                                     p_filter = task_data[2] if len(task_data) > 2 else None
-                                    ok_map = False
-                                    for _m_try in range(3):
+                                    ok_map = render_pladias_distribution_map(url, local_path, place_filter=p_filter)
+                                    if not ok_map:
+                                        time.sleep(0.3)
                                         ok_map = render_pladias_distribution_map(url, local_path, place_filter=p_filter)
-                                        if ok_map:
-                                            break
-                                        time.sleep(0.6 * (_m_try + 1))
                                     if ok_map:
                                         try: shutil.copy2(local_path, cache_path)
                                         except Exception: pass
