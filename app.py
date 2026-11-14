@@ -11117,10 +11117,7 @@ if st.session_state.df is not None:
                         st.session_state.type_target_col = None
 
                 all_selected_cols = list(dict.fromkeys(st.session_state.front_cols_ordered + st.session_state.back_cols_ordered))
-                text_cols_to_style = [
-                    c for c in all_selected_cols
-                    if not (check_col_is_image(c, st.session_state.df) or is_image_col(c) or any(img_kw in c.lower() for img_kw in ["foto", "fotka", "obrázek", "obrazek", "habitus", "květ", "kvet", "list", "plod", "herbář", "herbar", "detail", "mikrofoto"]))
-                ]
+                text_cols_to_style = list(all_selected_cols)
                 if text_cols_to_style:
                     with st.expander("Pokročilé nastavení zobrazení sloupců (formátování textu)", expanded=False):
                         for col in text_cols_to_style:
@@ -12367,10 +12364,7 @@ if st.session_state.df is not None:
                     render_column_reorder_ui("obs_back_cols_ordered", "obs_back", "Změnit pořadí sloupců na rubu (⇧ / ▲ / ▼ / ⇩)")
 
                 obs_selected_cols = list(dict.fromkeys(st.session_state.obs_front_cols_ordered + st.session_state.obs_back_cols_ordered))
-                obs_text_cols = [
-                    c for c in obs_selected_cols
-                    if not (check_col_is_image(c, df) or is_image_col(c) or any(img_kw in c.lower() for img_kw in ["foto", "fotka", "obrázek", "obrazek", "habitus", "květ", "kvet", "list", "plod", "herbář", "herbar", "detail", "mikrofoto"]))
-                ]
+                obs_text_cols = list(obs_selected_cols)
                 if obs_text_cols:
                     with st.expander("Pokročilé nastavení zobrazení sloupců (formátování textu v Obsidianu)", expanded=False):
                         for col in obs_text_cols:
