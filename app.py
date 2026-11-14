@@ -1012,7 +1012,7 @@ def get_topographic_base_map(minx=1335000, miny=6190000, maxx=2105000, maxy=6640
     )
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
     try:
-        r = requests.get(url, headers=headers, timeout=6)
+        r = requests.get(url, headers=headers, timeout=(2.5, 5.0))
         if r.status_code == 200 and len(r.content) > 3000:
             img = Image.open(io.BytesIO(r.content)).convert("RGBA")
             if light_layer:
@@ -1140,7 +1140,7 @@ def get_inat_observation_points(obs_url, limit=60):
             api_params["place_id"] = p_id
         api_url = "https://api.inaturalist.org/v1/observations"
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AnkiSpecies/1.0'}
-        r = requests.get(api_url, params=api_params, headers=headers, timeout=6)
+        r = requests.get(api_url, params=api_params, headers=headers, timeout=(2.5, 5.0))
         if r.status_code == 200:
             for obs in r.json().get('results', []):
                 coords = obs.get('geojson', {}).get('coordinates')
@@ -2747,7 +2747,7 @@ def fetch_wikimedia_images(query, max_photos=4):
 
     photos = []
     try:
-        r = requests.get(url, headers=headers, timeout=6)
+        r = requests.get(url, headers=headers, timeout=(2.5, 5.0))
         if r.status_code == 200:
             data = r.json()
             pages = data.get('query', {}).get('pages', {})
@@ -2933,7 +2933,7 @@ def fetch_adw_description(species_name, max_chars=800):
     url = f"https://animaldiversity.org/accounts/{account_name}/"
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
     try:
-        r = requests.get(url, headers=headers, timeout=6)
+        r = requests.get(url, headers=headers, timeout=(2.5, 5.0))
         if r.status_code == 200:
             soup = BeautifulSoup(r.text, 'html.parser')
             sections = []
@@ -11549,19 +11549,38 @@ if st.session_state.df is not None:
 
                         completed_count = 0
                         workers = min(20, max(4, (os.cpu_count() or 4) * 3))
-                        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-                            futures = {executor.submit(_download_task, item): item for item in media_tasks.items()}
-                            for future in concurrent.futures.as_completed(futures):
-                                completed_count += 1
-                                if completed_count % 10 == 0 or completed_count >= total_tasks - 25 or completed_count == total_tasks:
-                                    progress_bar.progress(completed_count / total_tasks)
-                                    status.text(f"Stahuji a optimalizuji média ({completed_count}/{total_tasks})...")
-                                try:
-                                    fname, local_path, success = future.result()
-                                    if success:
-                                        downloaded_media.append(local_path)
-                                except Exception:
-                                    pass
+                        executor = concurrent.futures.ThreadPoolExecutor(max_workers=workers)
+                        try:
+                            pending = {executor.submit(_download_task, item): item for item in media_tasks.items()}
+                            last_progress_ts = time.time()
+                            while pending:
+                                done_set, pending_set = concurrent.futures.wait(
+                                    pending.keys(),
+                                    timeout=1.0,
+                                    return_when=concurrent.futures.FIRST_COMPLETED
+                                )
+                                if done_set:
+                                    last_progress_ts = time.time()
+                                    for future in done_set:
+                                        completed_count += 1
+                                        if completed_count % 10 == 0 or completed_count >= total_tasks - 25 or completed_count == total_tasks:
+                                            progress_bar.progress(completed_count / total_tasks)
+                                            status.text(f"Stahuji a optimalizuji média ({completed_count}/{total_tasks})...")
+                                        try:
+                                            fname, local_path, success = future.result()
+                                            if success:
+                                                downloaded_media.append(local_path)
+                                        except Exception:
+                                            pass
+                                        pending.pop(future, None)
+                                else:
+                                    if time.time() - last_progress_ts > 25.0:
+                                        st.warning(f"Některé vzdálené servery neodpovídaly včas ({len(pending)} položek přeskočeno), pokračuji v sestavení balíčku.")
+                                        for f_hung in list(pending.keys()):
+                                            f_hung.cancel()
+                                        break
+                        finally:
+                            executor.shutdown(wait=False, cancel_futures=True)
 
                     status.text("Sestavuji kartičky...")
                     progress_bar.progress(1.0)
@@ -12833,17 +12852,36 @@ if st.session_state.df is not None:
 
                         workers = min(20, max(4, (os.cpu_count() or 4) * 3))
                         completed_count = 0
-                        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-                            futures = {executor.submit(_download_pdf_img, item): item for item in media_tasks.items()}
-                            for future in concurrent.futures.as_completed(futures):
-                                completed_count += 1
-                                if completed_count % 10 == 0 or completed_count == total_tasks:
-                                    progress_bar.progress(completed_count / total_tasks)
-                                    status.text(f"Stahuji a optimalizuji obrázky pro PDF ({completed_count}/{total_tasks})...")
-                                try:
-                                    future.result()
-                                except Exception:
-                                    pass
+                        executor = concurrent.futures.ThreadPoolExecutor(max_workers=workers)
+                        try:
+                            pending = {executor.submit(_download_pdf_img, item): item for item in media_tasks.items()}
+                            last_progress_ts = time.time()
+                            while pending:
+                                done_set, _ = concurrent.futures.wait(
+                                    pending.keys(),
+                                    timeout=1.0,
+                                    return_when=concurrent.futures.FIRST_COMPLETED
+                                )
+                                if done_set:
+                                    last_progress_ts = time.time()
+                                    for future in done_set:
+                                        completed_count += 1
+                                        if completed_count % 10 == 0 or completed_count >= total_tasks - 25 or completed_count == total_tasks:
+                                            progress_bar.progress(completed_count / total_tasks)
+                                            status.text(f"Stahuji a optimalizuji obrázky pro PDF ({completed_count}/{total_tasks})...")
+                                        try:
+                                            future.result()
+                                        except Exception:
+                                            pass
+                                        pending.pop(future, None)
+                                else:
+                                    if time.time() - last_progress_ts > 25.0:
+                                        st.warning(f"Některé vzdálené servery neodpovídaly včas ({len(pending)} položek přeskočeno), pokračuji v sestavení PDF.")
+                                        for f_hung in list(pending.keys()):
+                                            f_hung.cancel()
+                                        break
+                        finally:
+                            executor.shutdown(wait=False, cancel_futures=True)
 
                     status.text("Sázím a generuji PDF..." if is_preview else "Sázím a generuji PDF brožuru...")
                     progress_bar.progress(1.0)
