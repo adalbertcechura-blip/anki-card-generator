@@ -3840,7 +3840,6 @@ def generate_obsidian_vault_zip(
     if media_tasks is None: media_tasks = {}
 
     v_slug = slugify(vault_name) or "Studijni_Karticky"
-    zip_buffer = io.BytesIO()
 
     def _format_obs_field(col_name, val_str):
         if not val_str:
@@ -3906,7 +3905,7 @@ def generate_obsidian_vault_zip(
             return styled_val
 
     preloaded_cards = []
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+    with zipfile.ZipFile(output_zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
         if include_guide:
             readme_content = f"""# Jak používat tyto kartičky (Offline na mobilu i PC)
 
@@ -4038,7 +4037,7 @@ tags:
         }
         deck_js_str = f"window.PRELOADED_DECK = {json.dumps(deck_obj, ensure_ascii=False)};"
         zf.writestr(f"{v_slug}/deck_data.js", deck_js_str.encode('utf-8'))
-        zf.writestr("deck_data.js", deck_js_str.encode('utf-8'))
+        del deck_obj, preloaded_cards
 
         karty_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Karty.html")
         if os.path.exists(karty_path):
@@ -4047,12 +4046,20 @@ tags:
                     karty_str = f_k.read()
                 karty_inlined = karty_str.replace("/* __INLINED_DECK_DATA__ */", deck_js_str)
                 karty_bytes = karty_inlined.encode("utf-8")
-                zf.writestr("index.html", karty_bytes)
-                zf.writestr("Karty.html", karty_bytes)
                 zf.writestr(f"{v_slug}/index.html", karty_bytes)
                 zf.writestr(f"{v_slug}/Karty.html", karty_bytes)
+                redirect_html = (
+                    f'<!DOCTYPE html><html><head><meta charset="utf-8">'
+                    f'<meta http-equiv="refresh" content="0; url=./{v_slug}/index.html">'
+                    f'<title>{html.escape(str(vault_name))}</title></head>'
+                    f'<body><p><a href="./{v_slug}/index.html">Otevřít kartičky</a></p></body></html>'
+                ).encode("utf-8")
+                zf.writestr("index.html", redirect_html)
+                zf.writestr("Karty.html", redirect_html)
+                del karty_str, karty_inlined, karty_bytes
             except Exception:
                 pass
+        del deck_js_str
 
         if selected_citations:
             cits = [(src, ALL_AVAILABLE_CITATIONS[src]) for src in selected_citations if src in ALL_AVAILABLE_CITATIONS]
@@ -4069,16 +4076,27 @@ tags:
                     fn = os.path.basename(lpath)
                     if fn not in added_media:
                         try:
-                            zf.write(lpath, f"{v_slug}/{fn}")
-                            zf.write(lpath, fn)
+                            zf.write(lpath, f"{v_slug}/{fn}", compress_type=zipfile.ZIP_STORED)
                             added_media.add(fn)
                         except Exception:
                             pass
 
-    zip_bytes = zip_buffer.getvalue()
-    with open(output_zip_path, "wb") as f_out:
-        f_out.write(zip_bytes)
-    return len(zip_bytes)
+    return os.path.getsize(output_zip_path) if os.path.exists(output_zip_path) else 0
+
+def _persist_export_file(src_path: str, old_path: str = None) -> str:
+    """Přesune vygenerovaný soubor do trvalého dočasného adresáře a smaže předchozí kopii."""
+    if old_path and old_path != src_path:
+        try:
+            if os.path.exists(old_path):
+                os.remove(old_path)
+        except Exception:
+            pass
+    export_dir = os.path.join(tempfile.gettempdir(), "anki_card_gen_exports")
+    os.makedirs(export_dir, exist_ok=True)
+    fd, dst_path = tempfile.mkstemp(prefix="exp_", suffix=os.path.splitext(src_path)[1], dir=export_dir)
+    os.close(fd)
+    shutil.move(src_path, dst_path)
+    return dst_path
 
 def build_obsidian_zip_package(
     df: pd.DataFrame,
@@ -4092,7 +4110,8 @@ def build_obsidian_zip_package(
     selected_citations: list = None,
     progress_cb=None,
     status_cb=None,
-    preloaded_url_map: dict = None
+    preloaded_url_map: dict = None,
+    return_path: bool = False
 ) -> tuple:
     """Stáhne média a sestaví .zip balíček pro Obsidian / Karty.html."""
     temp_dir = tempfile.mkdtemp()
@@ -4224,6 +4243,8 @@ def build_obsidian_zip_package(
             card_separator=card_separator,
             selected_citations=selected_citations
         )
+        if return_path:
+            return _persist_export_file(out_zip_path), out_zip_filename
         with open(out_zip_path, "rb") as f_zip:
             zip_bytes = f_zip.read()
         return zip_bytes, out_zip_filename
@@ -12088,15 +12109,20 @@ if st.session_state.df is not None:
                     anki_package.media_files = unique_media
                     anki_package.write_to_file(apkg_path)
 
+                    notes_total_cnt = len(processed_notes)
+                    media_total_cnt = len(downloaded_media)
+                    del anki_package, decks, processed_notes, unique_media
+                    gc.collect()
+
                     status.text("Balíček Anki byl úspěšně vygenerován.")
 
-                    with open(apkg_path, "rb") as f:
-                        apkg_bytes = f.read()
-
-                    st.session_state.generated_apkg_data = apkg_bytes
+                    st.session_state.generated_apkg_path = _persist_export_file(
+                        apkg_path, st.session_state.get("generated_apkg_path")
+                    )
+                    st.session_state.generated_apkg_data = None
                     st.session_state.generated_apkg_filename = apkg_filename
-                    st.session_state.notes_count = len(processed_notes)
-                    st.session_state.media_count = len(downloaded_media)
+                    st.session_state.notes_count = notes_total_cnt
+                    st.session_state.media_count = media_total_cnt
 
                     if st.session_state.unfound_list:
                         unfound_df = pd.DataFrame(st.session_state.unfound_list)
@@ -12112,7 +12138,8 @@ if st.session_state.df is not None:
                             for fn, t_data in media_tasks.items()
                             if t_data and t_data[0] and os.path.isfile(os.path.join(media_dir, fn)) and os.path.getsize(os.path.join(media_dir, fn)) > 0
                         }
-                        obs_bytes, obs_fname = build_obsidian_zip_package(
+                        old_obs_path = st.session_state.get("generated_obsidian_path")
+                        obs_path, obs_fname = build_obsidian_zip_package(
                             df=df,
                             vault_name=obs_vault_auto,
                             front_cols=list(st.session_state.front_cols_ordered),
@@ -12124,9 +12151,17 @@ if st.session_state.df is not None:
                             selected_citations=st.session_state.get("user_selected_sources"),
                             progress_cb=progress_bar.progress,
                             status_cb=status.text,
-                            preloaded_url_map=preloaded_map
+                            preloaded_url_map=preloaded_map,
+                            return_path=True
                         )
-                        st.session_state.generated_obsidian_data = obs_bytes
+                        if old_obs_path and old_obs_path != obs_path:
+                            try:
+                                if os.path.exists(old_obs_path):
+                                    os.remove(old_obs_path)
+                            except Exception:
+                                pass
+                        st.session_state.generated_obsidian_path = obs_path
+                        st.session_state.generated_obsidian_data = None
                         st.session_state.generated_obsidian_filename = obs_fname
                         if clear_temp_on_finish:
                             shutil.rmtree(temp_dir, ignore_errors=True)
@@ -12463,7 +12498,8 @@ if st.session_state.df is not None:
                     effective_back = st.session_state.obs_back_cols_ordered
                     sel_card_sep = "??" if "Obousměrné" in st.session_state.get("obs_card_sep_radio", "") else "?"
 
-                    zip_bytes, out_zip_filename = build_obsidian_zip_package(
+                    old_obs_path = st.session_state.get("generated_obsidian_path")
+                    obs_path, out_zip_filename = build_obsidian_zip_package(
                         df=df,
                         vault_name=obs_vault_name or "Studijni_Karticky",
                         front_cols=effective_front,
@@ -12474,10 +12510,17 @@ if st.session_state.df is not None:
                         card_separator=sel_card_sep,
                         selected_citations=st.session_state.get("user_selected_sources"),
                         progress_cb=progress_bar.progress,
-                        status_cb=status.text
+                        status_cb=status.text,
+                        return_path=True
                     )
-
-                    st.session_state.generated_obsidian_data = zip_bytes
+                    if old_obs_path and old_obs_path != obs_path:
+                        try:
+                            if os.path.exists(old_obs_path):
+                                os.remove(old_obs_path)
+                        except Exception:
+                            pass
+                    st.session_state.generated_obsidian_path = obs_path
+                    st.session_state.generated_obsidian_data = None
                     st.session_state.generated_obsidian_filename = out_zip_filename
 
                     progress_bar.progress(1.0)
@@ -13448,29 +13491,53 @@ if st.session_state.df is not None:
                     gc.collect()
                     st.rerun()
 
-    if st.session_state.generated_apkg_data is not None or st.session_state.get('generated_obsidian_data') is not None or st.session_state.generated_pdf_data is not None or st.session_state.generated_docx_data is not None:
+    _has_apkg = bool(st.session_state.get('generated_apkg_path') and os.path.isfile(st.session_state.get('generated_apkg_path'))) or st.session_state.generated_apkg_data is not None
+    _has_obs = bool(st.session_state.get('generated_obsidian_path') and os.path.isfile(st.session_state.get('generated_obsidian_path'))) or st.session_state.get('generated_obsidian_data') is not None
+    if _has_apkg or _has_obs or st.session_state.generated_pdf_data is not None or st.session_state.generated_docx_data is not None:
         with st.expander("5. Stažení výsledků", expanded=False):
 
             col_res1, col_res2 = st.columns(2)
             with col_res1:
-                if st.session_state.generated_apkg_data is not None:
-                    st.download_button(
-                        label="Stáhnout .apkg balíček pro Anki",
-                        data=st.session_state.generated_apkg_data,
-                        file_name=st.session_state.generated_apkg_filename,
-                        mime="application/octet-stream",
-                        key="download_apkg_btn"
-                    )
+                if _has_apkg:
+                    _apkg_p = st.session_state.get('generated_apkg_path')
+                    if _apkg_p and os.path.isfile(_apkg_p):
+                        with open(_apkg_p, "rb") as _f_apkg:
+                            st.download_button(
+                                label="Stáhnout .apkg balíček pro Anki",
+                                data=_f_apkg,
+                                file_name=st.session_state.generated_apkg_filename,
+                                mime="application/octet-stream",
+                                key="download_apkg_btn"
+                            )
+                    else:
+                        st.download_button(
+                            label="Stáhnout .apkg balíček pro Anki",
+                            data=st.session_state.generated_apkg_data,
+                            file_name=st.session_state.generated_apkg_filename,
+                            mime="application/octet-stream",
+                            key="download_apkg_btn"
+                        )
                     st.info(f"Anki balíček obsahuje **{st.session_state.notes_count}** kartiček a **{st.session_state.media_count}** multimediálních souborů.")
 
-                if st.session_state.get('generated_obsidian_data') is not None:
-                    st.download_button(
-                        label="Stáhnout balíček kartiček (.zip – obsahuje i index.html přehrávač)",
-                        data=st.session_state.generated_obsidian_data,
-                        file_name=st.session_state.get('generated_obsidian_filename', 'Studijni_Karticky.zip'),
-                        mime="application/zip",
-                        key="download_obsidian_btn"
-                    )
+                if _has_obs:
+                    _obs_p = st.session_state.get('generated_obsidian_path')
+                    if _obs_p and os.path.isfile(_obs_p):
+                        with open(_obs_p, "rb") as _f_obs:
+                            st.download_button(
+                                label="Stáhnout balíček kartiček (.zip – obsahuje i index.html přehrávač)",
+                                data=_f_obs,
+                                file_name=st.session_state.get('generated_obsidian_filename', 'Studijni_Karticky.zip'),
+                                mime="application/zip",
+                                key="download_obsidian_btn"
+                            )
+                    else:
+                        st.download_button(
+                            label="Stáhnout balíček kartiček (.zip – obsahuje i index.html přehrávač)",
+                            data=st.session_state.generated_obsidian_data,
+                            file_name=st.session_state.get('generated_obsidian_filename', 'Studijni_Karticky.zip'),
+                            mime="application/zip",
+                            key="download_obsidian_btn"
+                        )
                     st.success("Balíček kartiček (.zip) je připraven. Můžete jej otevřít rovnou poklepáním na index.html uvnitř, nebo naimportovat do přehrávače či Obsidianu.")
                     k_bytes = _read_karty_html_bytes()
                     if k_bytes:
