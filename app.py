@@ -2752,7 +2752,12 @@ def fetch_wikimedia_images(query, max_photos=4):
                         artist = re.sub(r'\s+', ' ', artist).strip()[:40]
                         lic_short = extmeta.get('LicenseShortName', {}).get('value', '') or extmeta.get('UsageTerms', {}).get('value', '') or "CC BY-SA"
                         attr = f"© {artist} ({lic_short} via Wikimedia)"
-                        if is_herbarium_image(img_url, f"{p.get('title', '')} {attr}") or _is_wikimedia_or_scan_photo({"attribution": f"{p.get('title', '')} {attr}"}, img_url):
+                        title_and_url = f"{p.get('title', '')} {img_url} {attr}".lower()
+                        scan_or_drawing_markers = (
+                            "biodiversitylibrary", "illustration", "drawing", "plate", "lithograph",
+                            "thome", "lindman", "sturm", "masclef", "kops", "flora_von"
+                        )
+                        if is_herbarium_image(img_url, f"{p.get('title', '')} {attr}") or any(m in title_and_url for m in scan_or_drawing_markers):
                             continue
                         entry = f"{img_url}|{attr}"
                         if not any(p.split('|')[0] == img_url for p in photos):
