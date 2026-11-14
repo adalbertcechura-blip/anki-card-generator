@@ -776,6 +776,30 @@ def fetch_country_data(query, db):
 
     return res
 
+VALID_CC_CODES = {"cc0", "cc-by", "cc-by-nc", "cc-by-sa", "cc-by-nc-sa", "cc-by-nd", "cc-by-nc-nd", "pd"}
+
+def _format_inat_attribution(photo_obj: dict) -> str:
+    if not isinstance(photo_obj, dict):
+        return "iNaturalist"
+    attr = str(photo_obj.get("attribution") or "").strip()
+    lic = str(photo_obj.get("license_code") or "").strip().upper()
+    if attr:
+        attr = attr.replace("(c)", "©").replace("(C)", "©").strip()
+        return f"{attr} (via iNaturalist)" if "inaturalist" not in attr.lower() else attr
+    if lic:
+        return f"iNaturalist ({lic})"
+    return "iNaturalist"
+
+def _is_wikimedia_or_scan_photo(photo_obj: dict, url_str: str) -> bool:
+    u_low = (url_str or "").lower()
+    attr_low = str(photo_obj.get("attribution", "") or "").lower()
+    bad_markers = (
+        "wikimedia", "wikipedia", "commons", "biodiversitylibrary",
+        "illustration", "drawing", "plate", "lithograph", "herbarium",
+        "thome", "lindman", "sturm", "masclef", "kops", "flora_von"
+    )
+    return any(m in u_low or m in attr_low for m in bad_markers)
+
 def fetch_inaturalist_data(species_name, max_photos=4):
     headers = {'User-Agent': 'AnkiSpeciesGenerator/1.0 (contact: adalb@example.com)'}
     res_data = {
@@ -783,29 +807,45 @@ def fetch_inaturalist_data(species_name, max_photos=4):
         'photo_urls': [],
         'source': 'Nenalezeno'
     }
+    if not species_name or pd.isna(species_name):
+        return res_data
 
-    encoded_name = urllib.parse.quote(species_name)
-    search_url = f"https://api.inaturalist.org/v1/taxa?q={encoded_name}&locale=cs"
+    raw_sp = str(species_name).strip()
+    clean_sp = re.sub(r'\s*\(.*?\)\s*', ' ', raw_sp).strip()
+    clean_sp = re.sub(r'\s+sp(p)?\.?$', '', clean_sp).strip()
+    clean_no_subsp = re.sub(r'\s+(subsp|ssp|var|f)\.?\s+.*$', '', clean_sp, flags=re.IGNORECASE).strip()
+    candidates = []
+    for cand in [clean_sp, clean_no_subsp, raw_sp]:
+        if cand and cand not in candidates:
+            candidates.append(cand)
+        words = cand.split()
+        if len(words) >= 2:
+            binom = f"{words[0]} {words[1]}"
+            if binom not in candidates:
+                candidates.append(binom)
 
     taxon_id = None
-    try:
-        r_inat = requests.get(search_url, timeout=5)
-        if r_inat.status_code == 200:
-            results = r_inat.json().get('results', [])
-            if results:
-                best_match = results[0]
-                for res in results:
-                    if res.get('name', '').lower() == species_name.lower():
-                        best_match = res
-                        break
-                taxon_id = best_match.get('id')
-                res_data['common_name'] = best_match.get('preferred_common_name', '')
-                res_data['source'] = 'iNaturalist'
-    except Exception:
-        pass
+    for cand in candidates:
+        encoded_name = urllib.parse.quote(cand)
+        search_url = f"https://api.inaturalist.org/v1/taxa?q={encoded_name}&locale=cs"
+        try:
+            r_inat = requests.get(search_url, headers=headers, timeout=6)
+            if r_inat.status_code == 200:
+                results = r_inat.json().get('results', [])
+                if results:
+                    exact_matches = [res for res in results if res.get('name', '').lower() == cand.lower()]
+                    pool = exact_matches if exact_matches else results
+                    best_match = max(pool, key=lambda r_item: (1 if r_item.get('is_active', True) else 0, int(r_item.get('observations_count') or 0)))
+                    taxon_id = best_match.get('id')
+                    res_data['common_name'] = best_match.get('preferred_common_name', '')
+                    res_data['source'] = 'iNaturalist'
+                    break
+        except Exception:
+            pass
 
     if not res_data['common_name']:
-        encoded_slug = urllib.parse.quote(species_name.replace(' ', '_'))
+        slug_base = clean_no_subsp or clean_sp or raw_sp
+        encoded_slug = urllib.parse.quote(slug_base.replace(' ', '_'))
         url_wiki_cs = f"https://cs.wikipedia.org/api/rest_v1/page/summary/{encoded_slug}"
         try:
             r_wiki = requests.get(url_wiki_cs, headers=headers, timeout=5)
@@ -819,64 +859,78 @@ def fetch_inaturalist_data(species_name, max_photos=4):
 
     inat_photos = []
     if taxon_id:
-        detail_url = f"https://api.inaturalist.org/v1/taxa/{taxon_id}?locale=cs"
-        try:
-            r_detail = requests.get(detail_url, timeout=5)
-            if r_detail.status_code == 200:
-                detail_results = r_detail.json().get('results', [])
-                if detail_results:
-                    taxon_detail = detail_results[0]
-                    taxon_photos = taxon_detail.get('taxon_photos', [])
-                    for tp in taxon_photos:
-                        photo_obj = tp.get('photo', {})
-                        lic_code = str(photo_obj.get('license_code', '')).lower()
-
-                        if lic_code and lic_code in VALID_CC_CODES:
-                            photo_url = photo_obj.get('medium_url') or photo_obj.get('small_url') or photo_obj.get('url')
-                            if photo_url:
-                                if 'square' in photo_url:
-                                    photo_url = photo_url.replace('square', 'medium')
-                                attr_text = _format_inat_attribution(photo_obj)
-                                entry = f"{photo_url}|{attr_text}"
-                                if not any(p.split('|')[0] == photo_url for p in inat_photos):
+        def _add_obs_photos(obs_api_url):
+            try:
+                r_obs = requests.get(obs_api_url, headers=headers, timeout=7)
+                if r_obs.status_code == 200:
+                    for obs in r_obs.json().get('results', []):
+                        if len(inat_photos) >= max_photos:
+                            break
+                        for op in obs.get('photos', []):
+                            op_lic = str(op.get('license_code', '') or '').lower()
+                            if op_lic and op_lic not in VALID_CC_CODES:
+                                continue
+                            op_url = op.get('medium_url') or op.get('url')
+                            if op_url and not _is_wikimedia_or_scan_photo(op, op_url):
+                                if 'square' in op_url:
+                                    op_url = op_url.replace('square', 'medium')
+                                attr_text = _format_inat_attribution(op) if op_lic else "iNaturalist"
+                                entry = f"{op_url}|{attr_text}"
+                                if not any(p.split('|')[0] == op_url for p in inat_photos):
                                     inat_photos.append(entry)
+                                    if len(inat_photos) >= max_photos:
+                                        break
+            except Exception:
+                pass
 
-                    if len(inat_photos) < max_photos:
-                        obs_url = f"https://api.inaturalist.org/v1/observations?taxon_id={taxon_id}&photos=true&license=cc0,cc-by,cc-by-nc,cc-by-sa,cc-by-nc-sa,cc-by-nd,cc-by-nc-nd&per_page=15"
-                        r_obs = requests.get(obs_url, timeout=5)
-                        if r_obs.status_code == 200:
-                            obs_results = r_obs.json().get('results', [])
-                            for obs in obs_results:
-                                if len(inat_photos) >= max_photos:
-                                    break
-                                for op in obs.get('photos', []):
-                                    op_lic = str(op.get('license_code', '')).lower()
-                                    if op_lic and op_lic in VALID_CC_CODES:
-                                        op_url = op.get('url')
-                                        if op_url:
-                                            if 'square' in op_url:
-                                                op_url = op_url.replace('square', 'medium')
-                                            attr_text = _format_inat_attribution(op)
-                                            entry = f"{op_url}|{attr_text}"
-                                            if not any(p.split('|')[0] == op_url for p in inat_photos):
-                                                inat_photos.append(entry)
-                                                if len(inat_photos) >= max_photos:
-                                                    break
-        except Exception:
-            pass
+        _add_obs_photos(
+            f"https://api.inaturalist.org/v1/observations?taxon_id={taxon_id}&photos=true&quality_grade=research&order_by=votes&license=cc0,cc-by,cc-by-nc,cc-by-sa,cc-by-nc-sa,cc-by-nd,cc-by-nc-nd&per_page=20"
+        )
+        if len(inat_photos) < max_photos:
+            _add_obs_photos(
+                f"https://api.inaturalist.org/v1/observations?taxon_id={taxon_id}&photos=true&verifiable=true&license=cc0,cc-by,cc-by-nc,cc-by-sa,cc-by-nc-sa,cc-by-nd,cc-by-nc-nd&per_page=20"
+            )
+        if len(inat_photos) < max_photos:
+            detail_url = f"https://api.inaturalist.org/v1/taxa/{taxon_id}?locale=cs"
+            try:
+                r_detail = requests.get(detail_url, headers=headers, timeout=6)
+                if r_detail.status_code == 200:
+                    detail_results = r_detail.json().get('results', [])
+                    if detail_results:
+                        for tp in detail_results[0].get('taxon_photos', []):
+                            if len(inat_photos) >= max_photos:
+                                break
+                            photo_obj = tp.get('photo', {})
+                            lic_code = str(photo_obj.get('license_code', '') or '').lower()
+                            if lic_code and lic_code in VALID_CC_CODES:
+                                photo_url = photo_obj.get('medium_url') or photo_obj.get('small_url') or photo_obj.get('url')
+                                if photo_url and not _is_wikimedia_or_scan_photo(photo_obj, photo_url):
+                                    if 'square' in photo_url:
+                                        photo_url = photo_url.replace('square', 'medium')
+                                    attr_text = _format_inat_attribution(photo_obj)
+                                    entry = f"{photo_url}|{attr_text}"
+                                    if not any(p.split('|')[0] == photo_url for p in inat_photos):
+                                        inat_photos.append(entry)
+            except Exception:
+                pass
+        if len(inat_photos) < max_photos:
+            _add_obs_photos(
+                f"https://api.inaturalist.org/v1/observations?taxon_id={taxon_id}&photos=true&quality_grade=research&order_by=votes&per_page=15"
+            )
 
     if inat_photos:
         res_data['photo_urls'] = inat_photos[:max_photos]
     else:
+        slug_base = clean_no_subsp or clean_sp or raw_sp
         for lang in ['cs', 'en']:
-            encoded_slug = urllib.parse.quote(species_name.replace(' ', '_'))
+            encoded_slug = urllib.parse.quote(slug_base.replace(' ', '_'))
             url_wiki = f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/{encoded_slug}"
             try:
                 r_wiki = requests.get(url_wiki, headers=headers, timeout=5)
                 if r_wiki.status_code == 200:
                     wiki = r_wiki.json()
                     thumb = wiki.get('thumbnail', {}).get('source')
-                    if thumb:
+                    if thumb and not thumb.lower().endswith('.svg') and not _is_wikimedia_or_scan_photo({}, thumb.replace('commons', '')):
                         res_data['photo_urls'].append(f"{thumb}|Wikimedia Commons (CC BY-SA)")
                         break
             except Exception:
@@ -989,9 +1043,7 @@ def get_pladias_base_map():
     except Exception:
         pass
     
-    blank = Image.new("RGBA", (w, h), (245, 248, 245, 255))
-    _PLADIAS_BASE_MAP_CACHE = blank
-    return _PLADIAS_BASE_MAP_CACHE.copy()
+    return Image.new("RGBA", (w, h), (245, 248, 245, 255))
 
 def resolve_pladias_region_bbox(place_query: str):
     minx, miny, maxx, maxy = 1335000, 6190000, 2105000, 6640000
@@ -1416,18 +1468,34 @@ def render_pladias_distribution_map(species_name, output_path, place_filter=None
     if not species_name:
         return False
     species_name = str(species_name).strip()
+    if "pladias.cz/taxon/" in species_name:
+        tail = species_name.split("pladias.cz/taxon/")[-1].split("?")[0].split("#")[0].strip("/")
+        if "/" in tail:
+            tail = tail.split("/", 1)[1]
+        species_name = urllib.parse.unquote(tail).strip()
     clean_sp = re.sub(r'\s*\(.*?\)\s*', ' ', species_name).strip()
     clean_sp = re.sub(r'\s+sp(p)?\.?$', '', clean_sp).strip()
+    clean_no_subsp = re.sub(r'\s+(subsp|ssp|var|f)\.?\s+.*$', '', clean_sp, flags=re.IGNORECASE).strip()
     if not clean_sp:
         clean_sp = species_name
 
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
 
+    q_candidates = []
+    for cand in [clean_sp, clean_no_subsp, species_name]:
+        if cand and cand not in q_candidates:
+            q_candidates.append(cand)
+        words = cand.split()
+        if len(words) >= 2:
+            binom = f"{words[0]} {words[1]}"
+            if binom not in q_candidates:
+                q_candidates.append(binom)
+
     taxon_id = None
-    for q_name in [clean_sp, species_name]:
+    for q_name in q_candidates:
         url_dist = f"https://pladias.cz/taxon/distribution/{urllib.parse.quote(q_name)}"
         try:
-            r = requests.get(url_dist, headers=headers, timeout=6)
+            r = requests.get(url_dist, headers=headers, timeout=9)
             if r.status_code == 200:
                 soup = BeautifulSoup(r.text, 'html.parser')
                 map_div = soup.find('div', id='map') or soup.find('div', class_='distributionMap')
@@ -1436,6 +1504,24 @@ def render_pladias_distribution_map(species_name, output_path, place_filter=None
                     break
         except Exception:
             pass
+
+    if not taxon_id:
+        for q_name in q_candidates:
+            try:
+                api_u = f"https://api.pladias.cz/prest/taxa?name_lat=ilike.{urllib.parse.quote(q_name)}*&limit=3"
+                r_api = requests.get(api_u, headers=headers, timeout=8)
+                if r_api.status_code == 200:
+                    rows = r_api.json()
+                    if isinstance(rows, list):
+                        for row_t in rows:
+                            tid = row_t.get("id") or row_t.get("taxon_id")
+                            if tid:
+                                taxon_id = str(tid)
+                                break
+                    if taxon_id:
+                        break
+            except Exception:
+                pass
 
     if not taxon_id:
         return False
@@ -1588,15 +1674,18 @@ def extract_pladias_category_photos(all_items, target_succ, max_photos=3, fallba
     if not all_items:
         return []
     excluded = set(exclude_urls) if exclude_urls else set()
-    matched = all_items
-    if target_succ is not None:
+    real_photos_only = [it for it in all_items if it.get('succession') not in (None, 7)]
+    if target_succ is None:
+        matched = real_photos_only if real_photos_only else all_items
+    else:
         filtered = [it for it in all_items if it.get('succession') in target_succ]
         if filtered:
             matched = filtered
         elif not fallback:
             return []
         else:
-            matched = all_items
+            is_scan_target = all(s in (None, 7) for s in target_succ)
+            matched = all_items if is_scan_target else real_photos_only
 
     photos = []
     for it in matched:
@@ -1647,15 +1736,19 @@ def fetch_pladias_species_images(species_name):
         candidates.append(species_name)
 
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    exact_fallback_data = []
     for cand in candidates:
         q = urllib.parse.quote(cand)
         url = f"https://api.pladias.cz/prest/images?name_lat=eq.{q}&order=succession.asc.nullslast"
         try:
-            r = requests.get(url, headers=headers, timeout=5)
+            r = requests.get(url, headers=headers, timeout=6)
             if r.status_code == 200:
                 data = r.json()
                 if data and isinstance(data, list) and len(data) > 0:
-                    return data
+                    if any(it.get('succession') not in (None, 7) for it in data):
+                        return data
+                    if not exact_fallback_data:
+                        exact_fallback_data = data
         except Exception:
             pass
 
@@ -1665,14 +1758,17 @@ def fetch_pladias_species_images(species_name):
             q_prefix = urllib.parse.quote(f"{words[0]} {words[1]}")
             url_ilike = f"https://api.pladias.cz/prest/images?name_lat=ilike.{q_prefix}*&order=succession.asc.nullslast"
             try:
-                r = requests.get(url_ilike, headers=headers, timeout=5)
+                r = requests.get(url_ilike, headers=headers, timeout=6)
                 if r.status_code == 200:
                     data = r.json()
                     if data and isinstance(data, list) and len(data) > 0:
-                        return data
+                        if any(it.get('succession') not in (None, 7) for it in data):
+                            return data
+                        if not exact_fallback_data:
+                            exact_fallback_data = data
             except Exception:
                 pass
-    return []
+    return exact_fallback_data
 
 def fetch_dalibor_data(species_name, max_photos=3):
 \
@@ -5224,7 +5320,7 @@ def generate_pdf_booklet(
                     continue
                 clean_sp = slugify_species_name(str(row.iloc[0])) if len(row) > 0 else f"druh_{idx}"
 
-                if col in ["[Pladias] Mapa rozšíření", "[Pladias.cz] Mapa rozšíření"]:
+                if col in ["[Pladias] Mapa rozšíření", "[Pladias.cz] Mapa rozšíření"] or ("pladias" in str(col).lower() and "map" in str(col).lower()):
                     safe_fn = f"{clean_sp}_pladias_map_{idx}.jpg"
                     lpath = os.path.join(media_dir, safe_fn)
                     if os.path.exists(lpath) and os.path.getsize(lpath) > 0:
@@ -11186,7 +11282,8 @@ if st.session_state.df is not None:
 
                             try:
                                 if mtype == 'pladias_map':
-                                    if render_pladias_distribution_map(url, local_path):
+                                    p_filter = task_data[2] if len(task_data) > 2 else None
+                                    if render_pladias_distribution_map(url, local_path, place_filter=p_filter):
                                         try: shutil.copy2(local_path, cache_path)
                                         except Exception: pass
                                         return fname, local_path, True
@@ -11352,7 +11449,7 @@ if st.session_state.df is not None:
                                         )
                                 continue
 
-                            if col in ["[Pladias] Mapa rozšíření", "[Pladias.cz] Mapa rozšíření"]:
+                            if col in ["[Pladias] Mapa rozšíření", "[Pladias.cz] Mapa rozšíření"] or ("pladias" in str(col).lower() and "map" in str(col).lower()):
                                 species_col = st.session_state.api_config.get("pladias_map_col", columns[0])
                                 raw_species = str(row_data[species_col]).strip() if species_col in row_data else str(val).strip()
                                 clean_species = slugify_species_name(raw_species) if raw_species else f"druh_{row_idx}"
@@ -12334,24 +12431,39 @@ if st.session_state.df is not None:
                     media_tasks = {}
                     media_attributions = {}
 
+                    pdf_place_filter = None
+                    try:
+                        _pf = st.session_state.get("api_config", {}).get("pladias_place_opt")
+                        if _pf and _pf.startswith("Vlastní"):
+                            _pf = st.session_state.get("api_config", {}).get("pladias_custom_place", _pf)
+                        pdf_place_filter = _pf
+                    except Exception:
+                        pass
+
                     for idx, row in target_df.iterrows():
+                        raw_sp_first = str(row.iloc[0]).strip() if len(row) > 0 else f"druh_{idx}"
+                        clean_sp_fn = slugify_species_name(raw_sp_first) if raw_sp_first else f"druh_{idx}"
                         for col in active_cols_pdf:
                             val = row[col]
                             if pd.isna(val) or str(val).strip() == "" or str(val).lower() == "nan":
                                 continue
 
-                            if col in ["[Pladias] Mapa rozšíření", "[Pladias.cz] Mapa rozšíření"]:
+                            if col in ["[Pladias] Mapa rozšíření", "[Pladias.cz] Mapa rozšíření"] or ("pladias" in str(col).lower() and "map" in str(col).lower()):
+                                val_s = str(val).strip()
                                 species_col = st.session_state.api_config.get("pladias_map_col", columns[0])
-                                raw_species = str(row[species_col]).strip() if species_col in row else str(val).strip()
-                                clean_species = slugify_species_name(raw_species) if raw_species else f"druh_{idx}"
-                                safe_filename = f"{clean_species}_pladias_map_{idx}.jpg"
-                                media_tasks[safe_filename] = (raw_species, 'pladias_map')
+                                if "pladias.cz/taxon/" in val_s:
+                                    query_species = val_s
+                                elif species_col in row and pd.notna(row[species_col]) and str(row[species_col]).strip():
+                                    query_species = str(row[species_col]).strip()
+                                else:
+                                    query_species = val_s if (" " in val_s and not val_s.lower().startswith("mapa")) else raw_sp_first
+                                safe_filename = f"{clean_sp_fn}_pladias_map_{idx}.jpg"
+                                media_tasks[safe_filename] = (query_species, 'pladias_map', pdf_place_filter)
 
                             elif col in ["[iNaturalist] Mapa nálezů", "[iNaturalist] Mapa pozorování", "[iNat] Mapa pozorování"] or ("inat" in str(col).lower() and "map" in str(col).lower()):
                                 species_col = st.session_state.api_config.get("inat_col", columns[0])
-                                raw_species = str(row[species_col]).strip() if species_col in row else ""
-                                clean_species = slugify_species_name(raw_species) if raw_species else f"druh_{idx}"
-                                safe_filename = f"{clean_species}_inat_map_{idx}.jpg"
+                                raw_species = str(row[species_col]).strip() if (species_col in row and pd.notna(row[species_col])) else raw_sp_first
+                                safe_filename = f"{clean_sp_fn}_inat_map_{idx}.jpg"
                                 media_tasks[safe_filename] = (str(val).strip(), 'inat_map', raw_species)
 
                             elif col in ["[GBIF] Habitus", "[GBIF] Květ", "[GBIF] List", "[GBIF] Plod", "[GBIF] Herbář"] and is_image_col(col, val):
@@ -12443,7 +12555,8 @@ if st.session_state.df is not None:
 
                             try:
                                 if mtype == 'pladias_map':
-                                    if render_pladias_distribution_map(url, local_path):
+                                    p_filter = task_data[2] if len(task_data) > 2 else None
+                                    if render_pladias_distribution_map(url, local_path, place_filter=p_filter):
                                         try: shutil.copy2(local_path, cache_path)
                                         except Exception: pass
                                         return fname, local_path, True
@@ -12675,7 +12788,7 @@ if st.session_state.df is not None:
                             val = row[col]
                             if pd.isna(val) or str(val).strip() == "" or str(val).lower() == "nan":
                                 continue
-                            if col in ["[Pladias] Mapa rozšíření", "[Pladias.cz] Mapa rozšíření"]:
+                            if col in ["[Pladias] Mapa rozšíření", "[Pladias.cz] Mapa rozšíření"] or ("pladias" in str(col).lower() and "map" in str(col).lower()):
                                 species_col = st.session_state.api_config.get("pladias_map_col", columns[0])
                                 raw_species = str(row[species_col]).strip() if species_col in row else str(val).strip()
                                 clean_species = slugify_species_name(raw_species) if raw_species else f"druh_{idx}"
