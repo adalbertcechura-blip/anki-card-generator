@@ -2749,50 +2749,69 @@ def fetch_diatombase_data(species_name):
 def fetch_wikimedia_images(query, max_photos=4):
     if not query or pd.isna(query):
         return []
-    query = str(query).strip()
-    if not query:
+    raw_q = str(query).strip()
+    if not raw_q:
         return []
 
-    headers = {'User-Agent': 'AnkiCardGen/1.0 (contact: adalb@example.com)'}
-    search_query = f"filetype:bitmap {query}"
-    url = f"https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch={urllib.parse.quote(search_query)}&gsrnamespace=6&gsrlimit={max_photos * 2}&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=800&format=json"
+    clean_q = re.sub(r'\s*\(.*?\)\s*', ' ', raw_q).strip()
+    clean_q = re.sub(r'\s+(subsp|ssp|var|f|agg)\.?\s+.*$', '', clean_q, flags=re.IGNORECASE).strip()
+    clean_q = re.sub(r'\s+sp(p)?\.?$', '', clean_q, flags=re.IGNORECASE).strip()
+    words_q = clean_q.split()
+    queries_to_try = [clean_q] if clean_q else [raw_q]
+    if len(words_q) > 2:
+        binomial_q = f"{words_q[0]} {words_q[1]}"
+        if binomial_q not in queries_to_try:
+            queries_to_try.append(binomial_q)
+
+    headers = {'User-Agent': 'AnkiCardGen/1.0 (https://github.com/adalb/anki-card-generator)'}
+    scan_or_drawing_markers = (
+        "biodiversitylibrary", "illustration", "drawing", "plate", "lithograph",
+        "thome", "lindman", "sturm", "masclef", "kops", "flora_von"
+    )
+    gsr_lim = max(10, int(max_photos) * 5)
 
     photos = []
-    try:
-        r = requests.get(url, headers=headers, timeout=(2.5, 5.0))
-        if r.status_code == 200:
-            data = r.json()
-            pages = data.get('query', {}).get('pages', {})
-            for p in pages.values():
-                imageinfo = p.get('imageinfo', [])
-                if imageinfo:
-                    img_url = imageinfo[0].get('thumburl') or imageinfo[0].get('url')
-                    if img_url:
-                        extmeta = imageinfo[0].get('extmetadata', {})
-                        artist_raw = extmeta.get('Artist', {}).get('value', '')
-                        if artist_raw:
-                            artist = BeautifulSoup(artist_raw, 'html.parser').get_text(strip=True)
-                        else:
-                            artist = extmeta.get('Credit', {}).get('value', '')
-                            if artist:
-                                artist = BeautifulSoup(artist, 'html.parser').get_text(strip=True)
-                        if not artist:
-                            artist = "Wikimedia Commons"
-                        artist = re.sub(r'\s+', ' ', artist).strip()[:40]
-                        lic_short = extmeta.get('LicenseShortName', {}).get('value', '') or extmeta.get('UsageTerms', {}).get('value', '') or "CC BY-SA"
-                        attr = f"© {artist} ({lic_short} via Wikimedia)"
-                        title_and_url = f"{p.get('title', '')} {img_url} {attr}".lower()
-                        scan_or_drawing_markers = (
-                            "biodiversitylibrary", "illustration", "drawing", "plate", "lithograph",
-                            "thome", "lindman", "sturm", "masclef", "kops", "flora_von"
-                        )
-                        if is_herbarium_image(img_url, f"{p.get('title', '')} {attr}") or any(m in title_and_url for m in scan_or_drawing_markers):
-                            continue
-                        entry = f"{img_url}|{attr}"
-                        if not any(p.split('|')[0] == img_url for p in photos):
-                            photos.append(entry)
-    except Exception:
-        pass
+    for q_cur in queries_to_try:
+        if len(photos) >= max_photos:
+            break
+        search_query = f"filetype:bitmap {q_cur}"
+        url = f"https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch={urllib.parse.quote(search_query)}&gsrnamespace=6&gsrlimit={gsr_lim}&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=800&format=json"
+        try:
+            r = requests.get(url, headers=headers, timeout=(3.0, 8.0))
+            if r.status_code in (429, 502, 503, 504):
+                time.sleep(1.2)
+                r = requests.get(url, headers=headers, timeout=(3.0, 8.0))
+            if r.status_code == 200:
+                data = r.json()
+                pages = data.get('query', {}).get('pages', {})
+                for p in pages.values():
+                    if len(photos) >= max_photos:
+                        break
+                    imageinfo = p.get('imageinfo', [])
+                    if imageinfo:
+                        img_url = imageinfo[0].get('thumburl') or imageinfo[0].get('url')
+                        if img_url:
+                            extmeta = imageinfo[0].get('extmetadata', {})
+                            artist_raw = extmeta.get('Artist', {}).get('value', '')
+                            if artist_raw:
+                                artist = BeautifulSoup(artist_raw, 'html.parser').get_text(strip=True)
+                            else:
+                                artist = extmeta.get('Credit', {}).get('value', '')
+                                if artist:
+                                    artist = BeautifulSoup(artist, 'html.parser').get_text(strip=True)
+                            if not artist:
+                                artist = "Wikimedia Commons"
+                            artist = re.sub(r'\s+', ' ', artist).strip()[:40]
+                            lic_short = extmeta.get('LicenseShortName', {}).get('value', '') or extmeta.get('UsageTerms', {}).get('value', '') or "CC BY-SA"
+                            attr = f"© {artist} ({lic_short} via Wikimedia)"
+                            title_and_url = f"{p.get('title', '')} {img_url} {attr}".lower()
+                            if is_herbarium_image(img_url, f"{p.get('title', '')} {attr}") or any(m in title_and_url for m in scan_or_drawing_markers):
+                                continue
+                            entry = f"{img_url}|{attr}"
+                            if not any(p_old.split('|')[0] == img_url for p_old in photos):
+                                photos.append(entry)
+        except Exception:
+            pass
     return photos[:max_photos]
 
 @functools.lru_cache(maxsize=4096)
@@ -9956,13 +9975,13 @@ if st.session_state.df is not None:
             trans_tgt = cfg.get("trans_tgt", "Čeština")
 
             inat_col = cfg.get("inat_col", columns[0] if columns else "")
-            inat_max_photos = cfg.get("inat_max", 4)
+            inat_max_photos = int(st.session_state.get("w_inat_max", cfg.get("inat_max", 4)))
             desc_col = cfg.get("desc_col", columns[0] if columns else "")
             desc_type_val = cfg.get("desc_type", "Vědecký anglický (popis, habitat, listy...)")
             gbif_col = cfg.get("gbif_col", columns[0] if columns else "")
             gbif_photo_col = cfg.get("gbif_photo_col", columns[0] if columns else "")
             pladias_photos_col = cfg.get("pladias_photos_col", columns[0] if columns else "")
-            pladias_photos_max = cfg.get("pladias_photos_max", 3)
+            pladias_photos_max = int(st.session_state.get("w_pladias_photos_max", cfg.get("pladias_photos_max", 3)))
             pladias_photos_parts = cfg.get("pladias_photos_parts", [])
             pladias_photos_fallback = cfg.get("pladias_photos_fallback", False)
             pladias_map_col = cfg.get("pladias_map_col", columns[0] if columns else "")
@@ -10391,6 +10410,7 @@ if st.session_state.df is not None:
                                 exclude_urls=used_pladias_urls
                             )
                             if cat_photos:
+                                cat_photos = cat_photos[:pladias_photos_max]
                                 has_any_photo = True
                                 row_updates[col_name] = ";".join(cat_photos)
                                 used_pladias_urls.update(cat_photos)
@@ -10406,6 +10426,7 @@ if st.session_state.df is not None:
                                 exclude_urls=used_pladias_urls
                             )
                             if cat_photos:
+                                cat_photos = cat_photos[:pladias_photos_max]
                                 has_any_photo = True
                                 row_updates[col_name] = ";".join(cat_photos)
                                 used_pladias_urls.update(cat_photos)
@@ -10420,6 +10441,7 @@ if st.session_state.df is not None:
                                 exclude_urls=used_pladias_urls
                             )
                             if cat_photos:
+                                cat_photos = cat_photos[:pladias_photos_max]
                                 has_any_photo = True
                                 row_updates[col_name] = ";".join(cat_photos)
                                 used_pladias_urls.update(cat_photos)
