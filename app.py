@@ -1026,7 +1026,7 @@ def get_topographic_base_map(minx=1335000, miny=6190000, maxx=2105000, maxy=6640
 
 import threading as _threading
 _PLADIAS_BASE_MAP_LOCK = _threading.Lock()
-_PLADIAS_MAP_SEMAPHORE = _threading.Semaphore(6)
+_PLADIAS_MAP_SEMAPHORE = _threading.Semaphore(3)
 
 def get_pladias_base_map():
     global _PLADIAS_BASE_MAP_CACHE
@@ -11548,13 +11548,14 @@ if st.session_state.df is not None:
                             return fname, local_path, False
 
                         completed_count = 0
-                        workers = min(20, max(4, (os.cpu_count() or 4) * 3))
+                        failed_items = []
+                        workers = min(8, max(4, (os.cpu_count() or 4) * 2))
                         executor = concurrent.futures.ThreadPoolExecutor(max_workers=workers)
                         try:
                             pending = {executor.submit(_download_task, item): item for item in media_tasks.items()}
                             last_progress_ts = time.time()
                             while pending:
-                                done_set, pending_set = concurrent.futures.wait(
+                                done_set, _ = concurrent.futures.wait(
                                     pending.keys(),
                                     timeout=1.0,
                                     return_when=concurrent.futures.FIRST_COMPLETED
@@ -11562,6 +11563,7 @@ if st.session_state.df is not None:
                                 if done_set:
                                     last_progress_ts = time.time()
                                     for future in done_set:
+                                        item_orig = pending.pop(future, None)
                                         completed_count += 1
                                         if completed_count % 10 == 0 or completed_count >= total_tasks - 25 or completed_count == total_tasks:
                                             progress_bar.progress(completed_count / total_tasks)
@@ -11570,17 +11572,32 @@ if st.session_state.df is not None:
                                             fname, local_path, success = future.result()
                                             if success:
                                                 downloaded_media.append(local_path)
+                                            elif item_orig is not None:
+                                                failed_items.append(item_orig)
                                         except Exception:
-                                            pass
-                                        pending.pop(future, None)
+                                            if item_orig is not None:
+                                                failed_items.append(item_orig)
                                 else:
-                                    if time.time() - last_progress_ts > 25.0:
-                                        st.warning(f"Některé vzdálené servery neodpovídaly včas ({len(pending)} položek přeskočeno), pokračuji v sestavení balíčku.")
-                                        for f_hung in list(pending.keys()):
+                                    wait_sec = int(time.time() - last_progress_ts)
+                                    status.text(f"Stahuji a optimalizuji média ({completed_count}/{total_tasks}, čekám na {len(pending)} úloh, {wait_sec} s)...")
+                                    if wait_sec > 120:
+                                        for f_hung, item_hung in list(pending.items()):
                                             f_hung.cancel()
+                                            failed_items.append(item_hung)
                                         break
                         finally:
                             executor.shutdown(wait=False, cancel_futures=True)
+
+                        if failed_items:
+                            for r_idx, r_item in enumerate(failed_items):
+                                status.text(f"Opakuji stažení nedokončených souborů ({r_idx + 1}/{len(failed_items)})...")
+                                time.sleep(0.35)
+                                try:
+                                    _, r_lpath, r_ok = _download_task(r_item)
+                                    if r_ok:
+                                        downloaded_media.append(r_lpath)
+                                except Exception:
+                                    pass
 
                     status.text("Sestavuji kartičky...")
                     progress_bar.progress(1.0)
@@ -12850,8 +12867,9 @@ if st.session_state.df is not None:
                                 pass
                             return fname, local_path, False
 
-                        workers = min(20, max(4, (os.cpu_count() or 4) * 3))
+                        workers = min(8, max(4, (os.cpu_count() or 4) * 2))
                         completed_count = 0
+                        failed_pdf_items = []
                         executor = concurrent.futures.ThreadPoolExecutor(max_workers=workers)
                         try:
                             pending = {executor.submit(_download_pdf_img, item): item for item in media_tasks.items()}
@@ -12865,23 +12883,37 @@ if st.session_state.df is not None:
                                 if done_set:
                                     last_progress_ts = time.time()
                                     for future in done_set:
+                                        item_orig = pending.pop(future, None)
                                         completed_count += 1
                                         if completed_count % 10 == 0 or completed_count >= total_tasks - 25 or completed_count == total_tasks:
                                             progress_bar.progress(completed_count / total_tasks)
                                             status.text(f"Stahuji a optimalizuji obrázky pro PDF ({completed_count}/{total_tasks})...")
                                         try:
-                                            future.result()
+                                            _, _, ok_pdf_m = future.result()
+                                            if not ok_pdf_m and item_orig is not None:
+                                                failed_pdf_items.append(item_orig)
                                         except Exception:
-                                            pass
-                                        pending.pop(future, None)
+                                            if item_orig is not None:
+                                                failed_pdf_items.append(item_orig)
                                 else:
-                                    if time.time() - last_progress_ts > 25.0:
-                                        st.warning(f"Některé vzdálené servery neodpovídaly včas ({len(pending)} položek přeskočeno), pokračuji v sestavení PDF.")
-                                        for f_hung in list(pending.keys()):
+                                    wait_sec = int(time.time() - last_progress_ts)
+                                    status.text(f"Stahuji a optimalizuji obrázky pro PDF ({completed_count}/{total_tasks}, čekám na {len(pending)} úloh, {wait_sec} s)...")
+                                    if wait_sec > 120:
+                                        for f_hung, item_hung in list(pending.items()):
                                             f_hung.cancel()
+                                            failed_pdf_items.append(item_hung)
                                         break
                         finally:
                             executor.shutdown(wait=False, cancel_futures=True)
+
+                        if failed_pdf_items:
+                            for r_idx, r_item in enumerate(failed_pdf_items):
+                                status.text(f"Opakuji stažení nedokončených obrázků pro PDF ({r_idx + 1}/{len(failed_pdf_items)})...")
+                                time.sleep(0.35)
+                                try:
+                                    _download_pdf_img(r_item)
+                                except Exception:
+                                    pass
 
                     status.text("Sázím a generuji PDF..." if is_preview else "Sázím a generuji PDF brožuru...")
                     progress_bar.progress(1.0)
