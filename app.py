@@ -5379,7 +5379,7 @@ def generate_pdf_booklet(
                     lpath, col_lbl, attr = display_imgs[0]
                     iw, ih = _get_image_dims(lpath)
                     aspect = ih / float(iw) if iw > 0 else 0.75
-                    cap_text = (attr if include_media_attribution and attr else col_lbl) or ""
+                    cap_text = attr if (include_media_attribution and attr) else ""
                     cap_h = 0.55 * cm if cap_text else 0.0
                     max_h = max(1.8 * cm, photo_budget_h - cap_h - 0.2 * cm)
 
@@ -5417,7 +5417,7 @@ def generate_pdf_booklet(
                                 th = max_h_each
                                 tw = th / aspect
                             rl_img = _make_img_or_spacer(lpath, tw, th)
-                            cap_text = (attr if include_media_attribution and attr else col_lbl) or ""
+                            cap_text = attr if (include_media_attribution and attr) else ""
                             row_cells.append([rl_img])
                             if cap_text:
                                 row_cells.append([Paragraph(cap_text, caption_style)])
@@ -5445,7 +5445,7 @@ def generate_pdf_booklet(
                                 th = max_h
                                 tw = th / aspect
                             img_cells.append(_make_img_or_spacer(lpath, tw, th))
-                            cap_text = (attr if include_media_attribution and attr else col_lbl) or ""
+                            cap_text = attr if (include_media_attribution and attr) else ""
                             cap_cells.append(Paragraph(cap_text, caption_style))
                         t_imgs = Table([img_cells, cap_cells], colWidths=[half_w, half_w])
                         t_imgs.setStyle(TableStyle([
@@ -5475,7 +5475,7 @@ def generate_pdf_booklet(
                             th1 = max_h_top
                             tw1 = th1 / aspect1
                         rl_img1 = _make_img_or_spacer(lpath1, tw1, th1)
-                        cap_text1 = (attr1 if include_media_attribution and attr1 else col_lbl1) or ""
+                        cap_text1 = attr1 if (include_media_attribution and attr1) else ""
 
                         bot_imgs = []
                         bot_caps = []
@@ -5488,7 +5488,7 @@ def generate_pdf_booklet(
                                 th = max_h_bot
                                 tw = th / aspect
                             bot_imgs.append(_make_img_or_spacer(lpath, tw, th))
-                            cap_text = (attr if include_media_attribution and attr else col_lbl) or ""
+                            cap_text = attr if (include_media_attribution and attr) else ""
                             bot_caps.append(Paragraph(cap_text, caption_style))
 
                         t_grid_data = [
@@ -5525,7 +5525,7 @@ def generate_pdf_booklet(
                                 th = max_h
                                 tw = th / aspect
                             img_cells.append(_make_img_or_spacer(lpath, tw, th))
-                            cap_text = (attr if include_media_attribution and attr else col_lbl) or ""
+                            cap_text = attr if (include_media_attribution and attr) else ""
                             cap_cells.append(Paragraph(cap_text, caption_style))
                         t_imgs = Table([img_cells, cap_cells], colWidths=[tri_w, tri_w, tri_w])
                         t_imgs.setStyle(TableStyle([
@@ -5555,7 +5555,7 @@ def generate_pdf_booklet(
                             th = max_row_h
                             tw = th / aspect
                         img_objs.append(_make_img_or_spacer(lpath, tw, th))
-                        cap_text = (attr if include_media_attribution and attr else col_lbl) or ""
+                        cap_text = attr if (include_media_attribution and attr) else ""
                         cap_objs.append(Paragraph(cap_text, caption_style))
 
                     t_grid_data = [
@@ -5591,7 +5591,7 @@ def generate_pdf_booklet(
                             th = max_row_h
                             tw = th / aspect
                         img_objs.append(_make_img_or_spacer(lpath, tw, th))
-                        cap_text = (attr if include_media_attribution and attr else col_lbl) or ""
+                        cap_text = attr if (include_media_attribution and attr) else ""
                         cap_objs.append(Paragraph(cap_text, caption_style))
 
                     if len(img_objs) == 5:
