@@ -609,15 +609,6 @@ def download_media_file(url: str, local_path: str) -> bool:
                 headers=headers,
                 timeout=(5.0, 15.0)
             )
-            if r.status_code == 404 and 'cevs/images/taxa/' in req_url:
-                alt_url = req_url.replace('/taxa/large/', '/taxa/clopla/large/') if '/taxa/clopla/' not in req_url else req_url.replace('/taxa/clopla/large/', '/taxa/large/')
-                try:
-                    alt_resp = requests.get(alt_url, headers=headers, timeout=(5.0, 15.0))
-                    if alt_resp.status_code == 200:
-                        r = alt_resp
-                except Exception:
-                    pass
-
             if r.status_code == 200 and len(r.content) > 0:
                 if not save_optimized_image(r.content, local_path, max_dim=1200, quality=85):
                     with open(local_path, "wb") as f_out:
@@ -799,6 +790,20 @@ def _is_wikimedia_or_scan_photo(photo_obj: dict, url_str: str) -> bool:
         "thome", "lindman", "sturm", "masclef", "kops", "flora_von"
     )
     return any(m in u_low or m in attr_low for m in bad_markers)
+
+def is_herbarium_image(url_or_path: str, attr: str = "", col_name: str = "") -> bool:
+    """Vrací True, pokud URL, cesta, popisek nebo sloupec odkazuje na herbářovou položku."""
+    c_low = str(col_name or "").lower()
+    if any(k in c_low for k in ("herbář", "herbar", "herbarium", "clopla", "clo-pla")):
+        return True
+    combined = f"{url_or_path or ''} {attr or ''}".lower()
+    herb_markers = (
+        "/clopla/", "clopla", "herbarium", "herbar", "herbář",
+        "exsiccat", "preserved_specimen", "preserved specimen",
+        "nybg", "naturalis.nl", "mnhn.fr", "kew.org/herb", "jacq.org",
+        "virtualherbaria", "botanischestaatssammlung", "herb_sheet", "herbarium_sheet"
+    )
+    return any(m in combined for m in herb_markers)
 
 def fetch_inaturalist_data(species_name, max_photos=4):
     headers = {'User-Agent': 'AnkiSpeciesGenerator/1.0 (contact: adalb@example.com)'}
@@ -1675,28 +1680,26 @@ def extract_pladias_category_photos(all_items, target_succ, max_photos=3, fallba
     excluded = set(exclude_urls) if exclude_urls else set()
     real_photos_only = [it for it in all_items if it.get('succession') not in (None, 7)]
     if target_succ is None:
-        matched = real_photos_only if real_photos_only else all_items
+        matched = real_photos_only
     else:
-        filtered = [it for it in all_items if it.get('succession') in target_succ]
+        if all(s in (None, 7) for s in target_succ):
+            return []
+        filtered = [it for it in real_photos_only if it.get('succession') in target_succ]
         if filtered:
             matched = filtered
         elif not fallback:
             return []
         else:
-            is_scan_target = all(s in (None, 7) for s in target_succ)
-            matched = all_items if is_scan_target else real_photos_only
+            matched = real_photos_only
 
     photos = []
     for it in matched:
         fn = it.get('filename')
         succ = it.get('succession')
-        if not fn:
+        if not fn or succ is None or succ == 7:
             continue
-        if succ is None or succ == 7:
-            u = f"https://files.ibot.cas.cz/cevs/images/taxa/clopla/large/{fn}"
-        else:
-            u = f"https://files.ibot.cas.cz/cevs/images/taxa/large/{fn}"
-        if u not in photos and u not in excluded:
+        u = f"https://files.ibot.cas.cz/cevs/images/taxa/large/{fn}"
+        if u not in photos and u not in excluded and not is_herbarium_image(u):
             photos.append(u)
             if len(photos) >= max_photos:
                 break
@@ -2176,6 +2179,7 @@ def fetch_gbif_fungi_photos(species_name, max_photos=3):
             occ_params = {
                 "taxonKey": usage_key,
                 "mediaType": "StillImage",
+                "basisOfRecord": "HUMAN_OBSERVATION",
                 "limit": 35
             }
             r_occ = requests.get(occ_url, params=occ_params, timeout=8)
@@ -2184,13 +2188,17 @@ def fetch_gbif_fungi_photos(species_name, max_photos=3):
                 for occ in results:
                     if len(photos) >= max_photos:
                         break
+                    if occ.get("basisOfRecord") in ("PRESERVED_SPECIMEN", "FOSSIL_SPECIMEN", "MATERIAL_SAMPLE", "MATERIAL_CITATION"):
+                        continue
                     media_list = occ.get("media", [])
                     for media in media_list:
                         if media.get("type") == "StillImage" and media.get("identifier"):
                             img_url = media.get("identifier")
                             if img_url and is_cc_license(media.get("license") or occ.get("license")):
+                                attr_text = extract_gbif_attribution(media, occ)
+                                if is_herbarium_image(img_url, attr_text):
+                                    continue
                                 if not any(p.split('|')[0] == img_url for p in photos):
-                                    attr_text = extract_gbif_attribution(media, occ)
                                     photos.append(f"{img_url}|{attr_text}")
                                     if len(photos) >= max_photos:
                                         break
@@ -2236,6 +2244,7 @@ def fetch_gbif_zoo_photos(species_name, max_photos=3):
             occ_params = {
                 "taxonKey": usage_key,
                 "mediaType": "StillImage",
+                "basisOfRecord": "HUMAN_OBSERVATION",
                 "limit": 30
             }
             r_occ = requests.get(occ_url, params=occ_params, timeout=8)
@@ -2244,13 +2253,17 @@ def fetch_gbif_zoo_photos(species_name, max_photos=3):
                 for occ in results:
                     if len(photos) >= max_photos:
                         break
+                    if occ.get("basisOfRecord") in ("PRESERVED_SPECIMEN", "FOSSIL_SPECIMEN", "MATERIAL_SAMPLE", "MATERIAL_CITATION"):
+                        continue
                     media_list = occ.get("media", [])
                     for media in media_list:
                         if media.get("type") == "StillImage" and media.get("identifier"):
                             img_url = media.get("identifier")
                             if img_url and is_cc_license(media.get("license") or occ.get("license")):
+                                attr_text = extract_gbif_attribution(media, occ)
+                                if is_herbarium_image(img_url, attr_text):
+                                    continue
                                 if not any(p.split('|')[0] == img_url for p in photos):
-                                    attr_text = extract_gbif_attribution(media, occ)
                                     photos.append(f"{img_url}|{attr_text}")
                                     if len(photos) >= max_photos:
                                         break
@@ -2712,8 +2725,8 @@ def fetch_wikimedia_images(query, max_photos=4):
         return []
 
     headers = {'User-Agent': 'AnkiCardGen/1.0 (contact: adalb@example.com)'}
-    search_query = f"filetype:bitmap|drawing {query}"
-    url = f"https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch={urllib.parse.quote(search_query)}&gsrnamespace=6&gsrlimit={max_photos}&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=800&format=json"
+    search_query = f"filetype:bitmap {query}"
+    url = f"https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch={urllib.parse.quote(search_query)}&gsrnamespace=6&gsrlimit={max_photos * 2}&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=800&format=json"
 
     photos = []
     try:
@@ -2739,6 +2752,8 @@ def fetch_wikimedia_images(query, max_photos=4):
                         artist = re.sub(r'\s+', ' ', artist).strip()[:40]
                         lic_short = extmeta.get('LicenseShortName', {}).get('value', '') or extmeta.get('UsageTerms', {}).get('value', '') or "CC BY-SA"
                         attr = f"© {artist} ({lic_short} via Wikimedia)"
+                        if is_herbarium_image(img_url, f"{p.get('title', '')} {attr}") or _is_wikimedia_or_scan_photo({"attribution": f"{p.get('title', '')} {attr}"}, img_url):
+                            continue
                         entry = f"{img_url}|{attr}"
                         if not any(p.split('|')[0] == img_url for p in photos):
                             photos.append(entry)
@@ -2961,20 +2976,25 @@ def fetch_bryophyte_photos(species_name, max_photos=3):
             m_data = r_m.json()
             usage_key = m_data.get('usageKey') or m_data.get('speciesKey')
             if usage_key:
-                occ_url = f"https://api.gbif.org/v1/occurrence/search?taxonKey={usage_key}&mediaType=StillImage&limit=10"
+                occ_url = f"https://api.gbif.org/v1/occurrence/search?taxonKey={usage_key}&mediaType=StillImage&basisOfRecord=HUMAN_OBSERVATION&limit=15"
                 r_occ = requests.get(occ_url, headers=headers, timeout=6)
                 if r_occ.status_code == 200:
                     occ_res = r_occ.json().get('results', [])
                     for occ in occ_res:
+                        if occ.get("basisOfRecord") in ("PRESERVED_SPECIMEN", "FOSSIL_SPECIMEN", "MATERIAL_SAMPLE", "MATERIAL_CITATION"):
+                            continue
                         media = occ.get('media', [])
                         for m in media:
                             img_url = m.get('identifier')
                             if img_url and img_url.startswith('http'):
+                                rights = m.get('rightsHolder') or m.get('creator') or occ.get('recordedBy') or "GBIF / iNaturalist"
+                                lic = m.get('license', '')
+                                lic_clean = lic.split('/')[-2].upper() if '/' in lic else (lic or "CC BY")
+                                attr_str = f"© {rights} ({lic_clean} via GBIF)"
+                                if is_herbarium_image(img_url, attr_str):
+                                    continue
                                 if not any(p.split('|')[0] == img_url for p in photos):
-                                    rights = m.get('rightsHolder') or m.get('creator') or occ.get('recordedBy') or "GBIF / iNaturalist"
-                                    lic = m.get('license', '')
-                                    lic_clean = lic.split('/')[-2].upper() if '/' in lic else (lic or "CC BY")
-                                    photos.append(f"{img_url}|© {rights} ({lic_clean} via GBIF)")
+                                    photos.append(f"{img_url}|{attr_str}")
                                     if len(photos) >= max_photos:
                                         break
                         if len(photos) >= max_photos:
@@ -4055,7 +4075,7 @@ def build_obsidian_zip_package(
                     raw_entries = [u.strip() for u in str(val).split(';') if u.strip()]
                     for pos, entry in enumerate(raw_entries):
                         raw_u = entry.split('|')[0].strip()
-                        if not raw_u:
+                        if not raw_u or is_herbarium_image(raw_u, entry, col):
                             continue
                         sp_clean = slugify(str(row.iloc[0])) if len(row) > 0 else f"item_{idx}"
                         ext = ".jpg"
@@ -4420,6 +4440,8 @@ class NumberedCanvas(canvas.Canvas):
 
     def __init__(self, *args, **kwargs):
         self.doc_title = kwargs.pop('doc_title', '') if 'doc_title' in kwargs else ''
+        self.show_running_header = kwargs.pop('show_running_header', True) if 'show_running_header' in kwargs else True
+        self.compact_footer = kwargs.pop('compact_footer', False) if 'compact_footer' in kwargs else False
         super(NumberedCanvas, self).__init__(*args, **kwargs)
         self._saved_page_states = []
 
@@ -4444,9 +4466,10 @@ class NumberedCanvas(canvas.Canvas):
         self.setFillColor(colors.HexColor("#64748b"))
 
         page_w, page_h = self._pagesize
-        margin_x = 1.2 * cm if page_w < 16 * cm else 1.8 * cm
+        is_compact = getattr(self, 'compact_footer', False)
+        margin_x = (0.35 * cm) if is_compact else (1.2 * cm if page_w < 16 * cm else 1.8 * cm)
 
-        if self._pageNumber > 1:
+        if getattr(self, 'show_running_header', True) and self._pageNumber > 1:
             header_text = getattr(self, 'doc_title', '') or "Studijní atlas a brožura"
             self.drawString(margin_x, page_h - 1.15 * cm, header_text[:70])
             self.setStrokeColor(colors.HexColor("#cbd5e1"))
@@ -4454,11 +4477,15 @@ class NumberedCanvas(canvas.Canvas):
             self.line(margin_x, page_h - 1.3 * cm, page_w - margin_x, page_h - 1.3 * cm)
 
         footer_text = f"Strana {self._pageNumber} z {page_count}"
-        self.drawRightString(page_w - margin_x, 0.85 * cm, footer_text)
-        self.drawString(margin_x, 0.85 * cm, "Generátor výukových materiálů a kartiček")
-        self.setStrokeColor(colors.HexColor("#e2e8f0"))
-        self.setLineWidth(0.5)
-        self.line(margin_x, 1.1 * cm, page_w - margin_x, 1.1 * cm)
+        if is_compact:
+            self.setFont(font_name, 6.8)
+            self.drawRightString(page_w - margin_x, 0.18 * cm, footer_text)
+        else:
+            self.drawRightString(page_w - margin_x, 0.85 * cm, footer_text)
+            self.drawString(margin_x, 0.85 * cm, "Generátor výukových materiálů a kartiček")
+            self.setStrokeColor(colors.HexColor("#e2e8f0"))
+            self.setLineWidth(0.5)
+            self.line(margin_x, 1.1 * cm, page_w - margin_x, 1.1 * cm)
         self.restoreState()
 
 class TrackPage(Flowable):
@@ -4889,8 +4916,8 @@ def generate_pdf_booklet(
     fn_normal, fn_bold, fn_italic, fn_bold_italic = register_pdf_fonts()
 
     margin_presets = {
-        "narrow": (0.32 * cm, 0.50 * cm, 0.45 * cm),
-        "standard": (0.85 * cm, 1.0 * cm, 0.95 * cm),
+        "narrow": (0.32 * cm, 0.45 * cm, 0.50 * cm),
+        "standard": (0.95 * cm, 1.45 * cm, 1.25 * cm),
         "wide": (1.45 * cm, 1.65 * cm, 1.45 * cm),
     }
     mx_base, mt_base, mb_base = margin_presets.get(margin_mode, margin_presets["standard"])
@@ -5431,11 +5458,15 @@ def generate_pdf_booklet(
                             gathered_maps.append((lpath, "Mapa pozorování", "iNaturalist.org"))
 
                 elif col in ["[GBIF] Habitus", "[GBIF] Květ", "[GBIF] List", "[GBIF] Plod", "[GBIF] Herbář"] and is_image_col(col, val):
+                    if is_herbarium_image("", "", col):
+                        continue
                     organ_map = {"[GBIF] Habitus": "habitus", "[GBIF] Květ": "kvet", "[GBIF] List": "list", "[GBIF] Plod": "plod", "[GBIF] Herbář": "herbar"}
                     organ = organ_map.get(col, "foto")
                     raw_entries = [u.strip() for u in str(val).split(';') if u.strip()]
                     for u_idx, entry in enumerate(raw_entries):
                         url = entry.split('|', 1)[0].strip()
+                        if is_herbarium_image(url, "", col):
+                            continue
                         ext = ".jpg"
                         if ".png" in url.lower(): ext = ".png"
                         elif ".jpeg" in url.lower(): ext = ".jpeg"
@@ -5443,10 +5474,14 @@ def generate_pdf_booklet(
                         lpath = os.path.join(media_dir, safe_fn)
                         if os.path.exists(lpath) and os.path.getsize(lpath) > 0:
                             attr = media_attributions.get(safe_fn, "")
+                            if is_herbarium_image(lpath, attr, col):
+                                continue
                             if not any(img[0] == lpath for img in gathered_photos):
                                 gathered_photos.append((lpath, col.replace("[GBIF] ", ""), attr))
 
                 elif is_image_col(col, val):
+                    if is_herbarium_image("", "", col):
+                        continue
                     raw_entries = [u.strip() for u in str(val).split(';') if u.strip()]
                     for img_idx, entry in enumerate(raw_entries):
                         if '|' in entry:
@@ -5456,6 +5491,8 @@ def generate_pdf_booklet(
                         else:
                             url = entry.strip()
                             attr_item = ""
+                        if is_herbarium_image(url, attr_item, col):
+                            continue
 
                         loc_cand = resolve_local_media_path(url) if (not url.startswith('http://') and not url.startswith('https://')) else None
                         if loc_cand and os.path.isfile(loc_cand):
@@ -5777,6 +5814,8 @@ def generate_pdf_booklet(
     def _canvas_factory(filename, **kwargs):
         c = NumberedCanvas(filename, **kwargs)
         c.doc_title = title.strip() or "Studijní atlas a brožura"
+        c.show_running_header = (margin_mode != "narrow")
+        c.compact_footer = (margin_mode == "narrow")
         return c
 
     page_tracker = {}
@@ -6106,6 +6145,8 @@ def generate_docx_booklet(
                 for img_idx, entry in enumerate(raw_entries):
                     u = entry.split('|', 1)[0].strip()
                     attr_txt = entry.split('|', 1)[1].strip() if '|' in entry else ""
+                    if is_herbarium_image(u, attr_txt, col):
+                        continue
                     resolved_path = None
                     if os.path.isfile(u):
                         resolved_path = u
