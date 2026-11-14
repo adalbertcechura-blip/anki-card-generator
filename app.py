@@ -1497,34 +1497,23 @@ def render_pladias_distribution_map(species_name, output_path, place_filter=None
     taxon_id = None
     for q_name in q_candidates:
         url_dist = f"https://pladias.cz/taxon/distribution/{urllib.parse.quote(q_name)}"
-        try:
-            r = requests.get(url_dist, headers=headers, timeout=9)
-            if r.status_code == 200:
-                soup = BeautifulSoup(r.text, 'html.parser')
-                map_div = soup.find('div', id='map') or soup.find('div', class_='distributionMap')
-                if map_div and map_div.get('data-taxon-id'):
-                    taxon_id = map_div.get('data-taxon-id')
-                    break
-        except Exception:
-            pass
-
-    if not taxon_id:
-        for q_name in q_candidates:
+        for attempt in range(3):
             try:
-                api_u = f"https://api.pladias.cz/prest/taxa?name_lat=ilike.{urllib.parse.quote(q_name)}*&limit=3"
-                r_api = requests.get(api_u, headers=headers, timeout=8)
-                if r_api.status_code == 200:
-                    rows = r_api.json()
-                    if isinstance(rows, list):
-                        for row_t in rows:
-                            tid = row_t.get("id") or row_t.get("taxon_id")
-                            if tid:
-                                taxon_id = str(tid)
-                                break
-                    if taxon_id:
-                        break
+                r = requests.get(url_dist, headers=headers, timeout=10)
+                if r.status_code == 200:
+                    soup = BeautifulSoup(r.text, 'html.parser')
+                    map_div = soup.find('div', id='map') or soup.find('div', class_='distributionMap')
+                    if map_div and map_div.get('data-taxon-id'):
+                        taxon_id = map_div.get('data-taxon-id')
+                    break
+                elif r.status_code == 404:
+                    break
             except Exception:
                 pass
+            if attempt < 2:
+                time.sleep(0.4 * (attempt + 1))
+        if taxon_id:
+            break
 
     if not taxon_id:
         return False
@@ -9984,27 +9973,27 @@ if st.session_state.df is not None:
                         raw_sp = str(row[pladias_photos_col]).strip()
                         species_items = fetch_pladias_species_images(raw_sp)
                         target_cats = pladias_photos_parts if pladias_photos_parts else ["Všechny fotky dohromady (obecný sloupec)"]
+                        specific_cats = [c for c in target_cats if c in PLADIAS_CATEGORY_MAPPING and PLADIAS_CATEGORY_MAPPING[c][1] is not None]
+                        general_cats = [c for c in target_cats if c in PLADIAS_CATEGORY_MAPPING and PLADIAS_CATEGORY_MAPPING[c][1] is None]
                         has_any_photo = False
                         used_pladias_urls = set()
                         missing_cats = []
 
-                        for cat_opt in target_cats:
-                            if cat_opt in PLADIAS_CATEGORY_MAPPING:
-                                col_name, succs = PLADIAS_CATEGORY_MAPPING[cat_opt]
-                                cat_photos = extract_pladias_category_photos(
-                                    species_items,
-                                    succs,
-                                    max_photos=pladias_photos_max,
-                                    fallback=False,
-                                    exclude_urls=used_pladias_urls if succs is not None else None
-                                )
-                                if cat_photos:
-                                    has_any_photo = True
-                                    row_updates[col_name] = ";".join(cat_photos)
-                                    if succs is not None:
-                                        used_pladias_urls.update(cat_photos)
-                                elif pladias_photos_fallback and succs is not None:
-                                    missing_cats.append((col_name, succs))
+                        for cat_opt in specific_cats:
+                            col_name, succs = PLADIAS_CATEGORY_MAPPING[cat_opt]
+                            cat_photos = extract_pladias_category_photos(
+                                species_items,
+                                succs,
+                                max_photos=pladias_photos_max,
+                                fallback=False,
+                                exclude_urls=used_pladias_urls
+                            )
+                            if cat_photos:
+                                has_any_photo = True
+                                row_updates[col_name] = ";".join(cat_photos)
+                                used_pladias_urls.update(cat_photos)
+                            elif pladias_photos_fallback:
+                                missing_cats.append((col_name, succs))
 
                         for col_name, succs in missing_cats:
                             cat_photos = extract_pladias_category_photos(
@@ -10012,6 +10001,20 @@ if st.session_state.df is not None:
                                 succs,
                                 max_photos=pladias_photos_max,
                                 fallback=True,
+                                exclude_urls=used_pladias_urls
+                            )
+                            if cat_photos:
+                                has_any_photo = True
+                                row_updates[col_name] = ";".join(cat_photos)
+                                used_pladias_urls.update(cat_photos)
+
+                        for cat_opt in general_cats:
+                            col_name, succs = PLADIAS_CATEGORY_MAPPING[cat_opt]
+                            cat_photos = extract_pladias_category_photos(
+                                species_items,
+                                succs,
+                                max_photos=pladias_photos_max,
+                                fallback=False,
                                 exclude_urls=used_pladias_urls
                             )
                             if cat_photos:
@@ -11293,7 +11296,11 @@ if st.session_state.df is not None:
                             try:
                                 if mtype == 'pladias_map':
                                     p_filter = task_data[2] if len(task_data) > 2 else None
-                                    if render_pladias_distribution_map(url, local_path, place_filter=p_filter):
+                                    ok_map = render_pladias_distribution_map(url, local_path, place_filter=p_filter)
+                                    if not ok_map:
+                                        time.sleep(0.5)
+                                        ok_map = render_pladias_distribution_map(url, local_path, place_filter=p_filter)
+                                    if ok_map:
                                         try: shutil.copy2(local_path, cache_path)
                                         except Exception: pass
                                         return fname, local_path, True
@@ -12566,7 +12573,11 @@ if st.session_state.df is not None:
                             try:
                                 if mtype == 'pladias_map':
                                     p_filter = task_data[2] if len(task_data) > 2 else None
-                                    if render_pladias_distribution_map(url, local_path, place_filter=p_filter):
+                                    ok_map = render_pladias_distribution_map(url, local_path, place_filter=p_filter)
+                                    if not ok_map:
+                                        time.sleep(0.5)
+                                        ok_map = render_pladias_distribution_map(url, local_path, place_filter=p_filter)
+                                    if ok_map:
                                         try: shutil.copy2(local_path, cache_path)
                                         except Exception: pass
                                         return fname, local_path, True
