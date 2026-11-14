@@ -1024,31 +1024,38 @@ def get_topographic_base_map(minx=1335000, miny=6190000, maxx=2105000, maxy=6640
         pass
     return None
 
+import threading as _threading
+_PLADIAS_BASE_MAP_LOCK = _threading.Lock()
+_PLADIAS_MAP_SEMAPHORE = _threading.Semaphore(4)
+
 def get_pladias_base_map():
     global _PLADIAS_BASE_MAP_CACHE
     if _PLADIAS_BASE_MAP_CACHE is not None:
         return _PLADIAS_BASE_MAP_CACHE.copy()
-        
-    minx, miny, maxx, maxy = 1335000, 6190000, 2105000, 6640000
-    w, h = 800, 480
-    wms_url = (
-        f"https://geoserver.ibot.cas.cz/common/ows?service=WMS&version=1.1.1&request=GetMap"
-        f"&LAYERS=commonStyles:squares"
-        f"&STYLES=&SRS=EPSG:3857"
-        f"&BBOX={minx},{miny},{maxx},{maxy}"
-        f"&WIDTH={w}&HEIGHT={h}&FORMAT=image/png"
-    )
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-    try:
-        r_wms = requests.get(wms_url, headers=headers, timeout=8)
-        if r_wms.status_code == 200 and len(r_wms.content) > 1000:
-            base_img = Image.open(io.BytesIO(r_wms.content)).convert("RGBA")
-            _PLADIAS_BASE_MAP_CACHE = base_img
+    with _PLADIAS_BASE_MAP_LOCK:
+        if _PLADIAS_BASE_MAP_CACHE is not None:
             return _PLADIAS_BASE_MAP_CACHE.copy()
-    except Exception:
-        pass
-    
-    return Image.new("RGBA", (w, h), (245, 248, 245, 255))
+
+        minx, miny, maxx, maxy = 1335000, 6190000, 2105000, 6640000
+        w, h = 800, 480
+        wms_url = (
+            f"https://geoserver.ibot.cas.cz/common/ows?service=WMS&version=1.1.1&request=GetMap"
+            f"&LAYERS=commonStyles:squares"
+            f"&STYLES=&SRS=EPSG:3857"
+            f"&BBOX={minx},{miny},{maxx},{maxy}"
+            f"&WIDTH={w}&HEIGHT={h}&FORMAT=image/png"
+        )
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        try:
+            r_wms = requests.get(wms_url, headers=headers, timeout=8)
+            if r_wms.status_code == 200 and len(r_wms.content) > 1000:
+                base_img = Image.open(io.BytesIO(r_wms.content)).convert("RGBA")
+                _PLADIAS_BASE_MAP_CACHE = base_img
+                return _PLADIAS_BASE_MAP_CACHE.copy()
+        except Exception:
+            pass
+
+        return Image.new("RGBA", (w, h), (245, 248, 245, 255))
 
 def resolve_pladias_region_bbox(place_query: str):
     minx, miny, maxx, maxy = 1335000, 6190000, 2105000, 6640000
@@ -1500,25 +1507,35 @@ def render_pladias_distribution_map(species_name, output_path, place_filter=None
                 q_candidates.append(binom)
 
     taxon_id = None
-    for q_name in q_candidates:
-        url_dist = f"https://pladias.cz/taxon/distribution/{urllib.parse.quote(q_name)}"
-        for attempt in range(3):
-            try:
-                r = requests.get(url_dist, headers=headers, timeout=10)
-                if r.status_code == 200:
-                    soup = BeautifulSoup(r.text, 'html.parser')
-                    map_div = soup.find('div', id='map') or soup.find('div', class_='distributionMap')
-                    if map_div and map_div.get('data-taxon-id'):
-                        taxon_id = map_div.get('data-taxon-id')
-                    break
-                elif r.status_code == 404:
-                    break
-            except Exception:
-                pass
-            if attempt < 2:
-                time.sleep(0.4 * (attempt + 1))
-        if taxon_id:
-            break
+    with _PLADIAS_MAP_SEMAPHORE:
+        for q_name in q_candidates:
+            url_dist = f"https://pladias.cz/taxon/distribution/{urllib.parse.quote(q_name)}"
+            for attempt in range(3):
+                try:
+                    r = requests.get(url_dist, headers=headers, timeout=10)
+                    if r.status_code == 200:
+                        soup = BeautifulSoup(r.text, 'html.parser')
+                        map_div = soup.find('div', id='map') or soup.find('div', class_='distributionMap')
+                        if map_div and map_div.get('data-taxon-id'):
+                            taxon_id = map_div.get('data-taxon-id')
+                        break
+                    elif r.status_code == 404:
+                        break
+                except Exception:
+                    pass
+                if attempt < 2:
+                    time.sleep(0.5 * (attempt + 1))
+            if not taxon_id:
+                try:
+                    r_api = requests.get(f"https://api.pladias.cz/prest/taxa?name_lat=eq.{urllib.parse.quote(q_name)}&select=id", headers=headers, timeout=6)
+                    if r_api.status_code == 200:
+                        rows_api = r_api.json()
+                        if isinstance(rows_api, list) and rows_api and rows_api[0].get('id'):
+                            taxon_id = str(rows_api[0]['id'])
+                except Exception:
+                    pass
+            if taxon_id:
+                break
 
     if not taxon_id:
         return False
@@ -11444,10 +11461,12 @@ if st.session_state.df is not None:
                             try:
                                 if mtype == 'pladias_map':
                                     p_filter = task_data[2] if len(task_data) > 2 else None
-                                    ok_map = render_pladias_distribution_map(url, local_path, place_filter=p_filter)
-                                    if not ok_map:
-                                        time.sleep(0.5)
+                                    ok_map = False
+                                    for _m_try in range(3):
                                         ok_map = render_pladias_distribution_map(url, local_path, place_filter=p_filter)
+                                        if ok_map:
+                                            break
+                                        time.sleep(0.6 * (_m_try + 1))
                                     if ok_map:
                                         try: shutil.copy2(local_path, cache_path)
                                         except Exception: pass
@@ -12748,10 +12767,12 @@ if st.session_state.df is not None:
                             try:
                                 if mtype == 'pladias_map':
                                     p_filter = task_data[2] if len(task_data) > 2 else None
-                                    ok_map = render_pladias_distribution_map(url, local_path, place_filter=p_filter)
-                                    if not ok_map:
-                                        time.sleep(0.5)
+                                    ok_map = False
+                                    for _m_try in range(3):
                                         ok_map = render_pladias_distribution_map(url, local_path, place_filter=p_filter)
+                                        if ok_map:
+                                            break
+                                        time.sleep(0.6 * (_m_try + 1))
                                     if ok_map:
                                         try: shutil.copy2(local_path, cache_path)
                                         except Exception: pass
