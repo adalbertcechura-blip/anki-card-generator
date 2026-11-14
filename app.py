@@ -7578,6 +7578,35 @@ with col_test_card:
                 st.error(f"Chyba při čtení testovacího souboru: {e}")
 
 if st.session_state.df is not None:
+    st.components.v1.html(
+        """
+        <script>
+        (function() {
+            try {
+                var w = window.parent || window;
+                if (!w.__ankiUnloadGuard) {
+                    w.__ankiUnloadGuard = function(e) {
+                        e.preventDefault();
+                        e.returnValue = '';
+                        return '';
+                    };
+                    w.addEventListener('beforeunload', w.__ankiUnloadGuard);
+                }
+            } catch (err) {
+                if (!window.__ankiUnloadGuard) {
+                    window.__ankiUnloadGuard = function(e) {
+                        e.preventDefault();
+                        e.returnValue = '';
+                        return '';
+                    };
+                    window.addEventListener('beforeunload', window.__ankiUnloadGuard);
+                }
+            }
+        })();
+        </script>
+        """,
+        height=0,
+    )
     df = st.session_state.df
     columns = [c for c in df.columns if not c.startswith('_anki_')]
 
@@ -8462,6 +8491,8 @@ if st.session_state.df is not None:
         ALL_MODULE_KEYS = ALL_BIO_KEYS + ALL_LANG_KEYS + ALL_GEO_KEYS
 
         if "api_config" not in st.session_state or not st.session_state.api_config:
+            if "w_bulk_photo_slider" in st.session_state:
+                st.session_state["_sync_bulk_photo_pending"] = True
             st.session_state.api_config = {
                 "selected_api_topic": "Biologie",
                 "enable_inat": False,
@@ -8708,18 +8739,16 @@ if st.session_state.df is not None:
                     help="Hromadně nastaví maximální limit fotografií pro všechny povolené fotomoduly (Pladias.cz, iNaturalist, GBIF, Mykologie, DaLiBor...)"
                 )
 
-                if bulk_photo_count != st.session_state["_prev_bulk_slider"]:
+                _photo_cfg_keys = [
+                    "pladias_photos_max", "inat_max", "wiki_max", "mykologie_img_max",
+                    "gbif_fungi_max", "dalibor_photos_max", "bryo_photos_max", "gbif_zoo_max"
+                ]
+                if bulk_photo_count != st.session_state["_prev_bulk_slider"] or st.session_state.get("_sync_bulk_photo_pending", False):
                     st.session_state["_prev_bulk_slider"] = bulk_photo_count
-                    cfg["pladias_photos_max"] = bulk_photo_count
-                    cfg["inat_max"] = bulk_photo_count
-                    cfg["wiki_max"] = bulk_photo_count
-                    cfg["mykologie_img_max"] = bulk_photo_count
-                    cfg["gbif_fungi_max"] = bulk_photo_count
-                    cfg["dalibor_photos_max"] = bulk_photo_count
-                    cfg["bryo_photos_max"] = bulk_photo_count
-                    cfg["gbif_zoo_max"] = bulk_photo_count
-                    for _k in ["w_pladias_photos_max", "w_inat_max", "w_wiki_max", "w_mykologie_img_max", "w_gbif_fungi_max", "w_dalibor_photos_max", "w_bryo_photos_max", "w_gbif_zoo_max"]:
-                        st.session_state[_k] = bulk_photo_count
+                    st.session_state["_sync_bulk_photo_pending"] = False
+                    for _ck in _photo_cfg_keys:
+                        cfg[_ck] = bulk_photo_count
+                        st.session_state[f"w_{_ck}"] = bulk_photo_count
 
         col_keys = [
             "inat_col", "gbif_col", "gbif_photo_col", "desc_col", "pladias_col", "pladias_tax_col", "pladias_photos_col", "pladias_map_col",
@@ -10205,7 +10234,7 @@ if st.session_state.df is not None:
                             row_unfounds.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'iNaturalist'})
                         inat_cz = inat_data.get('common_name', '')
                         if not skip_existing or not _is_target_filled("[iNat] České jméno"): row_updates["[iNat] České jméno"] = inat_cz
-                        if not skip_existing or not _is_target_filled("[iNat] Obrázky (URL)"): row_updates["[iNat] Obrázky (URL)"] = ";".join(inat_data.get('photo_urls', []))
+                        if not skip_existing or not _is_target_filled("[iNat] Obrázky (URL)"): row_updates["[iNat] Obrázky (URL)"] = ";".join(inat_data.get('photo_urls', [])[:inat_max_photos])
                     except Exception:
                         row_unfounds.append({'Řádek': idx + 1, 'Položka': str(row.get(inat_col, "")), 'Modul': 'iNaturalist (Chyba)'})
 
@@ -10289,7 +10318,7 @@ if st.session_state.df is not None:
                         wiki_urls = fetch_wikimedia_images(kw, wiki_max_photos)
                         if not wiki_urls:
                             row_unfounds.append({'Řádek': idx + 1, 'Položka': kw, 'Modul': 'Wikimedia Commons'})
-                        row_updates["[Wikimedia] Obrázky (URL)"] = ";".join(wiki_urls)
+                        row_updates["[Wikimedia] Obrázky (URL)"] = ";".join(wiki_urls[:wiki_max_photos])
                     except Exception:
                         row_unfounds.append({'Řádek': idx + 1, 'Položka': str(row.get(wiki_img_col, "")), 'Modul': 'Wikimedia Commons (Chyba)'})
 
@@ -10631,7 +10660,7 @@ if st.session_state.df is not None:
                                 row_unfounds.append({'Řádek': idx + 1, 'Položka': raw_val, 'Modul': 'Mykologie.net'})
 
                             if enable_mykologie_img and (not skip_existing or not _is_target_filled("[Mykologie.net] Fotky")):
-                                row_updates["[Mykologie.net] Fotky"] = ";".join(myko_data.get('photo_urls', []))
+                                row_updates["[Mykologie.net] Fotky"] = ";".join(myko_data.get('photo_urls', [])[:mykologie_img_max])
                             if enable_mykologie_desc and (not skip_existing or not _is_target_filled("[Mykologie.net] Popis")):
                                 row_updates["[Mykologie.net] Popis"] = myko_data.get('description', '')
                             if enable_mykologie_link and (not skip_existing or not _is_target_filled("[Mykologie.net] Odkaz")):
@@ -10666,7 +10695,7 @@ if st.session_state.df is not None:
                                 row_unfounds.append({'Řádek': idx + 1, 'Položka': raw_val, 'Modul': 'DaLiBor (Lišejníky)'})
 
                             if enable_dalibor_photos and (not skip_existing or not _is_target_filled("[DaLiBor] Fotky")):
-                                row_updates["[DaLiBor] Fotky"] = ";".join(dalib_data.get('photo_urls', []))
+                                row_updates["[DaLiBor] Fotky"] = ";".join(dalib_data.get('photo_urls', [])[:dalibor_photos_max])
                             if enable_dalibor_desc and (not skip_existing or not _is_target_filled("[DaLiBor] Popis")):
                                 row_updates["[DaLiBor] Popis"] = dalib_data.get('description', '')
                             if enable_dalibor_link and (not skip_existing or not _is_target_filled("[DaLiBor] Odkaz")):
@@ -10729,7 +10758,7 @@ if st.session_state.df is not None:
                         fungi_photos = fetch_gbif_fungi_photos(raw_sp, max_photos=gbif_fungi_max)
                         if not fungi_photos:
                             row_unfounds.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'GBIF Houby'})
-                        row_updates["[GBIF] Houby"] = ";".join(fungi_photos)
+                        row_updates["[GBIF] Houby"] = ";".join(fungi_photos[:gbif_fungi_max])
                     except Exception:
                         row_unfounds.append({'Řádek': idx + 1, 'Položka': str(row.get(gbif_fungi_col, "")), 'Modul': 'GBIF Houby (Chyba)'})
 
@@ -10739,7 +10768,7 @@ if st.session_state.df is not None:
                         zoo_photos = fetch_gbif_zoo_photos(raw_sp, max_photos=gbif_zoo_max)
                         if not zoo_photos:
                             row_unfounds.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'GBIF Zoologie'})
-                        row_updates["[GBIF] Zoologie"] = ";".join(zoo_photos)
+                        row_updates["[GBIF] Zoologie"] = ";".join(zoo_photos[:gbif_zoo_max])
                     except Exception:
                         row_unfounds.append({'Řádek': idx + 1, 'Položka': str(row.get(gbif_zoo_col, "")), 'Modul': 'GBIF Zoologie (Chyba)'})
 
