@@ -12267,14 +12267,52 @@ if st.session_state.df is not None:
                         if st.button("Zavřít náhled", key="btn_close_pdf_preview"):
                             st.session_state.pdf_preview_data = None
                             st.rerun()
-                    if hasattr(st, "pdf"):
-                        st.pdf(st.session_state.pdf_preview_data, height=700)
-                    else:
-                        b64_pdf = base64.b64encode(st.session_state.pdf_preview_data).decode('utf-8')
-                        st.markdown(
-                            f'<iframe src="data:application/pdf;base64,{b64_pdf}#toolbar=1&navpanes=0" width="100%" height="700px" style="border: 1px solid #cbd5e1; border-radius: 8px;"></iframe>',
-                            unsafe_allow_html=True
-                        )
+                    b64_pdf = base64.b64encode(st.session_state.pdf_preview_data).decode('utf-8')
+                    pdf_viewer_html = f"""
+                    <div id="pdf-preview-wrap" style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:8px; padding:12px; max-height:680px; overflow-y:auto; text-align:center; font-family:sans-serif;">
+                      <div id="pdf-status" style="color:#475569; font-size:14px; padding:16px;">Načítám náhled PDF...</div>
+                      <div id="pdf-pages" style="display:flex; flex-direction:column; align-items:center; gap:12px;"></div>
+                    </div>
+                    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+                    <script>
+                    (async function() {{
+                      const statusEl = document.getElementById("pdf-status");
+                      const pagesEl = document.getElementById("pdf-pages");
+                      const b64 = "{b64_pdf}";
+                      const bin = atob(b64);
+                      const bytes = new Uint8Array(bin.length);
+                      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+                      try {{
+                        if (typeof pdfjsLib === "undefined") throw new Error("pdf.js unavailable");
+                        pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+                        const pdf = await pdfjsLib.getDocument({{ data: bytes }}).promise;
+                        statusEl.style.display = "none";
+                        const dpr = Math.min(window.devicePixelRatio || 1.5, 2);
+                        for (let p = 1; p <= pdf.numPages; p++) {{
+                          const page = await pdf.getPage(p);
+                          const vpBase = page.getViewport({{ scale: 1.0 }});
+                          const targetW = Math.min(820, (pagesEl.clientWidth || 780) - 16);
+                          const cssScale = targetW / vpBase.width;
+                          const vp = page.getViewport({{ scale: cssScale * dpr }});
+                          const canvas = document.createElement("canvas");
+                          canvas.width = vp.width;
+                          canvas.height = vp.height;
+                          canvas.style.width = (vp.width / dpr) + "px";
+                          canvas.style.height = (vp.height / dpr) + "px";
+                          canvas.style.background = "#ffffff";
+                          canvas.style.boxShadow = "0 2px 10px rgba(15,23,42,0.14)";
+                          canvas.style.borderRadius = "4px";
+                          pagesEl.appendChild(canvas);
+                          await page.render({{ canvasContext: canvas.getContext("2d"), viewport: vp }}).promise;
+                        }}
+                      }} catch (err) {{
+                        const blobUrl = URL.createObjectURL(new Blob([bytes], {{ type: "application/pdf" }}));
+                        statusEl.innerHTML = 'Náhled v prohlížeči se nepodařilo vykreslit. <a href="' + blobUrl + '" target="_blank" style="color:#15803d; font-weight:600;">Otevřít PDF v novém okně</a> nebo použijte tlačítko pro stažení výše.';
+                      }}
+                    }})();
+                    </script>
+                    """
+                    components.html(pdf_viewer_html, height=710, scrolling=False)
 
             if btn_generate_pdf_clicked or btn_preview_pdf_clicked:
                 is_preview = bool(btn_preview_pdf_clicked)
