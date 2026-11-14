@@ -593,7 +593,9 @@ def download_media_file(url: str, local_path: str) -> bool:
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
             }
-            if 'mykologie.net' in url_str:
+            if 'wikimedia.org' in url_str or 'wikipedia.org' in url_str:
+                headers['User-Agent'] = 'AnkiCardGen/1.0 (https://github.com/adalb/anki-card-generator)'
+            elif 'mykologie.net' in url_str:
                 headers['Referer'] = 'https://www.mykologie.net/'
             elif 'dalib.cz' in url_str:
                 headers['Referer'] = 'https://dalib.cz/'
@@ -607,8 +609,11 @@ def download_media_file(url: str, local_path: str) -> bool:
             r = requests.get(
                 req_url,
                 headers=headers,
-                timeout=(5.0, 15.0)
+                timeout=(3.0, 8.0)
             )
+            if r.status_code in (429, 502, 503, 504):
+                time.sleep(1.2)
+                r = requests.get(req_url, headers=headers, timeout=(3.0, 8.0))
             if r.status_code == 200 and len(r.content) > 0:
                 if not save_optimized_image(r.content, local_path, max_dim=1200, quality=85):
                     with open(local_path, "wb") as f_out:
@@ -4086,7 +4091,8 @@ def build_obsidian_zip_package(
     card_separator: str = "?",
     selected_citations: list = None,
     progress_cb=None,
-    status_cb=None
+    status_cb=None,
+    preloaded_url_map: dict = None
 ) -> tuple:
     """Stáhne média a sestaví .zip balíček pro Obsidian / Karty.html."""
     temp_dir = tempfile.mkdtemp()
@@ -4114,24 +4120,89 @@ def build_obsidian_zip_package(
                             ext = ".webp"
                         media_tasks[raw_u] = os.path.join(media_dir, f"{sp_clean}_{slugify(col)}_{pos}{ext}")
 
-        total_m = len(media_tasks)
+        preloaded = preloaded_url_map or {}
+        pending_downloads = {}
+        for raw_u, target_p in media_tasks.items():
+            src_pre = preloaded.get(raw_u)
+            if src_pre and os.path.isfile(src_pre) and os.path.getsize(src_pre) > 0:
+                try:
+                    shutil.copy2(src_pre, target_p)
+                    continue
+                except Exception:
+                    pass
+            pending_downloads[raw_u] = target_p
+
+        total_m = len(pending_downloads)
         if total_m > 0:
             if status_cb:
                 status_cb(f"Stahuji multimediální soubory pro Obsidian (0/{total_m})...")
-            workers = min(12, os.cpu_count() * 2 if os.cpu_count() else 4)
+            workers = min(8, max(4, (os.cpu_count() or 4) * 2))
             done_m = 0
-            with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-                future_to_url = {executor.submit(download_media_file, u, p): u for u, p in media_tasks.items()}
-                for future in concurrent.futures.as_completed(future_to_url):
-                    done_m += 1
-                    if progress_cb:
-                        progress_cb(done_m / float(total_m) * 0.7)
-                    if status_cb:
-                        status_cb(f"Stahuji multimediální soubory pro Obsidian ({done_m}/{total_m})...")
-                    try:
-                        future.result()
-                    except Exception:
-                        pass
+            failed_obs = []
+            executor = concurrent.futures.ThreadPoolExecutor(max_workers=workers)
+            try:
+                pending = {executor.submit(download_media_file, u, p): (u, p) for u, p in pending_downloads.items()}
+                last_ts = time.time()
+                while pending:
+                    done_set, _ = concurrent.futures.wait(
+                        pending.keys(),
+                        timeout=1.0,
+                        return_when=concurrent.futures.FIRST_COMPLETED
+                    )
+                    if done_set:
+                        last_ts = time.time()
+                        for future in done_set:
+                            item_orig = pending.pop(future, None)
+                            done_m += 1
+                            if progress_cb and (done_m % 10 == 0 or done_m >= total_m - 25 or done_m == total_m):
+                                progress_cb(done_m / float(total_m) * 0.7)
+                            if status_cb and (done_m % 10 == 0 or done_m >= total_m - 25 or done_m == total_m):
+                                status_cb(f"Stahuji multimediální soubory pro Obsidian ({done_m}/{total_m})...")
+                            try:
+                                ok_d = future.result()
+                                if not ok_d and item_orig is not None:
+                                    failed_obs.append(item_orig)
+                            except Exception:
+                                if item_orig is not None:
+                                    failed_obs.append(item_orig)
+                    else:
+                        wait_s = int(time.time() - last_ts)
+                        if status_cb:
+                            status_cb(f"Stahuji multimediální soubory pro Obsidian ({done_m}/{total_m}, čekám na {len(pending)} úloh, {wait_s} s)...")
+                        if wait_s > 45:
+                            for f_h in list(pending.keys()):
+                                f_h.cancel()
+                            break
+            finally:
+                executor.shutdown(wait=False, cancel_futures=True)
+
+            if failed_obs:
+                r_total = len(failed_obs)
+                r_done = 0
+                r_exec = concurrent.futures.ThreadPoolExecutor(max_workers=4)
+                try:
+                    r_pend = {r_exec.submit(download_media_file, u, p): (u, p) for u, p in failed_obs}
+                    r_ts = time.time()
+                    while r_pend:
+                        r_d, _ = concurrent.futures.wait(r_pend.keys(), timeout=1.0, return_when=concurrent.futures.FIRST_COMPLETED)
+                        if r_d:
+                            r_ts = time.time()
+                            for rf in r_d:
+                                r_pend.pop(rf, None)
+                                r_done += 1
+                                if status_cb and (r_done % 5 == 0 or r_done >= r_total - 10 or r_done == r_total):
+                                    status_cb(f"Opakuji stažení pro Obsidian ({r_done}/{r_total})...")
+                                try:
+                                    rf.result()
+                                except Exception:
+                                    pass
+                        else:
+                            if time.time() - r_ts > 30:
+                                for rf_h in list(r_pend.keys()):
+                                    rf_h.cancel()
+                                break
+                finally:
+                    r_exec.shutdown(wait=False, cancel_futures=True)
 
         if progress_cb:
             progress_cb(0.85)
@@ -12033,13 +12104,14 @@ if st.session_state.df is not None:
                     else:
                         st.session_state.unfound_csv_data = None
 
-                    if clear_temp_on_finish:
-                        shutil.rmtree(temp_dir, ignore_errors=True)
-                        gc.collect()
-
                     if st.session_state.get("cb_also_gen_obsidian", False) and _anki_from_obs is None:
                         obs_vault_auto = f"Atlas_{slugify(deck_name_input or 'karticky')}"
                         obs_sep_auto = "??" if "Obousměrné" in st.session_state.get("obs_card_sep_radio", "") else "?"
+                        preloaded_map = {
+                            t_data[0]: os.path.join(media_dir, fn)
+                            for fn, t_data in media_tasks.items()
+                            if t_data and t_data[0] and os.path.isfile(os.path.join(media_dir, fn)) and os.path.getsize(os.path.join(media_dir, fn)) > 0
+                        }
                         obs_bytes, obs_fname = build_obsidian_zip_package(
                             df=df,
                             vault_name=obs_vault_auto,
@@ -12051,14 +12123,24 @@ if st.session_state.df is not None:
                             card_separator=obs_sep_auto,
                             selected_citations=st.session_state.get("user_selected_sources"),
                             progress_cb=progress_bar.progress,
-                            status_cb=status.text
+                            status_cb=status.text,
+                            preloaded_url_map=preloaded_map
                         )
                         st.session_state.generated_obsidian_data = obs_bytes
                         st.session_state.generated_obsidian_filename = obs_fname
+                        if clear_temp_on_finish:
+                            shutil.rmtree(temp_dir, ignore_errors=True)
+                            gc.collect()
                         st.success("Balíčky pro Anki (.apkg) i Obsidian (.zip) byly úspěšně vygenerovány!")
                     elif _anki_from_obs is not None:
+                        if clear_temp_on_finish:
+                            shutil.rmtree(temp_dir, ignore_errors=True)
+                            gc.collect()
                         st.success("Balíčky pro Obsidian (.zip) i Anki (.apkg) byly úspěšně vygenerovány!")
                     else:
+                        if clear_temp_on_finish:
+                            shutil.rmtree(temp_dir, ignore_errors=True)
+                            gc.collect()
                         st.success("Balíček Anki byl úspěšně vygenerován.")
                     st.rerun()
 
