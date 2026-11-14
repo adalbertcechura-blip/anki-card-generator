@@ -4026,6 +4026,90 @@ tags:
         f_out.write(zip_bytes)
     return len(zip_bytes)
 
+def build_obsidian_zip_package(
+    df: pd.DataFrame,
+    vault_name: str,
+    front_cols: list,
+    back_cols: list,
+    col_styles: dict,
+    include_guide: bool = True,
+    include_index: bool = True,
+    card_separator: str = "?",
+    selected_citations: list = None,
+    progress_cb=None,
+    status_cb=None
+) -> tuple:
+    """Stáhne média a sestaví .zip balíček pro Obsidian / Karty.html."""
+    temp_dir = tempfile.mkdtemp()
+    try:
+        media_dir = os.path.join(temp_dir, "media")
+        os.makedirs(media_dir, exist_ok=True)
+        media_tasks = {}
+        active_cols = list(dict.fromkeys((front_cols or []) + (back_cols or [])))
+        for idx, row in df.iterrows():
+            for col in active_cols:
+                val = row.get(col) if hasattr(row, "get") else row[col]
+                if pd.isna(val) or str(val).strip() == "" or str(val).lower() == "nan":
+                    continue
+                if check_col_is_image(col, df) or is_image_col(col, val):
+                    raw_entries = [u.strip() for u in str(val).split(';') if u.strip()]
+                    for pos, entry in enumerate(raw_entries):
+                        raw_u = entry.split('|')[0].strip()
+                        if not raw_u:
+                            continue
+                        sp_clean = slugify(str(row.iloc[0])) if len(row) > 0 else f"item_{idx}"
+                        ext = ".jpg"
+                        if raw_u.lower().endswith(".png"):
+                            ext = ".png"
+                        elif raw_u.lower().endswith(".webp"):
+                            ext = ".webp"
+                        media_tasks[raw_u] = os.path.join(media_dir, f"{sp_clean}_{slugify(col)}_{pos}{ext}")
+
+        total_m = len(media_tasks)
+        if total_m > 0:
+            if status_cb:
+                status_cb(f"Stahuji multimediální soubory pro Obsidian (0/{total_m})...")
+            workers = min(12, os.cpu_count() * 2 if os.cpu_count() else 4)
+            done_m = 0
+            with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+                future_to_url = {executor.submit(download_media_file, u, p): u for u, p in media_tasks.items()}
+                for future in concurrent.futures.as_completed(future_to_url):
+                    done_m += 1
+                    if progress_cb:
+                        progress_cb(done_m / float(total_m) * 0.7)
+                    if status_cb:
+                        status_cb(f"Stahuji multimediální soubory pro Obsidian ({done_m}/{total_m})...")
+                    try:
+                        future.result()
+                    except Exception:
+                        pass
+
+        if progress_cb:
+            progress_cb(0.85)
+        if status_cb:
+            status_cb("Vytvářím Markdown karty a balíček .zip pro Obsidian...")
+
+        out_zip_filename = f"{slugify(vault_name) or 'Studijni_Karticky'}.zip"
+        out_zip_path = os.path.join(temp_dir, out_zip_filename)
+        generate_obsidian_vault_zip(
+            df=df,
+            output_zip_path=out_zip_path,
+            vault_name=vault_name or "Studijni_Karticky",
+            front_cols=front_cols or [],
+            back_cols=back_cols or [],
+            col_styles=col_styles or {},
+            media_tasks=media_tasks,
+            include_guide=include_guide,
+            include_index=include_index,
+            card_separator=card_separator,
+            selected_citations=selected_citations
+        )
+        with open(out_zip_path, "rb") as f_zip:
+            zip_bytes = f_zip.read()
+        return zip_bytes, out_zip_filename
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
 def extract_apkg_to_dataframe(apkg_file_or_bytes, media_target_dir=None):
     if media_target_dir is None:
         media_target_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "custom_media")
@@ -11123,9 +11207,21 @@ if st.session_state.df is not None:
                 key="cb_force_new_anki_cards",
                 help="Zaškrtněte, pokud chcete v Anki vytvořit nový samostatný balíček a předejít přeskočení karet kvůli předchozím importům."
             )
+            st.checkbox(
+                "Současně vygenerovat i balíček pro Obsidian / Karty.html (.zip) se stejným rozvržením",
+                value=False,
+                key="cb_also_gen_obsidian",
+                help="Po vytvoření .apkg rovnou vygeneruje i .zip balíček pro Obsidian a webový přehrávač Karty.html se stejným nastavením líce, rubu a stylů."
+            )
             btn_gen_apkg_clicked = st.button("Generovat balíček pro Anki (.apkg)", key="btn_gen_apkg", use_container_width=True, type="primary")
 
-            if btn_gen_apkg_clicked:
+            _anki_from_obs = st.session_state.pop("_trigger_anki_from_obsidian", None)
+            if btn_gen_apkg_clicked or _anki_from_obs is not None:
+                if _anki_from_obs is not None:
+                    st.session_state.front_cols_ordered = list(_anki_from_obs.get("front", []))
+                    st.session_state.back_cols_ordered = list(_anki_from_obs.get("back", []))
+                    for _c_k, _c_v in _anki_from_obs.get("styles", {}).items():
+                        st.session_state.col_styles[_c_k] = dict(_c_v)
                 st.session_state.api_errors = []
                 clear_temp_on_finish = True
                 if not st.session_state.front_cols_ordered and not st.session_state.back_cols_ordered:
@@ -11798,12 +11894,51 @@ if st.session_state.df is not None:
                         shutil.rmtree(temp_dir, ignore_errors=True)
                         gc.collect()
 
-                    st.success("Balíček Anki byl úspěšně vygenerován.")
+                    if st.session_state.get("cb_also_gen_obsidian", False) and _anki_from_obs is None:
+                        obs_vault_auto = f"Atlas_{slugify(deck_name_input or 'karticky')}"
+                        obs_sep_auto = "??" if "Obousměrné" in st.session_state.get("obs_card_sep_radio", "") else "?"
+                        obs_bytes, obs_fname = build_obsidian_zip_package(
+                            df=df,
+                            vault_name=obs_vault_auto,
+                            front_cols=list(st.session_state.front_cols_ordered),
+                            back_cols=list(st.session_state.back_cols_ordered),
+                            col_styles=dict(st.session_state.col_styles),
+                            include_guide=st.session_state.get("obs_include_guide_cb", True),
+                            include_index=st.session_state.get("obs_include_index_cb", True),
+                            card_separator=obs_sep_auto,
+                            selected_citations=st.session_state.get("user_selected_sources"),
+                            progress_cb=progress_bar.progress,
+                            status_cb=status.text
+                        )
+                        st.session_state.generated_obsidian_data = obs_bytes
+                        st.session_state.generated_obsidian_filename = obs_fname
+                        st.success("Balíčky pro Anki (.apkg) i Obsidian (.zip) byly úspěšně vygenerovány!")
+                    elif _anki_from_obs is not None:
+                        st.success("Balíčky pro Obsidian (.zip) i Anki (.apkg) byly úspěšně vygenerovány!")
+                    else:
+                        st.success("Balíček Anki byl úspěšně vygenerován.")
                     st.rerun()
 
         with tab_obsidian:
             st.markdown("#### Export kartiček (.zip) – Webový přehrávač & Obsidian (Zdarma pro iPhone, iPad i PC)")
             st.info("Vygenerovaný **.zip** balíček můžete otevřít **přímo v telefonu nebo PC** pomocí samostatného přehrávače (**Karty.html / index.html** uvnitř balíčku), nebo jej otevřít v bezplatné aplikaci **Obsidian** s doplňkem *Spaced Repetition*. Obě varianty jsou 100% zdarma, fungují offline a pamatují si postup učení!")
+
+            if st.button("Překlopit rozvržení z Anki (Líc, Rub i formátování)", key="btn_sync_anki_to_obsidian", help="Zkopíruje aktuálně vybrané sloupce líce, rubu, jejich pořadí a stylování z 1. záložky (Anki) do Obsidianu."):
+                st.session_state.obs_front_cols_ordered = [c for c in st.session_state.front_cols_ordered if c in columns]
+                st.session_state.obs_back_cols_ordered = [c for c in st.session_state.back_cols_ordered if c in columns]
+                st.session_state["obs_front_cols_multiselect"] = list(st.session_state.obs_front_cols_ordered)
+                st.session_state["obs_back_cols_multiselect"] = list(st.session_state.obs_back_cols_ordered)
+                st.session_state.obs_col_styles = {
+                    k: dict(v) for k, v in (st.session_state.col_styles or {}).items()
+                }
+                for _c in list(st.session_state.obs_front_cols_ordered) + list(st.session_state.obs_back_cols_ordered):
+                    for _wk in (f"obs_style_bold_{_c}", f"obs_style_italic_{_c}", f"obs_style_size_{_c}", f"obs_style_lbl_{_c}", f"obs_style_show_{_c}"):
+                        if _wk in st.session_state:
+                            del st.session_state[_wk]
+                st.session_state["_obs_synced_toast"] = True
+                st.rerun()
+            if st.session_state.pop("_obs_synced_toast", False):
+                st.success("Rozvržení líce, rubu a formátování bylo překlopeno z Anki do Obsidianu.")
 
             col_obs_left, col_obs_right = st.columns([1.1, 0.9], gap="large")
 
@@ -12083,88 +12218,53 @@ if st.session_state.df is not None:
                                         st.markdown(f'<div{val_style_attr}>{val_str}</div>', unsafe_allow_html=True)
 
             st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+            st.checkbox(
+                "Současně vygenerovat i balíček pro Anki (.apkg) se stejným rozvržením",
+                value=False,
+                key="cb_also_gen_anki",
+                help="Po vytvoření .zip balíčku pro Obsidian rovnou vygeneruje i .apkg balíček pro Anki se stejným rozvržením líce, rubu a formátováním."
+            )
             btn_gen_obs_clicked = st.button("Generovat balíček pro Obsidian (.zip)", key="btn_gen_obsidian", use_container_width=True, type="primary")
 
             if btn_gen_obs_clicked:
                 if not obs_front_cols and not obs_back_cols:
                     st.error("Musíte vybrat alespoň jeden sloupec pro otázku (líc) nebo odpověď (rub).")
                 else:
-                    temp_dir = tempfile.mkdtemp()
-                    media_dir = os.path.join(temp_dir, "media")
-                    os.makedirs(media_dir, exist_ok=True)
-
                     progress_bar = st.progress(0.0)
                     status = st.empty()
 
                     status.text("Připravuji seznam médií pro Obsidian...")
-                    media_tasks = {}
                     effective_front = st.session_state.obs_front_cols_ordered
                     effective_back = st.session_state.obs_back_cols_ordered
-                    active_cols = list(dict.fromkeys(effective_front + effective_back))
-
-                    for idx, row in df.iterrows():
-                        for col in active_cols:
-                            val = row[col]
-                            if pd.isna(val) or str(val).strip() == "" or str(val).lower() == "nan":
-                                continue
-                            if check_col_is_image(col, df) or is_image_col(col, val):
-                                raw_entries = [u.strip() for u in str(val).split(';') if u.strip()]
-                                for pos, entry in enumerate(raw_entries):
-                                    raw_u = entry.split('|')[0].strip()
-                                    if not raw_u: continue
-                                    sp_clean = slugify(str(row.iloc[0])) if len(row) > 0 else f"item_{idx}"
-                                    ext = ".jpg"
-                                    if raw_u.lower().endswith(".png"): ext = ".png"
-                                    elif raw_u.lower().endswith(".webp"): ext = ".webp"
-                                    media_tasks[raw_u] = os.path.join(media_dir, f"{sp_clean}_{slugify(col)}_{pos}{ext}")
-
-                    total_m = len(media_tasks)
-                    if total_m > 0:
-                        status.text(f"Stahuji multimediální soubory (0/{total_m})...")
-                        workers = min(12, os.cpu_count() * 2 if os.cpu_count() else 4)
-                        done_m = 0
-                        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-                            future_to_url = {executor.submit(download_media_file, u, p): u for u, p in media_tasks.items()}
-                            for future in concurrent.futures.as_completed(future_to_url):
-                                done_m += 1
-                                progress_bar.progress(done_m / float(total_m) * 0.7)
-                                status.text(f"Stahuji multimediální soubory ({done_m}/{total_m})...")
-                                try:
-                                    future.result()
-                                except Exception:
-                                    pass
-
-                    progress_bar.progress(0.85)
-                    status.text("Vytvářím Markdown karty a balíček .zip pro Obsidian...")
-
-                    out_zip_filename = f"{slugify(obs_vault_name) or 'Studijni_Karticky'}.zip"
-                    out_zip_path = os.path.join(temp_dir, out_zip_filename)
-
                     sel_card_sep = "??" if "Obousměrné" in st.session_state.get("obs_card_sep_radio", "") else "?"
-                    generate_obsidian_vault_zip(
+
+                    zip_bytes, out_zip_filename = build_obsidian_zip_package(
                         df=df,
-                        output_zip_path=out_zip_path,
                         vault_name=obs_vault_name or "Studijni_Karticky",
                         front_cols=effective_front,
                         back_cols=effective_back,
                         col_styles=st.session_state.obs_col_styles,
-                        media_tasks=media_tasks,
                         include_guide=obs_include_guide,
                         include_index=obs_include_index,
                         card_separator=sel_card_sep,
-                        selected_citations=st.session_state.get("user_selected_sources")
+                        selected_citations=st.session_state.get("user_selected_sources"),
+                        progress_cb=progress_bar.progress,
+                        status_cb=status.text
                     )
-
-                    with open(out_zip_path, "rb") as f_zip:
-                        zip_bytes = f_zip.read()
 
                     st.session_state.generated_obsidian_data = zip_bytes
                     st.session_state.generated_obsidian_filename = out_zip_filename
 
                     progress_bar.progress(1.0)
                     status.text("Balíček pro Obsidian byl úspěšně vygenerován.")
-                    shutil.rmtree(temp_dir, ignore_errors=True)
-                    st.success("Balíček pro Obsidian (.zip) byl úspěšně vytvořen a je připraven ke stažení!")
+                    if st.session_state.get("cb_also_gen_anki", False):
+                        st.session_state["_trigger_anki_from_obsidian"] = {
+                            "front": list(effective_front),
+                            "back": list(effective_back),
+                            "styles": {k: dict(v) for k, v in st.session_state.obs_col_styles.items()}
+                        }
+                    else:
+                        st.success("Balíček pro Obsidian (.zip) byl úspěšně vytvořen a je připraven ke stažení!")
                     st.rerun()
 
         with tab_pdf:
