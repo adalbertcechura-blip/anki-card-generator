@@ -4786,7 +4786,11 @@ def generate_pdf_booklet(
     max_images_mode: str = "Až 6 (doporučeno: 4 fotky + 2 mapy)",
     title_col: str = None,
     include_secondary_title: bool = False,
-    toc_layout: str = "1_column"
+    toc_layout: str = "1_column",
+    image_scale: float = 1.0,
+    margin_mode: str = "standard",
+    gallery_layout: str = "auto",
+    map_position: str = "below_table"
 ) -> bool:
 
     if active_cols is None:
@@ -4800,18 +4804,25 @@ def generate_pdf_booklet(
 
     fn_normal, fn_bold, fn_italic, fn_bold_italic = register_pdf_fonts()
 
+    margin_presets = {
+        "narrow": (0.65 * cm, 1.0 * cm, 0.9 * cm),
+        "standard": (1.1 * cm, 1.35 * cm, 1.2 * cm),
+        "wide": (1.6 * cm, 1.8 * cm, 1.6 * cm),
+    }
+    mx_base, mt_base, mb_base = margin_presets.get(margin_mode, margin_presets["standard"])
+
     if page_format == "A5":
         target_pagesize = A5
-        margin_x = 1.3 * cm
-        margin_top = 1.8 * cm
-        margin_bot = 1.6 * cm
+        margin_x = mx_base * 0.8
+        margin_top = mt_base * 0.85
+        margin_bot = mb_base * 0.85
         page_h = 21.0 * cm
         available_width = 14.8 * cm - (2 * margin_x)
     else:
         target_pagesize = A4
-        margin_x = 1.8 * cm
-        margin_top = 2.0 * cm
-        margin_bot = 1.8 * cm
+        margin_x = mx_base
+        margin_top = mt_base
+        margin_bot = mb_base
         page_h = 29.7 * cm
         available_width = 21.0 * cm - (2 * margin_x)
 
@@ -5398,26 +5409,205 @@ def generate_pdf_booklet(
             limit = 6 if "6" in str(max_images_mode) else (2 if "2" in str(max_images_mode) else (1 if "1" in str(max_images_mode) else 4))
 
             display_imgs = []
-            if gathered_maps and limit >= 4:
-                num_maps = min(len(gathered_maps), 2)
-                num_photos = min(len(gathered_photos), limit - num_maps)
-                display_imgs = gathered_photos[:num_photos] + gathered_maps[:num_maps]
-                if len(display_imgs) < limit:
-                    for p in gathered_photos[num_photos:]:
-                        if len(display_imgs) >= limit: break
-                        if p not in display_imgs: display_imgs.append(p)
-                    for m in gathered_maps[num_maps:]:
-                        if len(display_imgs) >= limit: break
-                        if m not in display_imgs: display_imgs.append(m)
-            elif gathered_maps and limit == 2:
-                if gathered_photos:
-                    display_imgs = [gathered_photos[0], gathered_maps[0]]
-                else:
-                    display_imgs = gathered_maps[:2]
-            elif gathered_maps and not gathered_photos:
-                display_imgs = gathered_maps[:limit]
-            else:
+            bottom_maps = []
+            if map_position == "below_table":
                 display_imgs = gathered_photos[:limit]
+                bottom_maps = gathered_maps[:2]
+                if not display_imgs and bottom_maps and layout_mode == "split_images_text":
+                    display_imgs = bottom_maps
+                    bottom_maps = []
+            else:
+                if gathered_maps and limit >= 4:
+                    num_maps = min(len(gathered_maps), 2)
+                    num_photos = min(len(gathered_photos), limit - num_maps)
+                    display_imgs = gathered_photos[:num_photos] + gathered_maps[:num_maps]
+                    if len(display_imgs) < limit:
+                        for p in gathered_photos[num_photos:]:
+                            if len(display_imgs) >= limit: break
+                            if p not in display_imgs: display_imgs.append(p)
+                        for m in gathered_maps[num_maps:]:
+                            if len(display_imgs) >= limit: break
+                            if m not in display_imgs: display_imgs.append(m)
+                elif gathered_maps and limit == 2:
+                    if gathered_photos:
+                        display_imgs = [gathered_photos[0], gathered_maps[0]]
+                    else:
+                        display_imgs = gathered_maps[:2]
+                elif gathered_maps and not gathered_photos:
+                    display_imgs = gathered_maps[:limit]
+                else:
+                    display_imgs = gathered_photos[:limit]
+
+            img_scale_eff = float(image_scale) if image_scale is not None else 1.0
+            if abs(img_scale_eff - 1.0) < 1e-4:
+                if "Maximální" in str(image_size_mode):
+                    img_scale_eff = 1.35
+                elif "Velká" in str(image_size_mode):
+                    img_scale_eff = 1.15
+                elif "Kompaktní" in str(image_size_mode) or "Menší" in str(image_size_mode):
+                    img_scale_eff = 0.78
+
+            def _make_img_or_spacer(lpath, tw, th):
+                if is_dummy:
+                    return Spacer(tw, th)
+                return RLImage(lpath, width=tw, height=th)
+
+            def _build_pdf_image_grid(imgs_list, budget_h, forced_layout="auto"):
+                if not imgs_list:
+                    return []
+                out_flowables = []
+                n_imgs = len(imgs_list)
+
+                if n_imgs == 1:
+                    lpath, col_lbl, attr = imgs_list[0]
+                    iw, ih = _get_image_dims(lpath)
+                    aspect = ih / float(iw) if iw > 0 else 0.75
+                    cap_text = attr if (include_media_attribution and attr) else ""
+                    cap_h = 0.45 * cm if cap_text else 0.0
+                    max_h = max(1.6 * cm, budget_h - cap_h - 4.0)
+                    tw = available_width - 3.0
+                    th = tw * aspect
+                    if th > max_h:
+                        th = max_h
+                        tw = th / aspect
+                    rl_img = _make_img_or_spacer(lpath, tw, th)
+                    tbl_content = [[rl_img]]
+                    if cap_text:
+                        tbl_content.append([Paragraph(cap_text, caption_style)])
+                    t_imgs = Table(tbl_content, colWidths=[available_width])
+                    t_imgs.setStyle(TableStyle([
+                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                        ('TOPPADDING', (0, 0), (-1, -1), 1),
+                        ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+                        ('LEFTPADDING', (0, 0), (-1, -1), 1.5),
+                        ('RIGHTPADDING', (0, 0), (-1, -1), 1.5),
+                    ]))
+                    out_flowables.append(t_imgs)
+                    out_flowables.append(Spacer(1, 2))
+                    return out_flowables
+
+                if n_imgs == 3 and forced_layout == "auto" and is_atlas_page and budget_h >= 7.5 * cm:
+                    cap1 = imgs_list[0][2] if (include_media_attribution and imgs_list[0][2]) else ""
+                    cap2 = imgs_list[1][2] if (include_media_attribution and imgs_list[1][2]) else ""
+                    cap3 = imgs_list[2][2] if (include_media_attribution and imgs_list[2][2]) else ""
+                    cap_h_total = (0.42 * cm if cap1 else 0.0) + (0.42 * cm if (cap2 or cap3) else 0.0)
+                    rem_h = max(3.6 * cm, budget_h - cap_h_total - 6.0)
+                    max_h_top = max(2.0 * cm, rem_h * 0.54)
+                    max_h_bot = max(1.8 * cm, rem_h * 0.45)
+                    half_w = available_width / 2.0
+
+                    iw1, ih1 = _get_image_dims(imgs_list[0][0])
+                    aspect1 = ih1 / float(iw1) if iw1 > 0 else 0.75
+                    tw1 = available_width - 3.0
+                    th1 = tw1 * aspect1
+                    if th1 > max_h_top:
+                        th1 = max_h_top
+                        tw1 = th1 / aspect1
+                    rl_img1 = _make_img_or_spacer(imgs_list[0][0], tw1, th1)
+
+                    bot_imgs = []
+                    for lpath, col_lbl, attr in imgs_list[1:]:
+                        iw, ih = _get_image_dims(lpath)
+                        aspect = ih / float(iw) if iw > 0 else 0.75
+                        tw = half_w - 3.0
+                        th = tw * aspect
+                        if th > max_h_bot:
+                            th = max_h_bot
+                            tw = th / aspect
+                        bot_imgs.append(_make_img_or_spacer(lpath, tw, th))
+
+                    t_grid_data = [[rl_img1, '']]
+                    span_cmds = [('SPAN', (0, 0), (1, 0))]
+                    if cap1:
+                        r_idx = len(t_grid_data)
+                        t_grid_data.append([Paragraph(cap1, caption_style), ''])
+                        span_cmds.append(('SPAN', (0, r_idx), (1, r_idx)))
+                    t_grid_data.append([bot_imgs[0], bot_imgs[1]])
+                    if cap2 or cap3:
+                        t_grid_data.append([Paragraph(cap2, caption_style), Paragraph(cap3, caption_style)])
+                    t_imgs = Table(t_grid_data, colWidths=[half_w, half_w])
+                    t_imgs.setStyle(TableStyle(span_cmds + [
+                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                        ('TOPPADDING', (0, 0), (-1, -1), 1),
+                        ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+                        ('LEFTPADDING', (0, 0), (-1, -1), 1.5),
+                        ('RIGHTPADDING', (0, 0), (-1, -1), 1.5),
+                    ]))
+                    out_flowables.append(t_imgs)
+                    out_flowables.append(Spacer(1, 2))
+                    return out_flowables
+
+                if forced_layout == "2_cols":
+                    cols = 2
+                elif forced_layout == "3_cols":
+                    cols = min(3, n_imgs)
+                else:
+                    if n_imgs == 2:
+                        cols = 1 if layout_mode == "split_images_text" else 2
+                    elif n_imgs == 3:
+                        cols = 3
+                    elif n_imgs == 4:
+                        cols = 2
+                    else:
+                        cols = 3 if (budget_h < 7.2 * cm and is_atlas_page) else 2
+
+                rows = (n_imgs + cols - 1) // cols
+                col_w = available_width / float(cols)
+                cell_w = col_w - 3.0
+
+                row_chunks = [imgs_list[r * cols:(r + 1) * cols] for r in range(rows)]
+                row_has_caps = [any(include_media_attribution and img_item[2] for img_item in chunk) for chunk in row_chunks]
+                total_cap_h = sum(0.42 * cm for hc in row_has_caps if hc)
+                max_row_h = max(1.6 * cm, (budget_h - total_cap_h - (rows * 3.0)) / float(rows))
+
+                t_grid_data = []
+                for r_idx, chunk in enumerate(row_chunks):
+                    img_row = []
+                    cap_row = []
+                    for lpath, col_lbl, attr in chunk:
+                        iw, ih = _get_image_dims(lpath)
+                        aspect = ih / float(iw) if iw > 0 else 0.75
+                        tw = cell_w
+                        th = tw * aspect
+                        if th > max_row_h:
+                            th = max_row_h
+                            tw = th / aspect
+                        img_row.append(_make_img_or_spacer(lpath, tw, th))
+                        cap_text = attr if (include_media_attribution and attr) else ""
+                        cap_row.append(Paragraph(cap_text, caption_style))
+                    while len(img_row) < cols:
+                        img_row.append('')
+                        cap_row.append('')
+                    t_grid_data.append(img_row)
+                    if row_has_caps[r_idx]:
+                        t_grid_data.append(cap_row)
+
+                t_imgs = Table(t_grid_data, colWidths=[col_w] * cols)
+                t_imgs.setStyle(TableStyle([
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('TOPPADDING', (0, 0), (-1, -1), 1),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 1.5),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 1.5),
+                ]))
+                out_flowables.append(t_imgs)
+                out_flowables.append(Spacer(1, 2))
+                return out_flowables
+
+            map_flowables = []
+            map_budget_h = 0.0
+            if bottom_maps:
+                map_max_h = min(avail_page_h * 0.27, (5.8 * cm if page_format == "A4" else 4.5 * cm) * max(0.75, min(1.3, img_scale_eff)))
+                map_flowables = [Spacer(1, 3)] + _build_pdf_image_grid(bottom_maps, map_max_h, forced_layout="2_cols" if len(bottom_maps) >= 2 else "auto")
+                for mf in map_flowables:
+                    try:
+                        _, mfh = mf.wrap(available_width, avail_page_h)
+                        map_budget_h += mfh
+                    except Exception:
+                        pass
 
             non_photo_flowables = species_header + property_flowables + description_flowables + media_flowables
             text_h = 0.0
@@ -5429,289 +5619,17 @@ def generate_pdf_booklet(
                     pass
 
             if layout_mode == "page_per_species":
-                reserved_margin = 0.9 * cm
-                avail_for_photos = max(2.2 * cm, avail_page_h - text_h - reserved_margin)
-
-                if "Maximální" in image_size_mode:
-                    photo_budget_h = avail_for_photos
-                elif "Velká" in image_size_mode:
-                    photo_budget_h = min(avail_for_photos, avail_for_photos * 0.85)
-                elif "Kompaktní" in image_size_mode or "Menší" in image_size_mode:
-                    photo_budget_h = min(avail_for_photos, avail_for_photos * 0.50)
-                else:
-                    photo_budget_h = min(avail_for_photos, avail_for_photos * 0.70)
+                reserved_margin = 0.45 * cm
+                avail_for_photos = max(2.2 * cm, avail_page_h - text_h - map_budget_h - reserved_margin)
+                photo_budget_h = min(avail_for_photos, avail_for_photos * min(1.0, max(0.35, 0.78 * img_scale_eff)))
             elif layout_mode == "split_images_text":
                 avail_for_photos = avail_photo_budget
-                if "Maximální" in image_size_mode:
-                    photo_budget_h = avail_photo_budget
-                elif "Velká" in image_size_mode:
-                    photo_budget_h = avail_photo_budget * 0.90
-                elif "Kompaktní" in image_size_mode or "Menší" in image_size_mode:
-                    photo_budget_h = avail_photo_budget * 0.60
-                else:
-                    photo_budget_h = avail_photo_budget * 0.80
+                photo_budget_h = avail_photo_budget * min(1.0, max(0.45, 0.85 * img_scale_eff))
             else:
-                img_scale = 1.0
-                if "Velká" in image_size_mode:
-                    img_scale = 1.25
-                elif "Maximální" in image_size_mode:
-                    img_scale = 1.55
-                elif "Kompaktní" in image_size_mode or "Menší" in image_size_mode:
-                    img_scale = 0.75
-                base_budget = 7.0 * cm if page_format == "A4" else 5.2 * cm
-                photo_budget_h = base_budget * img_scale
+                base_budget = 7.2 * cm if page_format == "A4" else 5.4 * cm
+                photo_budget_h = base_budget * img_scale_eff
 
-            photo_flowables = []
-            if display_imgs:
-                num_imgs = len(display_imgs)
-
-                def _make_img_or_spacer(lpath, tw, th):
-                    if is_dummy:
-                        return Spacer(tw, th)
-                    return RLImage(lpath, width=tw, height=th)
-
-                if num_imgs == 1:
-                    lpath, col_lbl, attr = display_imgs[0]
-                    iw, ih = _get_image_dims(lpath)
-                    aspect = ih / float(iw) if iw > 0 else 0.75
-                    cap_text = attr if (include_media_attribution and attr) else ""
-                    cap_h = 0.55 * cm if cap_text else 0.0
-                    max_h = max(1.8 * cm, photo_budget_h - cap_h - 0.2 * cm)
-
-                    tw = available_width - 0.2 * cm
-                    th = tw * aspect
-                    if th > max_h:
-                        th = max_h
-                        tw = th / aspect
-
-                    rl_img = _make_img_or_spacer(lpath, tw, th)
-                    tbl_content = [[rl_img]]
-                    if cap_text:
-                        tbl_content.append([Paragraph(cap_text, caption_style)])
-                    t_imgs = Table(tbl_content, colWidths=[available_width])
-                    t_imgs.setStyle(TableStyle([
-                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                        ('TOPPADDING', (0, 0), (-1, -1), 1),
-                        ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
-                    ]))
-                    photo_flowables.append(t_imgs)
-                    photo_flowables.append(Spacer(1, 3))
-
-                elif num_imgs == 2:
-                    if layout_mode == "split_images_text":
-                        cap_h = 0.55 * cm
-                        max_h_each = max(2.5 * cm, (photo_budget_h - 2 * cap_h - 0.6 * cm) / 2.0)
-                        row_cells = []
-                        for lpath, col_lbl, attr in display_imgs:
-                            iw, ih = _get_image_dims(lpath)
-                            aspect = ih / float(iw) if iw > 0 else 0.75
-                            tw = available_width - 0.2 * cm
-                            th = tw * aspect
-                            if th > max_h_each:
-                                th = max_h_each
-                                tw = th / aspect
-                            rl_img = _make_img_or_spacer(lpath, tw, th)
-                            cap_text = attr if (include_media_attribution and attr) else ""
-                            row_cells.append([rl_img])
-                            if cap_text:
-                                row_cells.append([Paragraph(cap_text, caption_style)])
-                            row_cells.append([Spacer(1, 2)])
-                        t_imgs = Table(row_cells, colWidths=[available_width])
-                        t_imgs.setStyle(TableStyle([
-                            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                            ('TOPPADDING', (0, 0), (-1, -1), 1),
-                            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
-                        ]))
-                        photo_flowables.append(t_imgs)
-                    else:
-                        half_w = available_width / 2.0
-                        cell_w = half_w - 0.3 * cm
-                        max_h = max(1.8 * cm, photo_budget_h - 0.55 * cm)
-                        img_cells = []
-                        cap_cells = []
-                        for lpath, col_lbl, attr in display_imgs:
-                            iw, ih = _get_image_dims(lpath)
-                            aspect = ih / float(iw) if iw > 0 else 0.75
-                            tw = cell_w
-                            th = tw * aspect
-                            if th > max_h:
-                                th = max_h
-                                tw = th / aspect
-                            img_cells.append(_make_img_or_spacer(lpath, tw, th))
-                            cap_text = attr if (include_media_attribution and attr) else ""
-                            cap_cells.append(Paragraph(cap_text, caption_style))
-                        t_imgs = Table([img_cells, cap_cells], colWidths=[half_w, half_w])
-                        t_imgs.setStyle(TableStyle([
-                            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                            ('TOPPADDING', (0, 0), (-1, -1), 1),
-                            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
-                            ('LEFTPADDING', (0, 0), (-1, -1), 2),
-                            ('RIGHTPADDING', (0, 0), (-1, -1), 2),
-                        ]))
-                        photo_flowables.append(t_imgs)
-                        photo_flowables.append(Spacer(1, 3))
-
-                elif num_imgs == 3:
-                    if is_atlas_page and photo_budget_h >= 7.5 * cm:
-                        rem_h = photo_budget_h - 1.2 * cm
-                        max_h_top = max(2.2 * cm, rem_h * 0.54)
-                        max_h_bot = max(1.8 * cm, rem_h * 0.44)
-                        half_w = available_width / 2.0
-
-                        lpath1, col_lbl1, attr1 = display_imgs[0]
-                        iw1, ih1 = _get_image_dims(lpath1)
-                        aspect1 = ih1 / float(iw1) if iw1 > 0 else 0.75
-                        tw1 = available_width - 0.2 * cm
-                        th1 = tw1 * aspect1
-                        if th1 > max_h_top:
-                            th1 = max_h_top
-                            tw1 = th1 / aspect1
-                        rl_img1 = _make_img_or_spacer(lpath1, tw1, th1)
-                        cap_text1 = attr1 if (include_media_attribution and attr1) else ""
-
-                        bot_imgs = []
-                        bot_caps = []
-                        for lpath, col_lbl, attr in display_imgs[1:]:
-                            iw, ih = _get_image_dims(lpath)
-                            aspect = ih / float(iw) if iw > 0 else 0.75
-                            tw = half_w - 0.3 * cm
-                            th = tw * aspect
-                            if th > max_h_bot:
-                                th = max_h_bot
-                                tw = th / aspect
-                            bot_imgs.append(_make_img_or_spacer(lpath, tw, th))
-                            cap_text = attr if (include_media_attribution and attr) else ""
-                            bot_caps.append(Paragraph(cap_text, caption_style))
-
-                        t_grid_data = [
-                            [rl_img1, ''],
-                            [Paragraph(cap_text1, caption_style), ''],
-                            [Spacer(1, 1), ''],
-                            [bot_imgs[0], bot_imgs[1]],
-                            [bot_caps[0], bot_caps[1]]
-                        ]
-                        t_imgs = Table(t_grid_data, colWidths=[half_w, half_w])
-                        t_imgs.setStyle(TableStyle([
-                            ('SPAN', (0, 0), (1, 0)),
-                            ('SPAN', (0, 1), (1, 1)),
-                            ('SPAN', (0, 2), (1, 2)),
-                            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                            ('TOPPADDING', (0, 0), (-1, -1), 1),
-                            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
-                        ]))
-                        photo_flowables.append(t_imgs)
-                        photo_flowables.append(Spacer(1, 3))
-                    else:
-                        tri_w = available_width / 3.0
-                        cell_w = tri_w - 0.25 * cm
-                        max_h = max(1.8 * cm, photo_budget_h - 0.55 * cm)
-                        img_cells = []
-                        cap_cells = []
-                        for lpath, col_lbl, attr in display_imgs:
-                            iw, ih = _get_image_dims(lpath)
-                            aspect = ih / float(iw) if iw > 0 else 0.75
-                            tw = cell_w
-                            th = tw * aspect
-                            if th > max_h:
-                                th = max_h
-                                tw = th / aspect
-                            img_cells.append(_make_img_or_spacer(lpath, tw, th))
-                            cap_text = attr if (include_media_attribution and attr) else ""
-                            cap_cells.append(Paragraph(cap_text, caption_style))
-                        t_imgs = Table([img_cells, cap_cells], colWidths=[tri_w, tri_w, tri_w])
-                        t_imgs.setStyle(TableStyle([
-                            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                            ('TOPPADDING', (0, 0), (-1, -1), 1),
-                            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
-                            ('LEFTPADDING', (0, 0), (-1, -1), 2),
-                            ('RIGHTPADDING', (0, 0), (-1, -1), 2),
-                        ]))
-                        photo_flowables.append(t_imgs)
-                        photo_flowables.append(Spacer(1, 3))
-
-                elif num_imgs == 4:
-                    half_w = available_width / 2.0
-                    cell_w = half_w - 0.3 * cm
-                    cap_total_h = 1.2 * cm
-                    max_row_h = max(1.8 * cm, (photo_budget_h - cap_total_h) / 2.0)
-                    img_objs = []
-                    cap_objs = []
-                    for lpath, col_lbl, attr in display_imgs:
-                        iw, ih = _get_image_dims(lpath)
-                        aspect = ih / float(iw) if iw > 0 else 0.75
-                        tw = cell_w
-                        th = tw * aspect
-                        if th > max_row_h:
-                            th = max_row_h
-                            tw = th / aspect
-                        img_objs.append(_make_img_or_spacer(lpath, tw, th))
-                        cap_text = attr if (include_media_attribution and attr) else ""
-                        cap_objs.append(Paragraph(cap_text, caption_style))
-
-                    t_grid_data = [
-                        [img_objs[0], img_objs[1]],
-                        [cap_objs[0], cap_objs[1]],
-                        [Spacer(1, 1), Spacer(1, 1)],
-                        [img_objs[2], img_objs[3]],
-                        [cap_objs[2], cap_objs[3]]
-                    ]
-                    t_imgs = Table(t_grid_data, colWidths=[half_w, half_w])
-                    t_imgs.setStyle(TableStyle([
-                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                        ('TOPPADDING', (0, 0), (-1, -1), 1),
-                        ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
-                    ]))
-                    photo_flowables.append(t_imgs)
-                    photo_flowables.append(Spacer(1, 3))
-
-                elif num_imgs in (5, 6):
-                    half_w = available_width / 2.0
-                    cell_w = half_w - 0.3 * cm
-                    cap_total_h = 1.6 * cm
-                    max_row_h = max(1.6 * cm, (photo_budget_h - cap_total_h) / 3.0)
-                    img_objs = []
-                    cap_objs = []
-                    for lpath, col_lbl, attr in display_imgs:
-                        iw, ih = _get_image_dims(lpath)
-                        aspect = ih / float(iw) if iw > 0 else 0.75
-                        tw = cell_w
-                        th = tw * aspect
-                        if th > max_row_h:
-                            th = max_row_h
-                            tw = th / aspect
-                        img_objs.append(_make_img_or_spacer(lpath, tw, th))
-                        cap_text = attr if (include_media_attribution and attr) else ""
-                        cap_objs.append(Paragraph(cap_text, caption_style))
-
-                    if len(img_objs) == 5:
-                        img_objs.append(Spacer(cell_w, 1))
-                        cap_objs.append(Paragraph("", caption_style))
-
-                    t_grid_data = [
-                        [img_objs[0], img_objs[1]],
-                        [cap_objs[0], cap_objs[1]],
-                        [Spacer(1, 1), Spacer(1, 1)],
-                        [img_objs[2], img_objs[3]],
-                        [cap_objs[2], cap_objs[3]],
-                        [Spacer(1, 1), Spacer(1, 1)],
-                        [img_objs[4], img_objs[5]],
-                        [cap_objs[4], cap_objs[5]]
-                    ]
-                    t_imgs = Table(t_grid_data, colWidths=[half_w, half_w])
-                    t_imgs.setStyle(TableStyle([
-                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                        ('TOPPADDING', (0, 0), (-1, -1), 0.8),
-                        ('BOTTOMPADDING', (0, 0), (-1, -1), 0.8),
-                    ]))
-                    photo_flowables.append(t_imgs)
-                    photo_flowables.append(Spacer(1, 3))
+            photo_flowables = _build_pdf_image_grid(display_imgs, photo_budget_h, forced_layout=gallery_layout)
 
             if layout_mode == "split_images_text":
                 story.extend(species_header)
@@ -5725,6 +5643,8 @@ def generate_pdf_booklet(
                 story.append(HRFlowable(width="100%", thickness=1.2, color=colors.HexColor("#1b4332"), spaceBefore=1, spaceAfter=5))
                 if property_flowables:
                     story.extend(property_flowables)
+                if map_flowables:
+                    story.extend(map_flowables)
                 if description_flowables:
                     story.extend(description_flowables)
                 if media_flowables:
@@ -5733,8 +5653,8 @@ def generate_pdf_booklet(
                     story.append(PageBreak())
 
             elif is_atlas_page:
-                species_story = species_header + photo_flowables + property_flowables + description_flowables + media_flowables
-                if (text_h + photo_budget_h) <= (avail_page_h + 10):
+                species_story = species_header + photo_flowables + property_flowables + map_flowables + description_flowables + media_flowables
+                if (text_h + photo_budget_h + map_budget_h) <= (avail_page_h + 10):
                     story.append(KeepTogether(species_story))
                 else:
                     story.extend(species_story)
@@ -5742,7 +5662,7 @@ def generate_pdf_booklet(
                     story.append(PageBreak())
 
             else:
-                c_items = species_header + photo_flowables + property_flowables + description_flowables + media_flowables
+                c_items = species_header + photo_flowables + property_flowables + map_flowables + description_flowables + media_flowables
                 if len(c_items) > 2:
                     story.append(KeepTogether(c_items[:2]))
                     story.extend(c_items[2:])
@@ -5850,13 +5770,21 @@ def generate_docx_booklet(
     selected_citations: list = None,
     include_media_attribution: bool = True,
     col_styles: dict = None,
-    title_col: str = None
+    title_col: str = None,
+    font_scale: float = 1.0,
+    image_scale: float = 1.0,
+    margin_mode: str = "standard",
+    gallery_layout: str = "auto",
+    map_position: str = "below_table",
+    max_images_mode: str = "4"
 ) -> bool:
 
     import docx
     from docx.shared import Inches, Pt, RGBColor
     from docx.enum.text import WD_ALIGN_PARAGRAPH
     from docx.enum.table import WD_TABLE_ALIGNMENT
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
 
     if active_cols is None:
         active_cols = list(df.columns)
@@ -5867,18 +5795,99 @@ def generate_docx_booklet(
 
     doc = docx.Document()
 
+    margin_in_map = {"narrow": 0.35, "standard": 0.55, "wide": 0.8}
+    margin_in = margin_in_map.get(margin_mode, 0.55)
     for section in doc.sections:
-        section.top_margin = Inches(0.8)
-        section.bottom_margin = Inches(0.8)
-        section.left_margin = Inches(0.8)
-        section.right_margin = Inches(0.8)
+        section.top_margin = Inches(margin_in)
+        section.bottom_margin = Inches(margin_in)
+        section.left_margin = Inches(margin_in)
+        section.right_margin = Inches(margin_in)
+
+    usable_w_in = max(4.5, 8.27 - 2.0 * margin_in)
+    fs = float(font_scale) if font_scale else 1.0
+    img_sc = float(image_scale) if image_scale else 1.0
+
+    def _set_tight_borderless_table(tbl):
+        tblPr = tbl._tbl.tblPr
+        if tblPr is None:
+            tblPr = OxmlElement('w:tblPr')
+            tbl._tbl.insert(0, tblPr)
+        borders = OxmlElement('w:tblBorders')
+        for b_name in ('top', 'left', 'bottom', 'right', 'insideH', 'insideV'):
+            b = OxmlElement(f'w:{b_name}')
+            b.set(qn('w:val'), 'none')
+            borders.append(b)
+        tblPr.append(borders)
+        cellMar = OxmlElement('w:tblCellMar')
+        for m_name in ('top', 'left', 'bottom', 'right'):
+            m = OxmlElement(f'w:{m_name}')
+            m.set(qn('w:w'), '20')
+            m.set(qn('w:type'), 'dxa')
+            cellMar.append(m)
+        tblPr.append(cellMar)
+
+    def _add_docx_image_grid(imgs_list, forced_layout="auto", is_map_grid=False):
+        if not imgs_list:
+            return
+        n_imgs = len(imgs_list)
+        scale_factor = max(0.6, min(1.35, img_sc)) if is_map_grid else max(0.55, min(1.6, img_sc))
+        if n_imgs == 1:
+            pic_w = min(usable_w_in - 0.1, (usable_w_in * 0.72 * scale_factor) if not is_map_grid else (usable_w_in * 0.78 * min(1.2, scale_factor)))
+            p_im = doc.add_paragraph()
+            p_im.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p_im.paragraph_format.space_before = Pt(2)
+            p_im.paragraph_format.space_after = Pt(2)
+            try:
+                p_im.add_run().add_picture(imgs_list[0][0], width=Inches(pic_w))
+                if include_media_attribution and imgs_list[0][2]:
+                    p_cap = doc.add_paragraph()
+                    p_cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    p_cap.paragraph_format.space_after = Pt(4)
+                    r_c = p_cap.add_run(imgs_list[0][2])
+                    r_c.font.size = Pt(round(8 * fs, 1))
+                    r_c.font.color.rgb = RGBColor(100, 116, 139)
+            except Exception:
+                pass
+            return
+
+        if forced_layout == "2_cols":
+            cols = 2
+        elif forced_layout == "3_cols":
+            cols = min(3, n_imgs)
+        else:
+            cols = 3 if (n_imgs == 3 or n_imgs >= 5) else 2
+
+        rows = (n_imgs + cols - 1) // cols
+        col_w = usable_w_in / float(cols)
+        pic_w = min(col_w - 0.08, (col_w - 0.08) * min(1.0, max(0.55, scale_factor)))
+
+        t_img = doc.add_table(rows=rows, cols=cols)
+        t_img.alignment = WD_TABLE_ALIGNMENT.CENTER
+        _set_tight_borderless_table(t_img)
+        for ci, (lp, cl, at) in enumerate(imgs_list):
+            r_i = ci // cols
+            c_i = ci % cols
+            cell = t_img.rows[r_i].cells[c_i]
+            cell.width = Inches(col_w)
+            c_p = cell.paragraphs[0]
+            c_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            c_p.paragraph_format.space_before = Pt(1)
+            c_p.paragraph_format.space_after = Pt(1)
+            try:
+                c_p.add_run().add_picture(lp, width=Inches(pic_w))
+                if include_media_attribution and at:
+                    r_c = c_p.add_run(f"\n{at}")
+                    r_c.font.size = Pt(round(7.5 * fs, 1))
+                    r_c.font.color.rgb = RGBColor(100, 116, 139)
+            except Exception:
+                pass
 
     clean_title = title.strip() or "Studijní atlas a brožura"
     p_title = doc.add_paragraph()
     p_title.paragraph_format.space_after = Pt(2)
     r_title = p_title.add_run(clean_title)
     r_title.bold = True
-    r_title.font.size = Pt(22)
+    r_title.font.size = Pt(round(22 * fs, 1))
     r_title.font.color.rgb = RGBColor(27, 67, 50)
 
     desc_str = subtitle.strip() if subtitle else "Výukový materiál a studijní atlas vygenerovaný z databáze"
@@ -5887,7 +5896,7 @@ def generate_docx_booklet(
     p_sub.paragraph_format.space_after = Pt(14)
     r_sub = p_sub.add_run(f"{desc_str} • {count_str}")
     r_sub.italic = True
-    r_sub.font.size = Pt(10)
+    r_sub.font.size = Pt(round(10 * fs, 1))
     r_sub.font.color.rgb = RGBColor(71, 85, 105)
 
     if include_toc and len(df) >= 2:
@@ -5896,7 +5905,7 @@ def generate_docx_booklet(
         p_toc_head.paragraph_format.space_after = Pt(4)
         r_toc_h = p_toc_head.add_run("Obsah a rejstřík položek")
         r_toc_h.bold = True
-        r_toc_h.font.size = Pt(13)
+        r_toc_h.font.size = Pt(round(13 * fs, 1))
         r_toc_h.font.color.rgb = RGBColor(33, 106, 64)
 
         toc_items = []
@@ -5973,7 +5982,7 @@ def generate_docx_booklet(
         p_sp.paragraph_format.space_after = Pt(2)
         r_sp = p_sp.add_run(title_text)
         r_sp.bold = True
-        r_sp.font.size = Pt(15)
+        r_sp.font.size = Pt(round(15 * fs, 1))
         r_sp.font.color.rgb = RGBColor(27, 67, 50)
 
         if sp_pronun:
@@ -5981,81 +5990,59 @@ def generate_docx_booklet(
             p_pr.paragraph_format.space_after = Pt(6)
             r_pr = p_pr.add_run(sp_pronun)
             r_pr.italic = True
-            r_pr.font.size = Pt(10)
+            r_pr.font.size = Pt(round(10 * fs, 1))
             r_pr.font.color.rgb = RGBColor(45, 106, 79)
 
-        found_images = []
+        found_photos = []
+        found_maps = []
+        clean_sp = slugify_species_name(str(row.iloc[0])) if len(row) > 0 else f"druh_{idx}"
+        media_files_cache = os.listdir(media_dir) if (media_dir and os.path.isdir(media_dir)) else []
+
         for col in active_cols:
             val = row.get(col)
             if pd.isna(val) or str(val).strip() == "":
                 continue
             val_s = str(val).strip()
-            if is_image_col(col, val):
+            col_low = str(col).lower()
+            is_map_col = (
+                col in ["[Pladias] Mapa rozšíření", "[Pladias.cz] Mapa rozšíření"]
+                or ("pladias" in col_low and "map" in col_low)
+                or ("inat" in col_low and "map" in col_low)
+            )
+            if is_image_col(col, val) or is_map_col:
                 raw_entries = [u.strip() for u in val_s.split(';') if u.strip()]
-                clean_sp = slugify_species_name(str(row.iloc[0])) if len(row) > 0 else f"druh_{idx}"
                 for img_idx, entry in enumerate(raw_entries):
                     u = entry.split('|', 1)[0].strip()
                     attr_txt = entry.split('|', 1)[1].strip() if '|' in entry else ""
+                    resolved_path = None
                     if os.path.isfile(u):
-                        found_images.append((u, col, attr_txt))
-                    elif media_dir and os.path.isdir(media_dir):
-                        for f_cand in os.listdir(media_dir):
-                            if clean_sp.lower() in f_cand.lower() and os.path.isfile(os.path.join(media_dir, f_cand)):
-                                found_images.append((os.path.join(media_dir, f_cand), col, attr_txt))
-                                break
+                        resolved_path = u
+                    elif media_files_cache:
+                        if is_map_col:
+                            map_tag = "pladias_map" if "pladias" in col_low else "inat_map"
+                            expected_prefix = f"{clean_sp}_{map_tag}_{idx}"
+                            for f_cand in media_files_cache:
+                                if f_cand.startswith(expected_prefix) and os.path.isfile(os.path.join(media_dir, f_cand)):
+                                    resolved_path = os.path.join(media_dir, f_cand)
+                                    break
+                        else:
+                            for f_cand in media_files_cache:
+                                if clean_sp.lower() in f_cand.lower() and "_map_" not in f_cand.lower():
+                                    cand_p = os.path.join(media_dir, f_cand)
+                                    if os.path.isfile(cand_p) and not any(p[0] == cand_p for p in found_photos):
+                                        resolved_path = cand_p
+                                        break
+                    if resolved_path:
+                        target_list = found_maps if is_map_col else found_photos
+                        if not any(x[0] == resolved_path for x in target_list):
+                            target_list.append((resolved_path, col, attr_txt))
 
-        if found_images:
-            display_imgs = found_images[:4]
-            num = len(display_imgs)
-            if num == 1:
-                p_im = doc.add_paragraph()
-                p_im.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                p_im.paragraph_format.space_after = Pt(2)
-                try:
-                    p_im.add_run().add_picture(display_imgs[0][0], width=Inches(4.8))
-                    if include_media_attribution and display_imgs[0][2]:
-                        p_cap = doc.add_paragraph()
-                        p_cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                        p_cap.paragraph_format.space_after = Pt(6)
-                        r_c = p_cap.add_run(display_imgs[0][2])
-                        r_c.font.size = Pt(8)
-                        r_c.font.color.rgb = RGBColor(100, 116, 139)
-                except Exception:
-                    pass
-            elif num == 2:
-                t_img = doc.add_table(rows=1, cols=2)
-                t_img.alignment = WD_TABLE_ALIGNMENT.CENTER
-                for ci, (lp, cl, at) in enumerate(display_imgs):
-                    c_p = t_img.rows[0].cells[ci].paragraphs[0]
-                    c_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                    c_p.paragraph_format.space_after = Pt(2)
-                    try:
-                        c_p.add_run().add_picture(lp, width=Inches(2.8))
-                        if include_media_attribution and at:
-                            r_c = c_p.add_run(f"\n{at}")
-                            r_c.font.size = Pt(8)
-                            r_c.font.color.rgb = RGBColor(100, 116, 139)
-                    except Exception:
-                        pass
-            elif num >= 3:
-                rows_count = 2 if num == 4 else 1
-                cols_count = 2 if num == 4 else 3
-                t_img = doc.add_table(rows=rows_count, cols=cols_count)
-                t_img.alignment = WD_TABLE_ALIGNMENT.CENTER
-                img_flat = t_img.rows[0].cells + (t_img.rows[1].cells if rows_count == 2 else [])
-                for ci, (lp, cl, at) in enumerate(display_imgs):
-                    if ci < len(img_flat):
-                        c_p = img_flat[ci].paragraphs[0]
-                        c_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                        c_p.paragraph_format.space_after = Pt(2)
-                        try:
-                            c_p.add_run().add_picture(lp, width=Inches(2.6 if cols_count == 2 else 1.9))
-                            if include_media_attribution and at:
-                                r_c = c_p.add_run(f"\n{at}")
-                                r_c.font.size = Pt(7.5)
-                                r_c.font.color.rgb = RGBColor(100, 116, 139)
-                        except Exception:
-                            pass
+        docx_img_limit = 6 if "6" in str(max_images_mode) else (2 if "2" in str(max_images_mode) else (1 if "1" in str(max_images_mode) else 4))
+        if map_position == "below_table":
+            _add_docx_image_grid(found_photos[:docx_img_limit], forced_layout=gallery_layout, is_map_grid=False)
+        else:
+            combined_top = (found_photos + found_maps)[:docx_img_limit]
+            _add_docx_image_grid(combined_top, forced_layout=gallery_layout, is_map_grid=False)
 
         short_props = []
         long_descriptions = []
@@ -6066,6 +6053,14 @@ def generate_docx_booklet(
             if pd.isna(val) or str(val).strip() == "":
                 continue
             val_s = str(val).strip()
+            col_low = str(col).lower()
+            is_map_col = (
+                col in ["[Pladias] Mapa rozšíření", "[Pladias.cz] Mapa rozšíření"]
+                or ("pladias" in col_low and "map" in col_low)
+                or ("inat" in col_low and "map" in col_low)
+            )
+            if is_image_col(col, val) or is_map_col:
+                continue
             if col == df.columns[0] and val_s == primary_name:
                 continue
             if col.startswith(("[TTS]", "[Zvuky]", "[Latina] Fonetická")):
@@ -6087,14 +6082,14 @@ def generate_docx_booklet(
             for r_i, (k, v) in enumerate(short_props):
                 c0 = t_props.rows[r_i].cells[0]
                 c1 = t_props.rows[r_i].cells[1]
-                c0.width = Inches(2.0)
-                c1.width = Inches(4.5)
+                c0.width = Inches(usable_w_in * 0.30)
+                c1.width = Inches(usable_w_in * 0.70)
                 p0 = c0.paragraphs[0]
                 p0.paragraph_format.space_before = Pt(2)
                 p0.paragraph_format.space_after = Pt(2)
                 r0 = p0.add_run(f"{k}:")
                 r0.bold = True
-                r0.font.size = Pt(9.5)
+                r0.font.size = Pt(round(9.5 * fs, 1))
                 r0.font.color.rgb = RGBColor(51, 65, 85)
 
                 p1 = c1.paragraphs[0]
@@ -6112,7 +6107,7 @@ def generate_docx_booklet(
                 elif t_st == "bold_italic" or (c_cfg.get("bold") and c_cfg.get("italic")):
                     r1.bold = True
                     r1.italic = True
-                r1.font.size = Pt(9.5)
+                r1.font.size = Pt(round(9.5 * fs, 1))
                 r1.font.color.rgb = RGBColor(30, 41, 59)
 
         for d_lbl, d_txt in long_descriptions:
@@ -6121,14 +6116,17 @@ def generate_docx_booklet(
             p_dl.paragraph_format.space_after = Pt(2)
             rd = p_dl.add_run(d_lbl)
             rd.bold = True
-            rd.font.size = Pt(11)
+            rd.font.size = Pt(round(11 * fs, 1))
             rd.font.color.rgb = RGBColor(22, 101, 52)
 
             p_dt = doc.add_paragraph()
             p_dt.paragraph_format.space_after = Pt(6)
             rd_t = p_dt.add_run(d_txt)
-            rd_t.font.size = Pt(9.5)
+            rd_t.font.size = Pt(round(9.5 * fs, 1))
             rd_t.font.color.rgb = RGBColor(30, 41, 59)
+
+        if map_position == "below_table" and found_maps:
+            _add_docx_image_grid(found_maps[:2], forced_layout="2_cols" if len(found_maps) >= 2 else "auto", is_map_grid=True)
 
         if links:
             p_lk = doc.add_paragraph()
@@ -6136,10 +6134,10 @@ def generate_docx_booklet(
             p_lk.paragraph_format.space_after = Pt(6)
             r_lh = p_lk.add_run("Odkazy a zdroje: ")
             r_lh.bold = True
-            r_lh.font.size = Pt(9.5)
+            r_lh.font.size = Pt(round(9.5 * fs, 1))
             for l_lbl, l_url in links:
                 r_l = p_lk.add_run(f"• {l_lbl} ({l_url}) ")
-                r_l.font.size = Pt(8.5)
+                r_l.font.size = Pt(round(8.5 * fs, 1))
                 r_l.font.color.rgb = RGBColor(22, 101, 52)
 
         if layout_mode == "page_per_species" and idx < len(df) - 1:
@@ -12307,11 +12305,20 @@ if st.session_state.df is not None:
                         index=0,
                         key="w_pdf_pagesize"
                     )
-                    pdf_font_scale_choice = st.selectbox(
-                        "Velikost textu:",
-                        ["Standardní (100 %)", "Menší / Kompaktní (90 %)", "Větší / Čitelný (115 %)"],
+                    pdf_font_scale_pct = st.slider(
+                        "Velikost textu (%):",
+                        min_value=65,
+                        max_value=160,
+                        value=100,
+                        step=5,
+                        key="w_pdf_font_scale_pct",
+                        help="Plynulé nastavení velikosti veškerého textu v PDF brožuře."
+                    )
+                    pdf_margin_choice = st.selectbox(
+                        "Okraje stránky:",
+                        ["Úzké (více místa pro fotky)", "Standardní", "Širší (knižní)"],
                         index=0,
-                        key="w_pdf_font_scale"
+                        key="w_pdf_margin_mode"
                     )
                 with c_fmt2:
                     pdf_imposition_choice = st.selectbox(
@@ -12326,12 +12333,26 @@ if st.session_state.df is not None:
                         key="w_pdf_imposition",
                         help="Standardní: běžné stránky za sebou. Sešitová vazba: vytvoří tiskové archy (2 strany na list), které po oboustranném tisku stačí přeložit napůl a sešít na hřbetu. Knižní vazba: rozdělí tisk do knihařských složek po 6 nebo 8 listech pro vazbu knih."
                     )
-                    pdf_img_size_choice = st.selectbox(
-                        "Velikost fotografií:",
-                        ["Standardní (vyvážená)", "Velká (dominantní fotky)", "Maximální (na celou plochu)", "Kompaktní (menší fotky)"],
+                    pdf_img_scale_pct = st.slider(
+                        "Velikost fotografií (%):",
+                        min_value=60,
+                        max_value=160,
+                        value=115,
+                        step=5,
+                        key="w_pdf_img_scale_pct",
+                        help="Plynulé nastavení velikosti fotografií. Vyšší hodnoty maximálně využijí volnou plochu stránky."
+                    )
+                    pdf_gallery_layout = st.selectbox(
+                        "Rozložení fotek:",
+                        ["Automaticky (natěsno)", "2 sloupce (velké fotky vedle sebe)", "3 sloupce (kompaktní řada)"],
                         index=0,
-                        key="w_pdf_img_size",
-                        help="Umožňuje zvětšit fotografie až na celou plochu stránky nebo je zmenšit ve prospěch textu."
+                        key="w_pdf_gallery_layout"
+                    )
+                    pdf_map_pos_choice = st.selectbox(
+                        "Umístění mapy rozšíření:",
+                        ["Pod tabulkou vlastností (doporučeno)", "V horní galerii s fotkami"],
+                        index=0,
+                        key="w_pdf_map_pos"
                     )
                     pdf_max_imgs_choice = st.selectbox(
                         "Počet fotografií a map na druh:",
@@ -12664,8 +12685,11 @@ if st.session_state.df is not None:
                         pdf_layout_mode_param = "compact"
                     page_fmt_param = "A5" if "A5" in pdf_pagesize_choice else "A4"
 
-                    scale_map = {"Standardní (100 %)": 1.0, "Menší / Kompaktní (90 %)": 0.9, "Větší / Čitelný (115 %)": 1.15}
-                    font_scale_val = scale_map.get(pdf_font_scale_choice, 1.0)
+                    font_scale_val = pdf_font_scale_pct / 100.0
+                    image_scale_val = pdf_img_scale_pct / 100.0
+                    pdf_margin_param = "narrow" if "Úzké" in pdf_margin_choice else ("wide" if "Širší" in pdf_margin_choice else "standard")
+                    pdf_gallery_param = "2_cols" if "2 sloupce" in pdf_gallery_layout else ("3_cols" if "3 sloupce" in pdf_gallery_layout else "auto")
+                    pdf_map_pos_param = "below_table" if "Pod tabulkou" in pdf_map_pos_choice else "top_gallery"
 
                     pdf_filename = f"{slugify(pdf_title_input)}.pdf"
                     pdf_path = os.path.join(temp_dir, pdf_filename)
@@ -12694,11 +12718,15 @@ if st.session_state.df is not None:
                             include_media_attribution=pdf_include_attributions,
                             col_styles=st.session_state.get('pdf_col_styles', {}),
                             include_qr_codes=pdf_include_qr_codes,
-                            image_size_mode=pdf_img_size_choice,
+                            image_size_mode="Standardní (vyvážená)",
                             max_images_mode=pdf_max_imgs_choice,
                             title_col=chosen_pdf_title_col,
                             include_secondary_title=pdf_show_sec_title,
-                            toc_layout=("1_column" if "1 sloupec" in pdf_toc_layout_choice else "2_columns")
+                            toc_layout=("1_column" if "1 sloupec" in pdf_toc_layout_choice else "2_columns"),
+                            image_scale=image_scale_val,
+                            margin_mode=pdf_margin_param,
+                            gallery_layout=pdf_gallery_param,
+                            map_position=pdf_map_pos_param
                         )
 
                         with open(pdf_path, "rb") as f:
@@ -12774,6 +12802,49 @@ if st.session_state.df is not None:
                     index=0,
                     key="w_docx_layout"
                 )
+                c_dx1, c_dx2 = st.columns(2)
+                with c_dx1:
+                    docx_font_scale_pct = st.slider(
+                        "Velikost textu (%):",
+                        min_value=65,
+                        max_value=160,
+                        value=100,
+                        step=5,
+                        key="w_docx_font_scale_pct"
+                    )
+                    docx_margin_choice = st.selectbox(
+                        "Okraje stránky:",
+                        ["Úzké (více místa pro fotky)", "Standardní", "Širší (knižní)"],
+                        index=0,
+                        key="w_docx_margin_mode"
+                    )
+                with c_dx2:
+                    docx_img_scale_pct = st.slider(
+                        "Velikost fotografií (%):",
+                        min_value=60,
+                        max_value=160,
+                        value=115,
+                        step=5,
+                        key="w_docx_img_scale_pct"
+                    )
+                    docx_gallery_layout = st.selectbox(
+                        "Rozložení fotek:",
+                        ["Automaticky (natěsno)", "2 sloupce (velké fotky vedle sebe)", "3 sloupce (kompaktní řada)"],
+                        index=0,
+                        key="w_docx_gallery_layout"
+                    )
+                docx_map_pos_choice = st.selectbox(
+                    "Umístění mapy rozšíření:",
+                    ["Pod tabulkou vlastností (doporučeno)", "V horní galerii s fotkami"],
+                    index=0,
+                    key="w_docx_map_pos"
+                )
+                docx_max_imgs_choice = st.selectbox(
+                    "Počet fotografií na druh:",
+                    ["Až 6", "Až 4", "Až 2", "Pouze 1"],
+                    index=0,
+                    key="w_docx_max_imgs"
+                )
 
                 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
                 st.markdown("##### Doplňkové prvky")
@@ -12812,7 +12883,7 @@ if st.session_state.df is not None:
                             if col in ["[Pladias] Mapa rozšíření", "[Pladias.cz] Mapa rozšíření"] or ("pladias" in str(col).lower() and "map" in str(col).lower()):
                                 species_col = st.session_state.api_config.get("pladias_map_col", columns[0])
                                 raw_species = str(row[species_col]).strip() if species_col in row else str(val).strip()
-                                clean_species = slugify_species_name(raw_species) if raw_species else f"druh_{idx}"
+                                clean_species = slugify_species_name(str(row.iloc[0])) if len(row) > 0 else (slugify_species_name(raw_species) if raw_species else f"druh_{idx}")
                                 safe_filename = f"{clean_species}_pladias_map_{idx}.jpg"
                                 media_tasks[safe_filename] = (raw_species, 'pladias_map')
                             elif is_image_col(col, val):
@@ -12877,7 +12948,11 @@ if st.session_state.df is not None:
 
                             try:
                                 if task_type == 'pladias_map':
-                                    if render_pladias_distribution_map(source_val, target_file):
+                                    ok_map = render_pladias_distribution_map(source_val, target_file)
+                                    if not ok_map:
+                                        time.sleep(0.5)
+                                        ok_map = render_pladias_distribution_map(source_val, target_file)
+                                    if ok_map:
                                         try: shutil.copy2(target_file, cache_file)
                                         except Exception: pass
                                         return True
@@ -12949,6 +13024,11 @@ if st.session_state.df is not None:
                             chosen_docx_title_col = st.session_state['w_docx_title_col']
 
                         docx_layout_mode_param = "page_per_species" if "1 druh" in docx_layout_choice else "compact"
+                        docx_font_scale_val = docx_font_scale_pct / 100.0
+                        docx_img_scale_val = docx_img_scale_pct / 100.0
+                        docx_margin_param = "narrow" if "Úzké" in docx_margin_choice else ("wide" if "Širší" in docx_margin_choice else "standard")
+                        docx_gallery_param = "2_cols" if "2 sloupce" in docx_gallery_layout else ("3_cols" if "3 sloupce" in docx_gallery_layout else "auto")
+                        docx_map_pos_param = "below_table" if "Pod tabulkou" in docx_map_pos_choice else "top_gallery"
                         generate_docx_booklet(
                             df=df,
                             output_docx_path=docx_path,
@@ -12963,7 +13043,13 @@ if st.session_state.df is not None:
                             selected_citations=st.session_state.get("user_selected_sources"),
                             include_media_attribution=docx_include_attributions,
                             col_styles=st.session_state.get('col_styles', {}),
-                            title_col=chosen_docx_title_col
+                            title_col=chosen_docx_title_col,
+                            font_scale=docx_font_scale_val,
+                            image_scale=docx_img_scale_val,
+                            margin_mode=docx_margin_param,
+                            gallery_layout=docx_gallery_param,
+                            map_position=docx_map_pos_param,
+                            max_images_mode=docx_max_imgs_choice
                         )
 
                         with open(docx_path, "rb") as f:
