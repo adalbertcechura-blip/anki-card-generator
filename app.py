@@ -1027,6 +1027,7 @@ def get_topographic_base_map(minx=1335000, miny=6190000, maxx=2105000, maxy=6640
 import threading as _threading
 _PLADIAS_BASE_MAP_LOCK = _threading.Lock()
 _PLADIAS_MAP_SEMAPHORE = _threading.Semaphore(3)
+_INAT_MAP_SEMAPHORE = _threading.Semaphore(2)
 
 def get_pladias_base_map():
     global _PLADIAS_BASE_MAP_CACHE
@@ -1139,17 +1140,23 @@ def get_inat_observation_points(obs_url, limit=60):
         if p_id:
             api_params["place_id"] = p_id
         api_url = "https://api.inaturalist.org/v1/observations"
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AnkiSpecies/1.0'}
-        r = requests.get(api_url, params=api_params, headers=headers, timeout=(2.5, 5.0))
-        if r.status_code == 200:
-            for obs in r.json().get('results', []):
-                coords = obs.get('geojson', {}).get('coordinates')
-                if coords and len(coords) >= 2:
-                    pts.append({'lon': float(coords[0]), 'lat': float(coords[1])})
-                elif obs.get('location'):
-                    parts = str(obs.get('location')).split(',')
-                    if len(parts) == 2:
-                        pts.append({'lat': float(parts[0].strip()), 'lon': float(parts[1].strip())})
+        headers = {'User-Agent': 'AnkiSpeciesGenerator/1.0 (contact: adalb@example.com)'}
+        with _INAT_MAP_SEMAPHORE:
+            for _att in range(2):
+                r = requests.get(api_url, params=api_params, headers=headers, timeout=(3.0, 6.0))
+                if r.status_code == 429:
+                    time.sleep(2.0)
+                    continue
+                if r.status_code == 200:
+                    for obs in r.json().get('results', []):
+                        coords = obs.get('geojson', {}).get('coordinates')
+                        if coords and len(coords) >= 2:
+                            pts.append({'lon': float(coords[0]), 'lat': float(coords[1])})
+                        elif obs.get('location'):
+                            parts = str(obs.get('location')).split(',')
+                            if len(parts) == 2:
+                                pts.append({'lat': float(parts[0].strip()), 'lon': float(parts[1].strip())})
+                break
     except Exception:
         pass
     return pts
@@ -11492,7 +11499,9 @@ if st.session_state.df is not None:
                                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                                     'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
                                 }
-                                if 'mykologie.net' in url:
+                                if 'wikimedia.org' in url or 'wikipedia.org' in url:
+                                    req_headers['User-Agent'] = 'AnkiCardGen/1.0 (https://github.com/adalb/anki-card-generator)'
+                                elif 'mykologie.net' in url:
                                     req_headers['Referer'] = 'https://www.mykologie.net/'
                                 elif 'dalib.cz' in url:
                                     req_headers['Referer'] = 'https://dalib.cz/'
@@ -11506,8 +11515,11 @@ if st.session_state.df is not None:
                                 r_resp = anki_http_session.get(
                                     req_url,
                                     headers=req_headers,
-                                    timeout=(3.0, 7.0)
+                                    timeout=(3.0, 8.0)
                                 )
+                                if r_resp.status_code in (429, 502, 503, 504):
+                                    time.sleep(1.2)
+                                    r_resp = anki_http_session.get(req_url, headers=req_headers, timeout=(3.0, 8.0))
                                 if r_resp.status_code == 404 and 'cevs/images/taxa/' in req_url:
                                     alt_url = req_url.replace('/taxa/large/', '/taxa/clopla/large/') if '/taxa/clopla/' not in req_url else req_url.replace('/taxa/clopla/large/', '/taxa/large/')
                                     try:
@@ -11580,24 +11592,48 @@ if st.session_state.df is not None:
                                 else:
                                     wait_sec = int(time.time() - last_progress_ts)
                                     status.text(f"Stahuji a optimalizuji média ({completed_count}/{total_tasks}, čekám na {len(pending)} úloh, {wait_sec} s)...")
-                                    if wait_sec > 120:
-                                        for f_hung, item_hung in list(pending.items()):
+                                    if wait_sec > 45:
+                                        for f_hung in list(pending.keys()):
                                             f_hung.cancel()
-                                            failed_items.append(item_hung)
                                         break
                         finally:
                             executor.shutdown(wait=False, cancel_futures=True)
 
                         if failed_items:
-                            for r_idx, r_item in enumerate(failed_items):
-                                status.text(f"Opakuji stažení nedokončených souborů ({r_idx + 1}/{len(failed_items)})...")
-                                time.sleep(0.35)
-                                try:
-                                    _, r_lpath, r_ok = _download_task(r_item)
-                                    if r_ok:
-                                        downloaded_media.append(r_lpath)
-                                except Exception:
-                                    pass
+                            retry_total = len(failed_items)
+                            retry_done = 0
+                            retry_exec = concurrent.futures.ThreadPoolExecutor(max_workers=4)
+                            try:
+                                r_pending = {retry_exec.submit(_download_task, r_item): r_item for r_item in failed_items}
+                                r_last_ts = time.time()
+                                while r_pending:
+                                    r_done, _ = concurrent.futures.wait(
+                                        r_pending.keys(),
+                                        timeout=1.0,
+                                        return_when=concurrent.futures.FIRST_COMPLETED
+                                    )
+                                    if r_done:
+                                        r_last_ts = time.time()
+                                        for rf in r_done:
+                                            r_pending.pop(rf, None)
+                                            retry_done += 1
+                                            if retry_done % 5 == 0 or retry_done >= retry_total - 10 or retry_done == retry_total:
+                                                status.text(f"Opakuji stažení nedokončených souborů ({retry_done}/{retry_total})...")
+                                            try:
+                                                _, r_lpath, r_ok = rf.result()
+                                                if r_ok:
+                                                    downloaded_media.append(r_lpath)
+                                            except Exception:
+                                                pass
+                                    else:
+                                        r_wait = int(time.time() - r_last_ts)
+                                        status.text(f"Opakuji stažení nedokončených souborů ({retry_done}/{retry_total}, čekám {r_wait} s)...")
+                                        if r_wait > 30:
+                                            for rf_h in list(r_pending.keys()):
+                                                rf_h.cancel()
+                                            break
+                            finally:
+                                retry_exec.shutdown(wait=False, cancel_futures=True)
 
                     status.text("Sestavuji kartičky...")
                     progress_bar.progress(1.0)
@@ -12898,22 +12934,46 @@ if st.session_state.df is not None:
                                 else:
                                     wait_sec = int(time.time() - last_progress_ts)
                                     status.text(f"Stahuji a optimalizuji obrázky pro PDF ({completed_count}/{total_tasks}, čekám na {len(pending)} úloh, {wait_sec} s)...")
-                                    if wait_sec > 120:
-                                        for f_hung, item_hung in list(pending.items()):
+                                    if wait_sec > 45:
+                                        for f_hung in list(pending.keys()):
                                             f_hung.cancel()
-                                            failed_pdf_items.append(item_hung)
                                         break
                         finally:
                             executor.shutdown(wait=False, cancel_futures=True)
 
                         if failed_pdf_items:
-                            for r_idx, r_item in enumerate(failed_pdf_items):
-                                status.text(f"Opakuji stažení nedokončených obrázků pro PDF ({r_idx + 1}/{len(failed_pdf_items)})...")
-                                time.sleep(0.35)
-                                try:
-                                    _download_pdf_img(r_item)
-                                except Exception:
-                                    pass
+                            retry_total = len(failed_pdf_items)
+                            retry_done = 0
+                            retry_exec = concurrent.futures.ThreadPoolExecutor(max_workers=4)
+                            try:
+                                r_pending = {retry_exec.submit(_download_pdf_img, r_item): r_item for r_item in failed_pdf_items}
+                                r_last_ts = time.time()
+                                while r_pending:
+                                    r_done, _ = concurrent.futures.wait(
+                                        r_pending.keys(),
+                                        timeout=1.0,
+                                        return_when=concurrent.futures.FIRST_COMPLETED
+                                    )
+                                    if r_done:
+                                        r_last_ts = time.time()
+                                        for rf in r_done:
+                                            r_pending.pop(rf, None)
+                                            retry_done += 1
+                                            if retry_done % 5 == 0 or retry_done >= retry_total - 10 or retry_done == retry_total:
+                                                status.text(f"Opakuji stažení nedokončených obrázků pro PDF ({retry_done}/{retry_total})...")
+                                            try:
+                                                rf.result()
+                                            except Exception:
+                                                pass
+                                    else:
+                                        r_wait = int(time.time() - r_last_ts)
+                                        status.text(f"Opakuji stažení nedokončených obrázků pro PDF ({retry_done}/{retry_total}, čekám {r_wait} s)...")
+                                        if r_wait > 30:
+                                            for rf_h in list(r_pending.keys()):
+                                                rf_h.cancel()
+                                            break
+                            finally:
+                                retry_exec.shutdown(wait=False, cancel_futures=True)
 
                     status.text("Sázím a generuji PDF..." if is_preview else "Sázím a generuji PDF brožuru...")
                     progress_bar.progress(1.0)
