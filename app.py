@@ -4889,9 +4889,9 @@ def generate_pdf_booklet(
     fn_normal, fn_bold, fn_italic, fn_bold_italic = register_pdf_fonts()
 
     margin_presets = {
-        "narrow": (0.65 * cm, 1.0 * cm, 0.9 * cm),
-        "standard": (1.1 * cm, 1.35 * cm, 1.2 * cm),
-        "wide": (1.6 * cm, 1.8 * cm, 1.6 * cm),
+        "narrow": (0.32 * cm, 0.50 * cm, 0.45 * cm),
+        "standard": (0.85 * cm, 1.0 * cm, 0.95 * cm),
+        "wide": (1.45 * cm, 1.65 * cm, 1.45 * cm),
     }
     mx_base, mt_base, mb_base = margin_presets.get(margin_mode, margin_presets["standard"])
 
@@ -5638,46 +5638,46 @@ def generate_pdf_booklet(
                         cols = 3 if (budget_h < 7.2 * cm and is_atlas_page) else 2
 
                 rows = (n_imgs + cols - 1) // cols
-                col_w = available_width / float(cols)
-                cell_w = col_w - 3.0
-
                 row_chunks = [imgs_list[r * cols:(r + 1) * cols] for r in range(rows)]
                 row_has_caps = [any(include_media_attribution and img_item[2] for img_item in chunk) for chunk in row_chunks]
                 total_cap_h = sum(0.42 * cm for hc in row_has_caps if hc)
-                max_row_h = max(1.6 * cm, (budget_h - total_cap_h - (rows * 3.0)) / float(rows))
+                max_row_h = max(1.6 * cm, (budget_h - total_cap_h - (rows * 2.5)) / float(rows))
 
-                t_grid_data = []
                 for r_idx, chunk in enumerate(row_chunks):
-                    img_row = []
-                    cap_row = []
+                    ratios = []
                     for lpath, col_lbl, attr in chunk:
                         iw, ih = _get_image_dims(lpath)
-                        aspect = ih / float(iw) if iw > 0 else 0.75
-                        tw = cell_w
-                        th = tw * aspect
-                        if th > max_row_h:
-                            th = max_row_h
-                            tw = th / aspect
+                        ratios.append(iw / float(ih) if (iw > 0 and ih > 0) else 1.3333)
+                    sum_ratios = max(0.1, sum(ratios))
+                    cell_pad = 2.5
+                    row_h_fit = max(1.0 * cm, (available_width - len(chunk) * cell_pad) / sum_ratios)
+                    row_h = min(max_row_h, row_h_fit)
+
+                    img_row = []
+                    cap_row = []
+                    row_col_widths = []
+                    for k_i, (lpath, col_lbl, attr) in enumerate(chunk):
+                        th = row_h
+                        tw = th * ratios[k_i]
                         img_row.append(_make_img_or_spacer(lpath, tw, th))
                         cap_text = attr if (include_media_attribution and attr) else ""
                         cap_row.append(Paragraph(cap_text, caption_style))
-                    while len(img_row) < cols:
-                        img_row.append('')
-                        cap_row.append('')
-                    t_grid_data.append(img_row)
-                    if row_has_caps[r_idx]:
-                        t_grid_data.append(cap_row)
+                        row_col_widths.append(tw + cell_pad)
 
-                t_imgs = Table(t_grid_data, colWidths=[col_w] * cols)
-                t_imgs.setStyle(TableStyle([
-                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                    ('TOPPADDING', (0, 0), (-1, -1), 1),
-                    ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
-                    ('LEFTPADDING', (0, 0), (-1, -1), 1.5),
-                    ('RIGHTPADDING', (0, 0), (-1, -1), 1.5),
-                ]))
-                out_flowables.append(t_imgs)
+                    t_row_data = [img_row]
+                    if row_has_caps[r_idx]:
+                        t_row_data.append(cap_row)
+
+                    t_row = Table(t_row_data, colWidths=row_col_widths, hAlign='CENTER')
+                    t_row.setStyle(TableStyle([
+                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                        ('TOPPADDING', (0, 0), (-1, -1), 0.5),
+                        ('BOTTOMPADDING', (0, 0), (-1, -1), 1.0),
+                        ('LEFTPADDING', (0, 0), (-1, -1), 1.25),
+                        ('RIGHTPADDING', (0, 0), (-1, -1), 1.25),
+                    ]))
+                    out_flowables.append(t_row)
                 out_flowables.append(Spacer(1, 2))
                 return out_flowables
 
@@ -5703,8 +5703,16 @@ def generate_pdf_booklet(
                     pass
 
             if layout_mode == "page_per_species":
-                reserved_margin = 0.45 * cm
-                avail_for_photos = max(2.2 * cm, avail_page_h - text_h - map_budget_h - reserved_margin)
+                reserved_margin = 0.65 * cm
+                cover_h = 0.0
+                if idx == 0 and not (include_toc and len(df) >= 2):
+                    for f_cov in story:
+                        try:
+                            _, ch = f_cov.wrap(available_width, avail_page_h)
+                            cover_h += ch + 6.0
+                        except Exception:
+                            pass
+                avail_for_photos = max(2.2 * cm, avail_page_h - cover_h - text_h - map_budget_h - reserved_margin)
                 photo_budget_h = min(avail_for_photos, avail_for_photos * min(1.0, max(0.35, 0.78 * img_scale_eff)))
             elif layout_mode == "split_images_text":
                 avail_for_photos = avail_photo_budget
@@ -5879,7 +5887,7 @@ def generate_docx_booklet(
 
     doc = docx.Document()
 
-    margin_in_map = {"narrow": 0.35, "standard": 0.55, "wide": 0.8}
+    margin_in_map = {"narrow": 0.20, "standard": 0.48, "wide": 0.75}
     margin_in = margin_in_map.get(margin_mode, 0.55)
     for section in doc.sections:
         section.top_margin = Inches(margin_in)
