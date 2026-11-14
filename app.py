@@ -3137,12 +3137,62 @@ def transcribe_latin_to_czech_phonetics(latin_name: str) -> str:
     words = text.split()
     phonetic_words = []
 
+    def _transcribe_token(tok: str) -> str:
+        s = tok.lower()
+        if not s:
+            return ""
+        # Spřežky a speciální skupiny
+        s = re.sub(r'ngu([aeiouyáéíóúý])', r'ngv\1', s)
+        s = s.replace('qu', 'kv')
+        s = s.replace('ph', 'f')
+        s = s.replace('th', 't')
+        s = s.replace('rh', 'r')
+        s = s.replace('ae', 'é').replace('oe', 'é')
+        s = s.replace('æ', 'é').replace('œ', 'é')
+        # ti + samohláska (pokud nepředchází s, t, x) -> ci
+        s = re.sub(r'(?<![stx])ti([aeiouyáéíóúý])', r'ci\1', s)
+        # cc před přední samohláskou -> kc, jinak k
+        s = re.sub(r'cc(?=[eiyéíý])', 'kc', s)
+        s = s.replace('cc', 'k')
+        # c před přední samohláskou zůstává c, jinak k (vyjma spřežky ch)
+        out = []
+        i = 0
+        while i < len(s):
+            if s[i:i+2] == 'ch':
+                out.append('ch')
+                i += 2
+                continue
+            ch_cur = s[i]
+            if ch_cur == 'c':
+                nxt = s[i+1] if i + 1 < len(s) else ''
+                out.append('c' if nxt in 'eiyéíý' else 'k')
+            elif ch_cur == 'x':
+                out.append('ks')
+            elif ch_cur == 'w':
+                out.append('v')
+            else:
+                out.append(ch_cur)
+            i += 1
+        res = ''.join(out)
+        # s mezi samohláskami -> z (pokud nebylo zdvojené ss)
+        res = re.sub(r'([aeiouyáéíóúý])s(?=[aeiouyáéíóúý])', r'\1z', res)
+        # Zjednodušení zdvojených souhlásek
+        res = re.sub(r'([bdfgklmnprstvz])\1+', r'\1', res)
+        return res
+
     for w in words:
         trail = ""
-        m_trail = re.search(r'[^a-zA-ZáéíóúýčďěňřšťžůÁÉÍÓÚÝČĎĚŇŘŠŤŽŮ]+$', w)
+        m_trail = re.search(r'[^a-zA-ZáéíóúýčďěňřšťžůÁÉÍÓÚÝČĎĚŇŘŠŤŽŮ-]+$', w)
         if m_trail:
             trail = m_trail.group(0)
             w = w[:-len(trail)]
+        if not w:
+            continue
+        sub_parts = [_transcribe_token(p) for p in w.split('-')]
+        phonetic_words.append('-'.join([p for p in sub_parts if p]) + trail)
+
+    result_str = " ".join([pw for pw in phonetic_words if pw]).strip()
+    return f"[{result_str}]" if result_str else ""
 
 def load_local_flora_databases():
 
@@ -7587,6 +7637,76 @@ if st.session_state.df is not None:
                     key="dl_table_preview_xlsx",
                     use_container_width=True
                 )
+
+        with st.expander("Editace textových sloupců a popisů (např. Pladias)", expanded=False):
+            st.caption("Upravte libovolné textové informace (včetně sloupců z Pladias.cz jako Popis druhu, Listy, Plod apod.) buď jednotlivě v poli níže, nebo hromadně v tabulce.")
+
+            edit_mode = st.radio(
+                "Způsob úpravy:",
+                ["Detailní úprava jednoho řádku (vhodné pro delší popisy)", "Hromadná úprava v tabulce"],
+                horizontal=True,
+                key="tbl_text_edit_mode"
+            )
+
+            if edit_mode.startswith("Detailní"):
+                row_labels = [
+                    f"{i + 1}. {str(df.iloc[i][columns[0]]) if len(columns) > 0 and pd.notna(df.iloc[i][columns[0]]) else f'Řádek {i + 1}'}"
+                    for i in range(len(df))
+                ]
+                sel_row_label = st.selectbox("Vyberte položku (řádek):", row_labels, key="edit_cell_row_sel")
+                sel_row_idx = row_labels.index(sel_row_label) if sel_row_label in row_labels else 0
+
+                def_col_idx = 0
+                for ci, cname in enumerate(columns):
+                    cl = str(cname).lower()
+                    if "popis" in cl or "pladias.cz" in cl:
+                        def_col_idx = ci
+                        break
+                sel_edit_col = st.selectbox("Vyberte sloupec k úpravě:", columns, index=def_col_idx, key="edit_cell_col_sel")
+
+                cur_cell_val = df.iloc[sel_row_idx][sel_edit_col]
+                cur_cell_str = "" if pd.isna(cur_cell_val) else str(cur_cell_val)
+                new_cell_str = st.text_area(
+                    f"Obsah buňky ({sel_edit_col}):",
+                    value=cur_cell_str,
+                    height=180,
+                    key=f"edit_cell_area_{sel_row_idx}_{sel_edit_col}"
+                )
+                if st.button("Uložit změnu buňky", key="btn_save_single_cell", type="primary"):
+                    st.session_state.df[sel_edit_col] = st.session_state.df[sel_edit_col].astype(object)
+                    st.session_state.df.iat[sel_row_idx, st.session_state.df.columns.get_loc(sel_edit_col)] = new_cell_str
+                    st.success(f"Uloženo: **{sel_row_label}** → **{sel_edit_col}**")
+                    st.rerun()
+            else:
+                default_edit_cols = [columns[0]] if columns else []
+                for cname in columns[1:]:
+                    cl = str(cname).lower()
+                    if any(k in cl for k in ["popis", "pladias.cz", "listy", "čepel", "květ", "plod", "výška", "růst", "životní", "poznám", "fonetic"]):
+                        default_edit_cols.append(cname)
+                if len(default_edit_cols) <= 1 and len(columns) > 1:
+                    default_edit_cols = columns[:min(5, len(columns))]
+
+                sel_bulk_cols = st.multiselect(
+                    "Sloupce zobrazené k úpravě:",
+                    options=columns,
+                    default=default_edit_cols,
+                    key="edit_bulk_cols_sel"
+                )
+                if sel_bulk_cols:
+                    edit_subset = df[sel_bulk_cols].copy()
+                    for c_ed in sel_bulk_cols:
+                        edit_subset[c_ed] = edit_subset[c_ed].apply(lambda x: "" if pd.isna(x) else str(x))
+                    edited_df = st.data_editor(
+                        edit_subset,
+                        use_container_width=True,
+                        num_rows="fixed",
+                        key="bulk_text_data_editor"
+                    )
+                    if st.button("Uložit změny z tabulky", key="btn_save_bulk_cells", type="primary"):
+                        for c_ed in sel_bulk_cols:
+                            st.session_state.df[c_ed] = edited_df[c_ed].values
+                        st.success(f"Změny ve sloupcích ({len(sel_bulk_cols)}) byly uloženy do tabulky.")
+                        st.rerun()
 
         with st.expander("Nástroje pro úpravu dat", expanded=False):
 

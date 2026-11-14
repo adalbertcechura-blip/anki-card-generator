@@ -501,6 +501,27 @@ main {
   margin-top: 18px;
   animation: fadeIn 0.2s ease-in-out;
 }
+.flashcard.side-mode-separate .card-answer {
+  border-top: none;
+  margin-top: 0;
+  padding-top: 0;
+}
+.btn-side-peek {
+  align-self: center;
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-side-peek:hover {
+  color: var(--text-main);
+  border-color: var(--accent);
+}
 
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(4px); }
@@ -1019,6 +1040,10 @@ main {
           <button class="btn-mode-tgl active" id="btnModeFlip" title="Režim otáčení karty">🔄 Otáčecí</button>
           <button class="btn-mode-tgl" id="btnModeType" title="Režim vepisování z klávesnice">⌨️ Vepisovací</button>
         </div>
+        <div class="mode-toggle-group" title="Zobrazení rubu karty">
+          <button class="btn-mode-tgl active" id="btnBackStacked" title="Zobrazit líc i rub pod sebou">📄 Pod sebe</button>
+          <button class="btn-mode-tgl" id="btnBackSeparate" title="Zobrazit rub na druhé straně karty">🃏 Na druhou stranu</button>
+        </div>
         <label class="switch-label">
           <input type="checkbox" id="chkReverseStudy">
           <span>Otočit směr</span>
@@ -1056,6 +1081,7 @@ main {
 
       <div class="study-controls">
         <button class="btn-flip" id="btnFlip">Zobrazit odpověď (Mezerník / Klepnutí)</button>
+        <button class="btn-side-peek" id="btnSidePeek" style="display:none;">↻ Zobrazit líc</button>
         <div class="rating-grid" id="ratingGrid">
           <button class="btn-rate btn-rate-again" id="btnAgain" title="Klávesa 1">
             <span>Znovu (1)</span>
@@ -1379,9 +1405,11 @@ let currentDeck = null;
 let studyQueue = [];
 let currentIndex = 0;
 let isCardFlipped = false;
+let showingFrontOnFlipped = false;
 let sessionStats = { newCount: 0, dueCount: 0, doneCount: 0 };
 let currentCard = null;
 let cardStudyMode = "flip"; // "flip" or "type"
+let backLayoutMode = localStorage.getItem("karty_back_layout") || "stacked"; // "stacked" or "separate"
 let heatmapYear = new Date().getFullYear();
 let statsModalDeck = null;
 let extraNewCardsGranted = 0;
@@ -2260,6 +2288,7 @@ async function loadCard(idx) {
 
   currentCard = studyQueue[idx];
   isCardFlipped = false;
+  showingFrontOnFlipped = false;
 
   const isReverse = document.getElementById("chkReverseStudy").checked;
   const isQuick = document.getElementById("chkQuickReview").checked;
@@ -2276,7 +2305,7 @@ async function loadCard(idx) {
   await resolvePendingImages(qBox, currentDeck.id);
   await resolvePendingImages(aBox, currentDeck.id);
 
-  aBox.style.display = "none";
+  applyBackLayoutVisibility();
   document.getElementById("ratingGrid").style.display = "none";
   document.getElementById("quickNavGrid").style.display = isQuick ? "flex" : "none";
 
@@ -2334,10 +2363,44 @@ function flipCard() {
   revealAnswer();
 }
 
+function applyBackLayoutVisibility() {
+  const qBox = document.getElementById("cardQuestion");
+  const aBox = document.getElementById("cardAnswer");
+  const flashcardBox = document.getElementById("flashcardBox");
+  const btnSidePeek = document.getElementById("btnSidePeek");
+  if (!isCardFlipped) {
+    qBox.style.display = "flex";
+    aBox.style.display = "none";
+    flashcardBox.classList.remove("side-mode-separate");
+    if (btnSidePeek) btnSidePeek.style.display = "none";
+    return;
+  }
+  if (backLayoutMode === "separate") {
+    flashcardBox.classList.add("side-mode-separate");
+    if (showingFrontOnFlipped) {
+      qBox.style.display = "flex";
+      aBox.style.display = "none";
+      if (btnSidePeek) btnSidePeek.innerText = "↻ Zobrazit rub";
+    } else {
+      qBox.style.display = "none";
+      aBox.style.display = "flex";
+      if (btnSidePeek) btnSidePeek.innerText = "↻ Zobrazit líc";
+    }
+    if (btnSidePeek) btnSidePeek.style.display = "inline-flex";
+  } else {
+    flashcardBox.classList.remove("side-mode-separate");
+    qBox.style.display = "flex";
+    aBox.style.display = "flex";
+    if (btnSidePeek) btnSidePeek.style.display = "none";
+  }
+}
+
 function revealAnswer() {
   isCardFlipped = true;
-  document.getElementById("cardAnswer").style.display = "flex";
+  showingFrontOnFlipped = false;
+  applyBackLayoutVisibility();
   document.getElementById("btnFlip").style.display = "none";
+  document.getElementById("flashcardBox").scrollTop = 0;
 
   const isQuick = document.getElementById("chkQuickReview").checked;
   if (isQuick) {
@@ -2443,6 +2506,47 @@ btnModeType.onclick = () => {
   btnModeFlip.classList.remove("active");
   loadCard(currentIndex);
 };
+
+// --- BACK LAYOUT TOGGLES (POD SEBE VS NA DRUHOU STRANU) ---
+const btnBackStacked = document.getElementById("btnBackStacked");
+const btnBackSeparate = document.getElementById("btnBackSeparate");
+const btnSidePeek = document.getElementById("btnSidePeek");
+
+function syncBackLayoutButtons() {
+  if (backLayoutMode === "separate") {
+    btnBackSeparate.classList.add("active");
+    btnBackStacked.classList.remove("active");
+  } else {
+    btnBackStacked.classList.add("active");
+    btnBackSeparate.classList.remove("active");
+  }
+}
+syncBackLayoutButtons();
+
+btnBackStacked.onclick = () => {
+  backLayoutMode = "stacked";
+  localStorage.setItem("karty_back_layout", backLayoutMode);
+  showingFrontOnFlipped = false;
+  syncBackLayoutButtons();
+  applyBackLayoutVisibility();
+};
+
+btnBackSeparate.onclick = () => {
+  backLayoutMode = "separate";
+  localStorage.setItem("karty_back_layout", backLayoutMode);
+  showingFrontOnFlipped = false;
+  syncBackLayoutButtons();
+  applyBackLayoutVisibility();
+  document.getElementById("flashcardBox").scrollTop = 0;
+};
+
+if (btnSidePeek) {
+  btnSidePeek.onclick = () => {
+    showingFrontOnFlipped = !showingFrontOnFlipped;
+    applyBackLayoutVisibility();
+    document.getElementById("flashcardBox").scrollTop = 0;
+  };
+}
 
 // Vepisovací tlačítko a Enter
 document.getElementById("btnCheckType").onclick = submitTypeAnswer;
