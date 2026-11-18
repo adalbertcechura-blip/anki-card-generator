@@ -54,6 +54,25 @@ _COUNTRIES_DB_CACHE = None
 _LOCAL_FLORA_DB_CACHE = None
 _img_dim_cache = {}
 
+try:
+    import inspect as _inspect_dl
+    _DL_BTN_SUPPORTS_IGNORE = "on_click" in _inspect_dl.signature(st.download_button).parameters
+except Exception:
+    _DL_BTN_SUPPORTS_IGNORE = False
+
+def _safe_download_button(*args, **kwargs):
+    if _DL_BTN_SUPPORTS_IGNORE and "on_click" not in kwargs:
+        kwargs["on_click"] = "ignore"
+    return st.download_button(*args, **kwargs)
+
+@st.cache_data(show_spinner=False)
+def _get_cached_table_exports(dataframe_obj):
+    c_data = dataframe_obj.to_csv(index=False, encoding='utf-8-sig')
+    e_buf = io.BytesIO()
+    with pd.ExcelWriter(e_buf, engine='openpyxl') as writer:
+        dataframe_obj.to_excel(writer, index=False)
+    return c_data, e_buf.getvalue()
+
 @st.cache_data(show_spinner=False)
 def _read_batch_replacer_html():
     p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "BatchReplacer.html")
@@ -317,14 +336,43 @@ ANKI_AFMT = """
 </div>
 """
 
-def check_image_quality(file_path):
-\
-\
-\
+def is_herbarium_sheet_file(file_path: str) -> bool:
+    """Detekuje sušené herbářové skeny (převaha bílého/krémového papíru bez čerstvé zeleně)."""
+    try:
+        if not file_path or not os.path.exists(file_path) or os.path.getsize(file_path) == 0:
+            return False
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext not in ('.jpg', '.jpeg', '.png', '.webp', '.bmp'):
+            return False
+        with Image.open(file_path) as im:
+            rgb = im.convert('RGB').resize((64, 64))
+            px = list(rgb.getdata())
+        if not px:
+            return False
+        def _is_paper(p):
+            r, g, b = p
+            return r > 195 and g > 190 and b > 180 and (max(r, g, b) - min(r, g, b)) < 32
+        non_w = [p for p in px if not _is_paper(p)]
+        white_all = 1.0 - (len(non_w) / float(len(px)))
+        if white_all < 0.72:
+            return False
+        border = [px[y * 64 + x] for y in range(64) for x in range(64) if x < 7 or x >= 57 or y < 7 or y >= 57]
+        white_brd = sum(1 for p in border if _is_paper(p)) / float(len(border))
+        if white_brd < 0.78:
+            return False
+        green_fg = sum(1 for r, g, b in non_w if g > r + 8 and g > b + 8) / float(max(1, len(non_w)))
+        return green_fg < 0.05
+    except Exception:
+        return False
 
+def check_image_quality(file_path):
     try:
         import os
-        return os.path.exists(file_path) and os.path.getsize(file_path) > 0
+        if not (os.path.exists(file_path) and os.path.getsize(file_path) > 0):
+            return False
+        if is_herbarium_sheet_file(file_path):
+            return False
+        return True
     except Exception:
         return False
 
@@ -618,6 +666,10 @@ def download_media_file(url: str, local_path: str) -> bool:
                 if not save_optimized_image(r.content, local_path, max_dim=1200, quality=85):
                     with open(local_path, "wb") as f_out:
                         f_out.write(r.content)
+                if is_herbarium_sheet_file(local_path):
+                    try: os.remove(local_path)
+                    except Exception: pass
+                    return False
                 return os.path.exists(local_path) and os.path.getsize(local_path) > 0
         except Exception:
             pass
@@ -1800,6 +1852,64 @@ def fetch_pladias_species_images(species_name):
             except Exception:
                 pass
     return exact_fallback_data
+
+def fetch_pladias_overview_photos(species_name, max_photos=3, exclude_urls=None):
+    """Načte první fotografie taxonu přímo z webové stránky Pladias.cz v jejich přesném pořadí."""
+    if not species_name or pd.isna(species_name):
+        return []
+    clean_sp = re.sub(r'\s*\(.*?\)\s*', ' ', str(species_name)).strip()
+    clean_sp = re.sub(r'\s+sp(p)?\.?$', '', clean_sp).strip()
+    clean_no_subsp = re.sub(r'\s+(subsp|ssp|var|f)\.?\s+.*$', '', clean_sp, flags=re.IGNORECASE).strip()
+    if not clean_sp:
+        clean_sp = str(species_name).strip()
+
+    builtin_flora_synonyms = {
+        "lychnis viscaria": "Viscaria vulgaris",
+        "stipa calamagrostis": "Achnatherum calamagrostis",
+        "steris viscaria": "Viscaria vulgaris"
+    }
+
+    candidates = []
+    for s in [clean_sp, clean_no_subsp]:
+        if s and s not in candidates:
+            candidates.append(s)
+        words = s.split()
+        if len(words) >= 2:
+            binom = f"{words[0]} {words[1]}"
+            if binom not in candidates:
+                candidates.append(binom)
+            if binom.lower() in builtin_flora_synonyms:
+                syn = builtin_flora_synonyms[binom.lower()]
+                if syn not in candidates:
+                    candidates.append(syn)
+
+    excluded = set(exclude_urls) if exclude_urls else set()
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    photos = []
+
+    for cand in candidates:
+        url = f"https://pladias.cz/taxon/overview/{urllib.parse.quote(cand)}"
+        try:
+            r = requests.get(url, headers=headers, timeout=6)
+            if r.status_code == 200 and r.text:
+                matches = re.findall(r'images/taxa/[^\s"\'<>]+', r.text)
+                for m in matches:
+                    if '/clopla/' in m.lower():
+                        continue
+                    fn = m.split('/')[-1].split('?')[0].strip()
+                    if not fn or not fn.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
+                        continue
+                    full_u = f"https://files.ibot.cas.cz/cevs/images/taxa/large/{fn}"
+                    if full_u in photos or full_u in excluded or is_herbarium_image(full_u):
+                        continue
+                    photos.append(full_u)
+                    if len(photos) >= max_photos:
+                        return photos
+                if photos:
+                    return photos
+        except Exception:
+            pass
+    return photos
 
 def fetch_dalibor_data(species_name, max_photos=3):
 \
@@ -4921,11 +5031,20 @@ def get_active_citations(cols=None, df=None, selected_sources=None) -> list:
     return citations
 
 def render_citations_selector_ui(key_prefix: str = "export") -> list:
+    df_curr = st.session_state.get("df", None)
+    cols_curr = list(df_curr.columns) if df_curr is not None else []
+    auto_detected = [c[0] for c in get_active_citations(cols_curr, df_curr, selected_sources=None)]
+    ms_key = f"{key_prefix}_sources_multiselect"
+
     if "user_selected_sources" not in st.session_state:
-        df_curr = st.session_state.get("df", None)
-        cols_curr = list(df_curr.columns) if df_curr is not None else []
-        auto_detected = [c[0] for c in get_active_citations(cols_curr, df_curr, selected_sources=None)]
-        st.session_state.user_selected_sources = auto_detected
+        st.session_state.user_selected_sources = list(auto_detected)
+    elif not st.session_state.get("_citations_manually_edited", False):
+        if st.session_state.user_selected_sources != auto_detected:
+            st.session_state.user_selected_sources = list(auto_detected)
+            st.session_state[ms_key] = list(auto_detected)
+
+    if ms_key not in st.session_state:
+        st.session_state[ms_key] = [s for s in st.session_state.user_selected_sources if s in ALL_AVAILABLE_CITATIONS]
 
     with st.expander("Výběr zdrojů dat a citací do bibliografie (volitelné)", expanded=False):
         st.caption("Můžete ručně naklikat nebo upravit zdroje, které se mají uvést na konci výstupu (ideální např. při nahrání tabulky, která byla obohacena dříve):")
@@ -4933,30 +5052,35 @@ def render_citations_selector_ui(key_prefix: str = "export") -> list:
         c_btn1, c_btn2, c_btn3 = st.columns([1, 1, 1])
         with c_btn1:
             if st.button("Vybrat vše", key=f"{key_prefix}_cit_all"):
-                st.session_state.user_selected_sources = list(ALL_AVAILABLE_CITATIONS.keys())
+                all_c = list(ALL_AVAILABLE_CITATIONS.keys())
+                st.session_state.user_selected_sources = all_c
+                st.session_state[ms_key] = list(all_c)
+                st.session_state._citations_manually_edited = True
                 st.rerun()
         with c_btn2:
             if st.button("Dle sloupců (auto)", key=f"{key_prefix}_cit_auto"):
-                df_curr = st.session_state.get("df", None)
-                cols_curr = list(df_curr.columns) if df_curr is not None else []
-                st.session_state.user_selected_sources = [c[0] for c in get_active_citations(cols_curr, df_curr, selected_sources=None)]
+                st.session_state.user_selected_sources = list(auto_detected)
+                st.session_state[ms_key] = list(auto_detected)
+                st.session_state._citations_manually_edited = False
                 st.rerun()
         with c_btn3:
             if st.button("Zrušit vše", key=f"{key_prefix}_cit_none"):
                 st.session_state.user_selected_sources = []
+                st.session_state[ms_key] = []
+                st.session_state._citations_manually_edited = True
                 st.rerun()
 
         chosen = st.multiselect(
             "Uvést tyto zdroje a citace v závěrečném přehledu:",
             options=list(ALL_AVAILABLE_CITATIONS.keys()),
-            default=[s for s in st.session_state.user_selected_sources if s in ALL_AVAILABLE_CITATIONS],
-            key=f"{key_prefix}_sources_multiselect"
+            key=ms_key
         )
+        if chosen != st.session_state.user_selected_sources:
+            st.session_state._citations_manually_edited = True
         st.session_state.user_selected_sources = chosen
         return chosen
 
-    return citations
-
+@st.cache_data(show_spinner=False)
 def generate_citations_pdf():
     from reportlab.lib.pagesizes import A4
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
@@ -5721,8 +5845,9 @@ def generate_pdf_booklet(
 
             display_imgs = []
             bottom_maps = []
+            photo_cap = 4 if limit == 6 else limit
             if map_position == "below_table":
-                display_imgs = gathered_photos[:limit]
+                display_imgs = gathered_photos[:photo_cap]
                 bottom_maps = gathered_maps[:2]
                 if not display_imgs and bottom_maps and layout_mode == "split_images_text":
                     display_imgs = bottom_maps
@@ -5730,15 +5855,8 @@ def generate_pdf_booklet(
             else:
                 if gathered_maps and limit >= 4:
                     num_maps = min(len(gathered_maps), 2)
-                    num_photos = min(len(gathered_photos), limit - num_maps)
-                    display_imgs = gathered_photos[:num_photos] + gathered_maps[:num_maps]
-                    if len(display_imgs) < limit:
-                        for p in gathered_photos[num_photos:]:
-                            if len(display_imgs) >= limit: break
-                            if p not in display_imgs: display_imgs.append(p)
-                        for m in gathered_maps[num_maps:]:
-                            if len(display_imgs) >= limit: break
-                            if m not in display_imgs: display_imgs.append(m)
+                    max_p = 4 if limit == 6 else max(1, limit - num_maps)
+                    display_imgs = gathered_photos[:max_p] + gathered_maps[:num_maps]
                 elif gathered_maps and limit == 2:
                     if gathered_photos:
                         display_imgs = [gathered_photos[0], gathered_maps[0]]
@@ -5747,7 +5865,7 @@ def generate_pdf_booklet(
                 elif gathered_maps and not gathered_photos:
                     display_imgs = gathered_maps[:limit]
                 else:
-                    display_imgs = gathered_photos[:limit]
+                    display_imgs = gathered_photos[:photo_cap]
 
             img_scale_eff = float(image_scale) if image_scale is not None else 1.0
             if abs(img_scale_eff - 1.0) < 1e-4:
@@ -5908,75 +6026,163 @@ def generate_pdf_booklet(
                 out_flowables.append(Spacer(1, 2))
                 return out_flowables
 
+            import copy as _copy_mod
+            inner_frame_w = max(4.0 * cm, available_width - 14.0)
+            inner_frame_h = max(6.0 * cm, avail_page_h - 18.0)
+
+            def _measure_h(flist):
+                tot = 0.0
+                for fe in (flist or []):
+                    try:
+                        _, fh = fe.wrap(inner_frame_w, inner_frame_h)
+                        st_fe = getattr(fe, 'style', None)
+                        sb = getattr(st_fe, 'spaceBefore', 0.0) or 0.0
+                        sa = getattr(st_fe, 'spaceAfter', 0.0) or 0.0
+                        if isinstance(fe, HRFlowable):
+                            sb = getattr(fe, 'spaceBefore', 0.0) or 0.0
+                            sa = getattr(fe, 'spaceAfter', 0.0) or 0.0
+                        tot += fh + sb + sa
+                    except Exception:
+                        pass
+                return tot
+
+            def _scale_flowables_compact(flist, scale_f):
+                out_f = []
+                for fe in (flist or []):
+                    if isinstance(fe, Spacer):
+                        out_f.append(Spacer(fe.width, max(0.4, fe.height * min(0.45, scale_f))))
+                    elif isinstance(fe, HRFlowable):
+                        out_f.append(HRFlowable(width=fe.width, thickness=fe.thickness, color=fe.color, spaceBefore=0.5, spaceAfter=0.5))
+                    elif isinstance(fe, Paragraph):
+                        st_c = _copy_mod.copy(fe.style)
+                        st_c.fontSize = max(5.8, getattr(fe.style, 'fontSize', 9.0) * scale_f)
+                        st_c.leading = max(6.8, getattr(fe.style, 'leading', 11.0) * scale_f)
+                        st_c.spaceBefore = min(1.0, getattr(fe.style, 'spaceBefore', 0.0) * 0.25)
+                        st_c.spaceAfter = min(1.0, getattr(fe.style, 'spaceAfter', 0.0) * 0.25)
+                        out_f.append(Paragraph(fe.text, st_c))
+                    elif isinstance(fe, Table):
+                        try:
+                            for r_i in range(len(fe._cellvalues)):
+                                for c_i in range(len(fe._cellvalues[r_i])):
+                                    cell_v = fe._cellvalues[r_i][c_i]
+                                    if isinstance(cell_v, Paragraph):
+                                        st_c = _copy_mod.copy(cell_v.style)
+                                        st_c.fontSize = max(5.6, getattr(cell_v.style, 'fontSize', 8.5) * scale_f)
+                                        st_c.leading = max(6.5, getattr(cell_v.style, 'leading', 10.5) * scale_f)
+                                        st_c.spaceBefore = 0.0
+                                        st_c.spaceAfter = 0.0
+                                        fe._cellvalues[r_i][c_i] = Paragraph(cell_v.text, st_c)
+                            pad_s = max(0.4, 1.8 * scale_f)
+                            fe.setStyle(TableStyle([
+                                ('TOPPADDING', (0, 0), (-1, -1), pad_s),
+                                ('BOTTOMPADDING', (0, 0), (-1, -1), pad_s),
+                            ]))
+                        except Exception:
+                            pass
+                        out_f.append(fe)
+                    else:
+                        out_f.append(fe)
+                return out_f
+
             map_flowables = []
             map_budget_h = 0.0
             if bottom_maps:
                 map_max_h = min(avail_page_h * 0.27, (5.8 * cm if page_format == "A4" else 4.5 * cm) * max(0.75, min(1.3, img_scale_eff)))
                 map_flowables = [Spacer(1, 3)] + _build_pdf_image_grid(bottom_maps, map_max_h, forced_layout="2_cols" if len(bottom_maps) >= 2 else "auto")
-                for mf in map_flowables:
-                    try:
-                        _, mfh = mf.wrap(available_width, avail_page_h)
-                        map_budget_h += mfh
-                    except Exception:
-                        pass
+                map_budget_h = _measure_h(map_flowables)
 
-            non_photo_flowables = species_header + property_flowables + description_flowables + media_flowables
-            text_h = 0.0
-            for f_elem in non_photo_flowables:
-                try:
-                    _, fh = f_elem.wrap(available_width, avail_page_h)
-                    text_h += fh
-                except Exception:
-                    pass
+            header_h = _measure_h(species_header)
+            text_h = _measure_h(property_flowables) + _measure_h(description_flowables) + _measure_h(media_flowables)
 
             if layout_mode == "page_per_species":
-                reserved_margin = 0.65 * cm
+                reserved_margin = 0.35 * cm
                 cover_h = 0.0
                 if idx == 0 and not (include_toc and len(df) >= 2):
-                    for f_cov in story:
-                        try:
-                            _, ch = f_cov.wrap(available_width, avail_page_h)
-                            cover_h += ch + 6.0
-                        except Exception:
-                            pass
-                avail_for_photos = max(2.2 * cm, avail_page_h - cover_h - text_h - map_budget_h - reserved_margin)
-                photo_budget_h = min(avail_for_photos, avail_for_photos * min(1.0, max(0.35, 0.78 * img_scale_eff)))
+                    cover_h = _measure_h(story) + 8.0
+                max_species_h = max(4.0 * cm, inner_frame_h - cover_h - reserved_margin)
+                min_photo_h = min(3.2 * cm, max_species_h * 0.24) if display_imgs else 0.0
+
+                if (header_h + text_h + map_budget_h) > (max_species_h - min_photo_h):
+                    if bottom_maps and map_budget_h > max_species_h * 0.16:
+                        map_flowables = [Spacer(1, 1.5)] + _build_pdf_image_grid(
+                            bottom_maps, max(1.6 * cm, max_species_h * 0.15),
+                            forced_layout="2_cols" if len(bottom_maps) >= 2 else "auto"
+                        )
+                        map_budget_h = _measure_h(map_flowables)
+
+                    for _sf in (0.90, 0.80, 0.70, 0.62, 0.54):
+                        if (header_h + text_h + map_budget_h) <= (max_species_h - min_photo_h):
+                            break
+                        property_flowables = _scale_flowables_compact(property_flowables, _sf)
+                        description_flowables = _scale_flowables_compact(description_flowables, _sf)
+                        media_flowables = _scale_flowables_compact(media_flowables, _sf)
+                        text_h = _measure_h(property_flowables) + _measure_h(description_flowables) + _measure_h(media_flowables)
+                    if (header_h + text_h + map_budget_h) > (max_species_h - min_photo_h):
+                        species_header = _scale_flowables_compact(species_header, 0.82)
+                        header_h = _measure_h(species_header)
+
+                avail_for_photos = max(1.2 * cm, max_species_h - header_h - text_h - map_budget_h - 2.0)
+                photo_budget_h = min(avail_for_photos, avail_for_photos * min(1.0, max(0.35, 0.82 * img_scale_eff)))
+                photo_flowables = _build_pdf_image_grid(display_imgs, photo_budget_h, forced_layout=gallery_layout)
+                actual_photo_h = _measure_h(photo_flowables)
+                if display_imgs and (header_h + actual_photo_h + text_h + map_budget_h) > max_species_h:
+                    tight_photo_h = max(1.0 * cm, max_species_h - header_h - text_h - map_budget_h - 3.0)
+                    photo_flowables = _build_pdf_image_grid(display_imgs, tight_photo_h, forced_layout=gallery_layout)
+
             elif layout_mode == "split_images_text":
-                avail_for_photos = avail_photo_budget
-                photo_budget_h = avail_photo_budget * min(1.0, max(0.45, 0.85 * img_scale_eff))
+                avail_for_photos = max(2.5 * cm, inner_frame_h - header_h - 8.0)
+                photo_budget_h = min(avail_for_photos, avail_for_photos * min(1.0, max(0.45, 0.85 * img_scale_eff)))
+                photo_flowables = _build_pdf_image_grid(display_imgs, photo_budget_h, forced_layout=gallery_layout)
+                if display_imgs and (header_h + _measure_h(photo_flowables)) > (inner_frame_h - 4.0):
+                    photo_flowables = _build_pdf_image_grid(display_imgs, max(2.0 * cm, inner_frame_h - header_h - 8.0), forced_layout=gallery_layout)
             else:
                 base_budget = 7.2 * cm if page_format == "A4" else 5.4 * cm
                 photo_budget_h = base_budget * img_scale_eff
-
-            photo_flowables = _build_pdf_image_grid(display_imgs, photo_budget_h, forced_layout=gallery_layout)
+                photo_flowables = _build_pdf_image_grid(display_imgs, photo_budget_h, forced_layout=gallery_layout)
 
             if layout_mode == "split_images_text":
                 story.extend(species_header)
                 if photo_flowables:
+                    while photo_flowables and isinstance(photo_flowables[-1], Spacer):
+                        photo_flowables.pop()
                     story.extend(photo_flowables)
                 else:
                     story.append(Paragraph("<font color='#64748b'><i>Pro tento taxon není k dispozici žádná fotografie.</i></font>", body_style))
                 story.append(PageBreak())
 
-                story.append(Paragraph(f"{title_text} – Popis a vlastnosti", sp_title_style))
-                story.append(HRFlowable(width="100%", thickness=1.2, color=colors.HexColor("#1b4332"), spaceBefore=1, spaceAfter=5))
-                if property_flowables:
-                    story.extend(property_flowables)
-                if map_flowables:
-                    story.extend(map_flowables)
-                if description_flowables:
-                    story.extend(description_flowables)
-                if media_flowables:
-                    story.extend(media_flowables)
+                p2_head = [
+                    Paragraph(f"{title_text} – Popis a vlastnosti", sp_title_style),
+                    HRFlowable(width="100%", thickness=1.2, color=colors.HexColor("#1b4332"), spaceBefore=1, spaceAfter=5)
+                ]
+                p2_head_h = _measure_h(p2_head)
+                p2_avail_h = max(5.0 * cm, inner_frame_h - p2_head_h - 8.0)
+                if (_measure_h(property_flowables) + _measure_h(map_flowables) + _measure_h(description_flowables) + _measure_h(media_flowables)) > p2_avail_h:
+                    if bottom_maps and map_budget_h > p2_avail_h * 0.22:
+                        map_flowables = [Spacer(1, 1.5)] + _build_pdf_image_grid(
+                            bottom_maps, max(2.0 * cm, p2_avail_h * 0.20),
+                            forced_layout="2_cols" if len(bottom_maps) >= 2 else "auto"
+                        )
+                        map_budget_h = _measure_h(map_flowables)
+                    for _sf in (0.90, 0.80, 0.70, 0.62, 0.54):
+                        p2_cur_h = _measure_h(property_flowables) + map_budget_h + _measure_h(description_flowables) + _measure_h(media_flowables)
+                        if p2_cur_h <= p2_avail_h:
+                            break
+                        property_flowables = _scale_flowables_compact(property_flowables, _sf)
+                        description_flowables = _scale_flowables_compact(description_flowables, _sf)
+                        media_flowables = _scale_flowables_compact(media_flowables, _sf)
+
+                p2_items = list(p2_head) + list(property_flowables) + list(map_flowables) + list(description_flowables) + list(media_flowables)
+                while p2_items and isinstance(p2_items[-1], Spacer):
+                    p2_items.pop()
+                story.extend(p2_items)
                 if idx < len(df) - 1:
                     story.append(PageBreak())
 
             elif is_atlas_page:
                 species_story = species_header + photo_flowables + property_flowables + map_flowables + description_flowables + media_flowables
-                if (text_h + photo_budget_h + map_budget_h) <= (avail_page_h + 10):
-                    story.append(KeepTogether(species_story))
-                else:
-                    story.extend(species_story)
+                while species_story and isinstance(species_story[-1], Spacer):
+                    species_story.pop()
+                story.extend(species_story)
                 if idx < len(df) - 1:
                     story.append(PageBreak())
 
@@ -7601,25 +7807,31 @@ if st.session_state.df is not None:
         """
         <script>
         (function() {
+            function attachGuard(targetWin) {
+                if (!targetWin || targetWin.__ankiUnloadGuard) return;
+                targetWin.__ankiLastDlClickTs = 0;
+                try {
+                    targetWin.document.addEventListener('click', function(ev) {
+                        var el = ev.target && ev.target.closest ? ev.target.closest('[data-testid="stDownloadButton"], a[download], a[href*="/media/"]') : null;
+                        if (el) {
+                            targetWin.__ankiLastDlClickTs = Date.now();
+                        }
+                    }, true);
+                } catch (e) {}
+                targetWin.__ankiUnloadGuard = function(e) {
+                    if (Date.now() - (targetWin.__ankiLastDlClickTs || 0) < 5000) {
+                        return;
+                    }
+                    e.preventDefault();
+                    e.returnValue = '';
+                    return '';
+                };
+                targetWin.addEventListener('beforeunload', targetWin.__ankiUnloadGuard);
+            }
             try {
-                var w = window.parent || window;
-                if (!w.__ankiUnloadGuard) {
-                    w.__ankiUnloadGuard = function(e) {
-                        e.preventDefault();
-                        e.returnValue = '';
-                        return '';
-                    };
-                    w.addEventListener('beforeunload', w.__ankiUnloadGuard);
-                }
+                attachGuard(window.parent || window);
             } catch (err) {
-                if (!window.__ankiUnloadGuard) {
-                    window.__ankiUnloadGuard = function(e) {
-                        e.preventDefault();
-                        e.returnValue = '';
-                        return '';
-                    };
-                    window.addEventListener('beforeunload', window.__ankiUnloadGuard);
-                }
+                attachGuard(window);
             }
         })();
         </script>
@@ -7653,22 +7865,13 @@ if st.session_state.df is not None:
         """
         st.markdown(tbl_html, unsafe_allow_html=True)
 
-        @st.cache_data(show_spinner=False)
-        def _get_cached_table_exports(dataframe_obj):
-            import io
-            c_data = dataframe_obj.to_csv(index=False, encoding='utf-8-sig')
-            e_buf = io.BytesIO()
-            with pd.ExcelWriter(e_buf, engine='openpyxl') as writer:
-                dataframe_obj.to_excel(writer, index=False)
-            return c_data, e_buf.getvalue()
-
         csv_data, excel_data = _get_cached_table_exports(df)
 
         col_dummy, col_dl_right = st.columns([2.5, 1.5])
         with col_dl_right:
             c_csv, c_xlsx = st.columns(2, gap="small")
             with c_csv:
-                st.download_button(
+                _safe_download_button(
                     "Stáhnout (CSV)",
                     data=csv_data,
                     file_name="tabulka_dat.csv",
@@ -7677,7 +7880,7 @@ if st.session_state.df is not None:
                     use_container_width=True
                 )
             with c_xlsx:
-                st.download_button(
+                _safe_download_button(
                     "Stáhnout (Excel)",
                     data=excel_data,
                     file_name="tabulka_dat.xlsx",
@@ -10397,7 +10600,16 @@ if st.session_state.df is not None:
                         specific_cats = [c for c in target_cats if c in PLADIAS_CATEGORY_MAPPING and PLADIAS_CATEGORY_MAPPING[c][1] is not None]
                         general_cats = [c for c in target_cats if c in PLADIAS_CATEGORY_MAPPING and PLADIAS_CATEGORY_MAPPING[c][1] is None]
                         has_any_photo = False
+                        target_col_names = {PLADIAS_CATEGORY_MAPPING[c][0] for c in target_cats if c in PLADIAS_CATEGORY_MAPPING}
                         used_pladias_urls = set()
+                        for ex_c in row.index:
+                            if ex_c not in target_col_names and (str(ex_c).startswith("[Pladias]") or is_image_col(ex_c, row[ex_c])):
+                                ex_v = row[ex_c]
+                                if pd.notna(ex_v) and str(ex_v).strip():
+                                    for ex_part in str(ex_v).split(';'):
+                                        ex_u = ex_part.split('|')[0].strip()
+                                        if ex_u:
+                                            used_pladias_urls.add(ex_u)
                         missing_cats = []
 
                         for cat_opt in specific_cats:
@@ -10433,13 +10645,19 @@ if st.session_state.df is not None:
 
                         for cat_opt in general_cats:
                             col_name, succs = PLADIAS_CATEGORY_MAPPING[cat_opt]
-                            cat_photos = extract_pladias_category_photos(
-                                species_items,
-                                succs,
+                            cat_photos = fetch_pladias_overview_photos(
+                                raw_sp,
                                 max_photos=pladias_photos_max,
-                                fallback=False,
                                 exclude_urls=used_pladias_urls
                             )
+                            if not cat_photos:
+                                cat_photos = extract_pladias_category_photos(
+                                    species_items,
+                                    succs,
+                                    max_photos=pladias_photos_max,
+                                    fallback=False,
+                                    exclude_urls=used_pladias_urls
+                                )
                             if cat_photos:
                                 cat_photos = cat_photos[:pladias_photos_max]
                                 has_any_photo = True
@@ -11806,18 +12024,6 @@ if st.session_state.df is not None:
                                 if r_resp.status_code in (429, 502, 503, 504):
                                     time.sleep(1.2)
                                     r_resp = anki_http_session.get(req_url, headers=req_headers, timeout=(3.0, 8.0))
-                                if r_resp.status_code == 404 and 'cevs/images/taxa/' in req_url:
-                                    alt_url = req_url.replace('/taxa/large/', '/taxa/clopla/large/') if '/taxa/clopla/' not in req_url else req_url.replace('/taxa/clopla/large/', '/taxa/large/')
-                                    try:
-                                        alt_resp = anki_http_session.get(
-                                            alt_url,
-                                            headers=req_headers,
-                                            timeout=(3.0, 7.0)
-                                        )
-                                        if alt_resp.status_code == 200:
-                                            r_resp = alt_resp
-                                    except Exception:
-                                        pass
                                 if r_resp.status_code == 200 and len(r_resp.content) > 0:
                                     if mtype == 'image':
                                         if save_optimized_image(r_resp.content, local_path, max_dim=1600, quality=88):
@@ -12973,7 +13179,7 @@ if st.session_state.df is not None:
                 with st.expander("Interaktivní náhled PDF (1. položka)", expanded=True):
                     col_prev_dl, col_prev_cls = st.columns([3, 1])
                     with col_prev_dl:
-                        st.download_button(
+                        _safe_download_button(
                             label="⬇Stáhnout náhled v PDF",
                             data=st.session_state.pdf_preview_data,
                             file_name=st.session_state.get('pdf_preview_filename', 'nahled_brozury.pdf'),
@@ -13167,6 +13373,10 @@ if st.session_state.df is not None:
 
                             cache_path = os.path.join(cache_media_dir, fname)
                             if os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
+                                if mtype in ('image', 'local_image') and is_herbarium_sheet_file(cache_path):
+                                    try: os.remove(cache_path)
+                                    except Exception: pass
+                                    return fname, local_path, False
                                 try:
                                     shutil.copy2(cache_path, local_path)
                                     return fname, local_path, True
@@ -13218,17 +13428,13 @@ if st.session_state.df is not None:
                                     req_url = urllib.parse.urlunsplit(parts)
 
                                 r_resp = pdf_http_session.get(req_url, headers=req_headers, timeout=(3.0, 7.0))
-                                if r_resp.status_code == 404 and 'cevs/images/taxa/' in req_url:
-                                    alt_url = req_url.replace('/taxa/large/', '/taxa/clopla/large/') if '/taxa/clopla/' not in req_url else req_url.replace('/taxa/clopla/large/', '/taxa/large/')
-                                    try:
-                                        alt_resp = pdf_http_session.get(alt_url, headers=req_headers, timeout=(3.0, 7.0))
-                                        if alt_resp.status_code == 200:
-                                            r_resp = alt_resp
-                                    except Exception:
-                                        pass
 
                                 if r_resp.status_code == 200 and len(r_resp.content) > 0:
                                     if save_optimized_image(r_resp.content, local_path, max_dim=800, quality=80):
+                                        if is_herbarium_sheet_file(local_path):
+                                            try: os.remove(local_path)
+                                            except Exception: pass
+                                            return fname, local_path, False
                                         try: shutil.copy2(local_path, cache_path)
                                         except Exception: pass
                                         return fname, local_path, True
@@ -13616,17 +13822,13 @@ if st.session_state.df is not None:
                                         req_headers['Referer'] = 'https://dalib.cz/'
 
                                     r_img = docx_http_session.get(source_val, headers=req_headers, timeout=(3.0, 7.0))
-                                    if r_img.status_code == 404 and 'cevs/images/taxa/' in source_val:
-                                        alt_url = source_val.replace('/taxa/large/', '/taxa/clopla/large/') if '/taxa/clopla/' not in source_val else source_val.replace('/taxa/clopla/large/', '/taxa/large/')
-                                        try:
-                                            alt_resp = docx_http_session.get(alt_url, headers=req_headers, timeout=(3.0, 7.0))
-                                            if alt_resp.status_code == 200:
-                                                r_img = alt_resp
-                                        except Exception:
-                                            pass
 
                                     if r_img.status_code == 200 and len(r_img.content) > 0:
                                         if save_optimized_image(r_img.content, target_file, max_dim=1200, quality=85):
+                                            if is_herbarium_sheet_file(target_file):
+                                                try: os.remove(target_file)
+                                                except Exception: pass
+                                                return False
                                             try: shutil.copy2(target_file, cache_file)
                                             except Exception: pass
                                             return True
@@ -13716,7 +13918,7 @@ if st.session_state.df is not None:
                     _apkg_p = st.session_state.get('generated_apkg_path')
                     if _apkg_p and os.path.isfile(_apkg_p):
                         with open(_apkg_p, "rb") as _f_apkg:
-                            st.download_button(
+                            _safe_download_button(
                                 label="Stáhnout .apkg balíček pro Anki",
                                 data=_f_apkg,
                                 file_name=st.session_state.generated_apkg_filename,
@@ -13724,7 +13926,7 @@ if st.session_state.df is not None:
                                 key="download_apkg_btn"
                             )
                     else:
-                        st.download_button(
+                        _safe_download_button(
                             label="Stáhnout .apkg balíček pro Anki",
                             data=st.session_state.generated_apkg_data,
                             file_name=st.session_state.generated_apkg_filename,
@@ -13737,7 +13939,7 @@ if st.session_state.df is not None:
                     _obs_p = st.session_state.get('generated_obsidian_path')
                     if _obs_p and os.path.isfile(_obs_p):
                         with open(_obs_p, "rb") as _f_obs:
-                            st.download_button(
+                            _safe_download_button(
                                 label="Stáhnout balíček kartiček (.zip – obsahuje i index.html přehrávač)",
                                 data=_f_obs,
                                 file_name=st.session_state.get('generated_obsidian_filename', 'Studijni_Karticky.zip'),
@@ -13745,7 +13947,7 @@ if st.session_state.df is not None:
                                 key="download_obsidian_btn"
                             )
                     else:
-                        st.download_button(
+                        _safe_download_button(
                             label="Stáhnout balíček kartiček (.zip – obsahuje i index.html přehrávač)",
                             data=st.session_state.generated_obsidian_data,
                             file_name=st.session_state.get('generated_obsidian_filename', 'Studijni_Karticky.zip'),
@@ -13755,7 +13957,7 @@ if st.session_state.df is not None:
                     st.success("Balíček kartiček (.zip) je připraven. Můžete jej otevřít rovnou poklepáním na index.html uvnitř, nebo naimportovat do přehrávače či Obsidianu.")
                     k_bytes = _read_karty_html_bytes()
                     if k_bytes:
-                        st.download_button(
+                        _safe_download_button(
                             label="⬇Stáhnout samostatný přehrávač (Karty.html)",
                             data=k_bytes,
                             file_name="Karty.html",
@@ -13765,7 +13967,7 @@ if st.session_state.df is not None:
                         st.caption("Samostatný webový přehrávač (Karty.html) funguje plně offline a umožňuje pohodlné procvičování na libovolném zařízení.")
 
                 if st.session_state.generated_pdf_data is not None:
-                    st.download_button(
+                    _safe_download_button(
                         label="Stáhnout studijní brožuru (.pdf)",
                         data=st.session_state.generated_pdf_data,
                         file_name=st.session_state.generated_pdf_filename,
@@ -13775,7 +13977,7 @@ if st.session_state.df is not None:
                     st.success("PDF brožura je připravena ke stažení a tisku.")
 
                 if st.session_state.generated_docx_data is not None:
-                    st.download_button(
+                    _safe_download_button(
                         label="Stáhnout dokument Word (.docx)",
                         data=st.session_state.generated_docx_data,
                         file_name=st.session_state.generated_docx_filename,
@@ -13787,7 +13989,7 @@ if st.session_state.df is not None:
             with col_res2:
                 if st.session_state.unfound_csv_data is not None:
                     st.warning("Některé položky nebyly při obohacení nalezeny.")
-                    st.download_button(
+                    _safe_download_button(
                         label="Stáhnout seznam nenalezených položek (.csv)",
                         data=st.session_state.unfound_csv_data,
                         file_name="nenalezene_polozky.csv",
@@ -13818,7 +14020,7 @@ if st.session_state.df is not None:
             """)
             k_bytes = _read_karty_html_bytes()
             if k_bytes:
-                st.download_button(
+                _safe_download_button(
                     label="⬇Stáhnout samostatný přehrávač (Karty.html)",
                     data=k_bytes,
                     file_name="Karty.html",
@@ -13840,7 +14042,7 @@ if st.session_state.df is not None:
             """)
             br_html = _read_batch_replacer_html()
             if br_html:
-                st.download_button(
+                _safe_download_button(
                     label="⬇Stáhnout Batch Replacer (.html)",
                     data=br_html,
                     file_name="BatchReplacer.html",
@@ -13858,7 +14060,7 @@ if st.session_state.df is not None:
         col_m1, col_m2, col_m3, col_m4 = st.columns(4, gap="small")
         with col_m1:
             if pdf_gen_data:
-                st.download_button(
+                _safe_download_button(
                     "Návod: Generátor (PDF)",
                     data=pdf_gen_data,
                     file_name="O_generatoru.pdf",
@@ -13868,7 +14070,7 @@ if st.session_state.df is not None:
                 )
         with col_m2:
             if pdf_anki_data:
-                st.download_button(
+                _safe_download_button(
                     "Návod: Jak na Anki (PDF)",
                     data=pdf_anki_data,
                     file_name="O_Anki.pdf",
@@ -13878,7 +14080,7 @@ if st.session_state.df is not None:
                 )
         with col_m3:
             if 'pdf_karty_data' in locals() and pdf_karty_data:
-                st.download_button(
+                _safe_download_button(
                     "Návod: Karty.html (PDF)",
                     data=pdf_karty_data,
                     file_name="O_Karty_html.pdf",
@@ -13888,7 +14090,7 @@ if st.session_state.df is not None:
                 )
         with col_m4:
             cit_pdf_data = generate_citations_pdf()
-            st.download_button(
+            _safe_download_button(
                 "Citace zdrojů (PDF)",
                 data=cit_pdf_data,
                 file_name="Citace_a_databaze.pdf",
