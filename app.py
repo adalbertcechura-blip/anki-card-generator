@@ -1,7 +1,10 @@
 import streamlit as st
-import ui_i18n
-ui_i18n.set_lang_getter(lambda: st.session_state.get("ui_lang", "cs"))
-ui_i18n.install_streamlit_i18n(st)
+try:
+    import ui_i18n
+    ui_i18n.set_lang_getter(lambda: st.session_state.get("ui_lang", "cs"))
+    ui_i18n.install_streamlit_i18n(st)
+except ImportError:
+    ui_i18n = None
 import pandas as pd
 import requests
 import os
