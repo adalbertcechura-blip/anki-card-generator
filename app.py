@@ -1,4 +1,7 @@
 import streamlit as st
+import ui_i18n
+ui_i18n.set_lang_getter(lambda: st.session_state.get("ui_lang", "cs"))
+ui_i18n.install_streamlit_i18n(st)
 import pandas as pd
 import requests
 import os
@@ -4933,7 +4936,7 @@ def impose_booklet_pdf(input_pdf_path: str, output_pdf_path: str, sheets_per_sig
         return False
 
 ALL_AVAILABLE_CITATIONS = {
-    "Pladias.cz": "Chytrý M., Danihelka J., Kaplan Z., Koutecký P., Řezníček J., Danihelka J. et al. (2021): Pladias.cz Database of the Czech Flora and Vegetation. – Preslia 93: 1–87. (pladias.cz)",
+    "Pladias.cz": "Chytrý M., Danihelka J., Kaplan Z., Wild J. et al. (2021): Pladias Database of the Czech Flora and Vegetation. – Preslia 93: 1–87. (doi: 10.23855/preslia.2021.001, pladias.cz)",
     "Pladias.cz – Mapy rozšíření v ČR": "Wild J., Kaplan Z., Danihelka J., Petřík P., Chytrý M., Novotný P. et al. (2019): Plant distribution data for the Czech Republic integrated in the Pladias database. – Preslia 91: 1–24. (doi: 10.23855/preslia.2019.001, pladias.cz)",
     "Klíč ke květeně ČR (2019)": "Kaplan Z., Danihelka J., Chrtek J., Kirschner J., Kubát K., Štech M. & Štěpánek J. (eds) (2019): Klíč ke květeně České republiky. Ed. 2. – Academia, Praha, 1168 s.",
     "Květena ČR": "Hejný S. & Slavík B. (eds) (1988–2010): Květena České republiky. Vol. 1–8. – Academia, Praha. (ibot.cas.cz)",
@@ -7309,7 +7312,20 @@ with col_head1:
     st.markdown('<div class="main-title">Generátor kartiček Anki</div>', unsafe_allow_html=True)
     st.markdown('<div class="subtitle">Nahrajte tabulku, obohaťte ji o data přes API a sestavte líc a rub kartiček.</div>', unsafe_allow_html=True)
 with col_head2:
-    st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-top: 6px;'></div>", unsafe_allow_html=True)
+    if "ui_lang" not in st.session_state:
+        st.session_state.ui_lang = "cs"
+    lang_sel = st.radio(
+        "Jazyk / Language:",
+        options=["Čeština", "English"],
+        index=0 if st.session_state.ui_lang == "cs" else 1,
+        horizontal=True,
+        key="w_app_ui_lang_radio"
+    )
+    new_lang = "en" if lang_sel == "English" else "cs"
+    if new_lang != st.session_state.ui_lang:
+        st.session_state.ui_lang = new_lang
+        st.rerun()
     theme_sel = st.radio(
         "Vzhled aplikace:",
         options=["Světlý režim", "Tmavý režim"],
@@ -8370,10 +8386,11 @@ if st.session_state.df is not None:
                 custom_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "custom_media")
                 os.makedirs(custom_dir, exist_ok=True)
 
-                c_cust_tab0, c_cust_tab1, c_cust_tab2 = st.tabs([
+                c_cust_tab0, c_cust_tab1, c_cust_tab2, c_cust_tab3 = st.tabs([
                     "1. Průvodce: Fotky + tabulka citací (Doporučeno)",
                     "2. Jednotlivé přiřazení k druhu",
-                    "3. Rychlé párování podle názvu souboru"
+                    "3. Rychlé párování podle názvu souboru",
+                    "4. Pokročilý výběr z databází (Pladias / iNat / Wikimedia)"
                 ])
 
                 with c_cust_tab0:
@@ -8754,6 +8771,117 @@ if st.session_state.df is not None:
                         st.session_state["custom_photo_pairing_msg"] = succ_msg
                         st.toast(f"{succ_msg}")
                         st.rerun()
+
+                with c_cust_tab3:
+                    st.markdown("#### Pokročilý výběr fotografií z databází pro jednotlivé druhy")
+                    st.caption("Prohlédněte si kandidáty z Pladias.cz, iNaturalist, Wikimedia Commons nebo aktuální fotky v buňce a vyberte přesně ty, které chcete v kartičce/PDF ponechat.")
+                    if len(df) > 0 and len(columns) > 0:
+                        if "curator_row_idx" not in st.session_state:
+                            st.session_state.curator_row_idx = 0
+                        st.session_state.curator_row_idx = min(max(0, st.session_state.curator_row_idx), len(df) - 1)
+
+                        cur_nav1, cur_nav2, cur_nav3 = st.columns([0.8, 3.4, 0.8])
+                        with cur_nav1:
+                            if st.button("◀ Předchozí", key="cur_prev_btn", use_container_width=True):
+                                st.session_state.curator_row_idx = max(0, st.session_state.curator_row_idx - 1)
+                                st.rerun()
+                        with cur_nav3:
+                            if st.button("Další ▶", key="cur_next_btn", use_container_width=True):
+                                st.session_state.curator_row_idx = min(len(df) - 1, st.session_state.curator_row_idx + 1)
+                                st.rerun()
+
+                        cur_row_opts = [
+                            f"{i + 1}. {str(df.iloc[i][columns[0]]) if pd.notna(df.iloc[i][columns[0]]) else f'Řádek {i + 1}'}"
+                            for i in range(len(df))
+                        ]
+                        with cur_nav2:
+                            sel_cur_lbl = st.selectbox(
+                                "Vyberte druh / položku:",
+                                options=cur_row_opts,
+                                index=st.session_state.curator_row_idx,
+                                key="cur_row_selectbox"
+                            )
+                            new_cur_idx = cur_row_opts.index(sel_cur_lbl) if sel_cur_lbl in cur_row_opts else 0
+                            st.session_state.curator_row_idx = new_cur_idx
+
+                        cur_idx = st.session_state.curator_row_idx
+                        cur_sp_name = str(df.iloc[cur_idx][columns[0]]).strip() if pd.notna(df.iloc[cur_idx][columns[0]]) else ""
+
+                        img_col_cands = [c for c in columns if check_col_is_image(c, df) or is_image_col(c)]
+                        for def_ic in ["[Pladias] Fotky", "[Pladias] Celá rostlina", "[Pladias] Květ", "[Pladias] List", "[iNat] Obrázky (URL)", "[Wikimedia] Obrázky (URL)", "[Vlastní] Fotografie"]:
+                            if def_ic not in img_col_cands:
+                                img_col_cands.append(def_ic)
+
+                        cur_c1, cur_c2, cur_c3 = st.columns([1.8, 1.8, 1.0])
+                        with cur_c1:
+                            cur_target_col = st.selectbox("Cílový sloupec v tabulce:", options=img_col_cands, key="cur_target_col_sel")
+                        with cur_c2:
+                            cur_src_opts = [
+                                "Pladias.cz (všechny fotky v pořadí)",
+                                "Pladias.cz – Celá rostlina (habitus)",
+                                "Pladias.cz – Květ / květenství",
+                                "Pladias.cz – List",
+                                "Pladias.cz – Plod / semeno",
+                                "iNaturalist",
+                                "Wikimedia Commons",
+                                "Aktuální fotky v buňce"
+                            ]
+                            cur_src_choice = st.selectbox("Zdroj kandidátů:", options=cur_src_opts, key="cur_src_sel")
+                        with cur_c3:
+                            cur_limit = st.slider("Kandidátů:", 3, 12, 6, key="cur_cand_limit")
+
+                        existing_cell_val = str(df.iloc[cur_idx].get(cur_target_col, "")) if cur_target_col in df.columns and pd.notna(df.iloc[cur_idx].get(cur_target_col, "")) else ""
+                        existing_entries = [e.strip() for e in existing_cell_val.split(";") if e.strip()]
+                        existing_urls = {e.split("|")[0].strip() for e in existing_entries}
+
+                        cur_cache_key = f"{cur_idx}|{cur_sp_name}|{cur_src_choice}|{cur_limit}"
+                        if st.button("Načíst náhledy kandidátů", key="btn_cur_load_cands") or (cur_src_choice == "Aktuální fotky v buňce"):
+                            loaded_cands = []
+                            if cur_src_choice == "Aktuální fotky v buňce":
+                                loaded_cands = list(existing_entries)
+                            elif cur_sp_name:
+                                sp_q = re.sub(r'\s*\(.*?\)\s*', ' ', cur_sp_name).strip()
+                                sp_q = re.sub(r'\s+sp(p)?\.?$', '', sp_q).strip()
+                                if cur_src_choice == "Pladias.cz (všechny fotky v pořadí)":
+                                    loaded_cands = fetch_pladias_overview_photos(sp_q, max_photos=cur_limit)
+                                elif cur_src_choice.startswith("Pladias.cz – "):
+                                    cat_lbl = cur_src_choice.replace("Pladias.cz – ", "")
+                                    succ_set = PLADIAS_CATEGORY_MAPPING.get(cat_lbl, ("", None))[1]
+                                    all_p_items = fetch_pladias_species_images(sp_q)
+                                    loaded_cands = extract_pladias_category_photos(all_p_items, succ_set, max_photos=cur_limit, fallback=True)
+                                elif cur_src_choice == "iNaturalist":
+                                    loaded_cands = fetch_inaturalist_data(sp_q, max_photos=cur_limit).get("photo_urls", [])
+                                elif cur_src_choice == "Wikimedia Commons":
+                                    loaded_cands = fetch_wikimedia_images(sp_q, max_photos=cur_limit)
+                            st.session_state["curator_loaded_key"] = cur_cache_key
+                            st.session_state["curator_loaded_cands"] = loaded_cands
+
+                        cands_to_show = st.session_state.get("curator_loaded_cands", []) if st.session_state.get("curator_loaded_key") == cur_cache_key else []
+                        if cands_to_show:
+                            st.markdown(f"**Vyberte fotografie pro `{cur_sp_name}` → `{cur_target_col}`:**")
+                            chosen_entries = []
+                            grid_cols = st.columns(3)
+                            for ci, c_entry in enumerate(cands_to_show):
+                                c_url = c_entry.split("|")[0].strip()
+                                c_attr = c_entry.split("|")[1].strip() if "|" in c_entry else ""
+                                with grid_cols[ci % 3]:
+                                    try:
+                                        st.image(c_url, use_container_width=True)
+                                    except Exception:
+                                        st.caption(c_url)
+                                    is_def_chk = (c_url in existing_urls) or (not existing_urls and ci == 0)
+                                    if st.checkbox(f"Vybrat #{ci + 1}" + (f" ({c_attr[:22]})" if c_attr else ""), value=is_def_chk, key=f"cur_chk_{cur_idx}_{hashlib.md5(c_entry.encode('utf-8')).hexdigest()[:8]}"):
+                                        chosen_entries.append(c_entry)
+
+                            if st.button("Uložit vybrané fotky pro tento druh", key="btn_cur_save_sel", type="primary"):
+                                if cur_target_col not in st.session_state.df.columns:
+                                    st.session_state.df[cur_target_col] = ""
+                                st.session_state.df[cur_target_col] = st.session_state.df[cur_target_col].astype(object)
+                                st.session_state.df.iat[cur_idx, st.session_state.df.columns.get_loc(cur_target_col)] = ";".join(chosen_entries)
+                                st.success(f"Uloženo {len(chosen_entries)} fotografií pro **{cur_sp_name}** do sloupce **{cur_target_col}**.")
+                                st.rerun()
+                        elif cur_src_choice != "Aktuální fotky v buňce":
+                            st.info("Klikněte na **Načíst náhledy kandidátů** pro zobrazení dostupných fotografií ze zvoleného zdroje.")
 
         st.markdown("---")
 
