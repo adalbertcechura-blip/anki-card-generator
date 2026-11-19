@@ -8695,27 +8695,60 @@ if st.session_state.df is not None:
                         if "[Vlastní] Fotografie" not in st.session_state.df.columns:
                             st.session_state.df["[Vlastní] Fotografie"] = ""
 
+                        def _norm_batch_txt(val_s):
+                            s_n = unicodedata.normalize('NFKD', str(val_s or '')).encode('ascii', 'ignore').decode('ascii').lower()
+                            return re.sub(r'\s+', ' ', re.sub(r'[^a-z0-9]+', ' ', s_n)).strip()
+
+                        row_candidates = []
+                        for r_idx, r_val in enumerate(st.session_state.df[columns[0]]):
+                            rc = _norm_batch_txt(r_val)
+                            if rc:
+                                row_candidates.append((r_idx, r_val, rc))
+
                         for up_f in uploaded_batch_photos:
-
                             f_stem = os.path.splitext(up_f.name)[0]
-                            f_clean = re.sub(r'[^a-zA-Z0-9]', ' ', f_stem).strip().lower()
+                            f_clean = _norm_batch_txt(f_stem)
+                            if not f_clean:
+                                continue
 
-                            for r_idx, r_val in enumerate(st.session_state.df[columns[0]]):
-                                r_clean = re.sub(r'[^a-zA-Z0-9]', ' ', str(r_val)).strip().lower()
-                                if r_clean and (r_clean in f_clean or f_clean in r_clean or f_clean.startswith(r_clean.split()[0])):
-                                    dest_fn = f"batch_{slugify(str(r_val))[:20]}_{up_f.name}"
-                                    dest_path = os.path.join(custom_dir, dest_fn)
-                                    with open(dest_path, "wb") as f_out:
-                                        f_out.write(up_f.getvalue())
-
-                                    entry = f"{dest_path}|{batch_caption.strip()}"
-                                    curr_val = str(st.session_state.df.at[r_idx, "[Vlastní] Fotografie"]).strip()
-                                    if curr_val and curr_val != "nan":
-                                        st.session_state.df.at[r_idx, "[Vlastní] Fotografie"] = f"{curr_val}; {entry}"
-                                    else:
-                                        st.session_state.df.at[r_idx, "[Vlastní] Fotografie"] = entry
-                                    matched_count += 1
+                            matched_row = None
+                            # 1. Přesná shoda celého názvu (od nejdelšího názvu)
+                            for r_idx, r_val, r_clean in sorted(row_candidates, key=lambda x: len(x[2]), reverse=True):
+                                if re.search(r'(?:^|\s)' + re.escape(r_clean) + r'(?:\s|$)', f_clean):
+                                    matched_row = (r_idx, r_val)
                                     break
+                            # 2. Shoda binomického jména (Rod druh)
+                            if matched_row is None:
+                                for r_idx, r_val, r_clean in row_candidates:
+                                    r_words = r_clean.split()
+                                    if len(r_words) >= 2:
+                                        binom = f"{r_words[0]} {r_words[1]}"
+                                        if re.search(r'(?:^|\s)' + re.escape(binom) + r'(?:\s|$)', f_clean):
+                                            matched_row = (r_idx, r_val)
+                                            break
+                            # 3. Jednoslovná položka nebo název souboru bez druhového epiteta
+                            if matched_row is None:
+                                f_words = f_clean.split()
+                                for r_idx, r_val, r_clean in row_candidates:
+                                    r_words = r_clean.split()
+                                    if (len(r_words) == 1 or len(f_words) == 1) and (r_clean in f_clean or f_clean in r_clean):
+                                        matched_row = (r_idx, r_val)
+                                        break
+
+                            if matched_row is not None:
+                                r_idx, r_val = matched_row
+                                dest_fn = f"batch_{slugify(str(r_val))[:20]}_{up_f.name}"
+                                dest_path = os.path.join(custom_dir, dest_fn)
+                                with open(dest_path, "wb") as f_out:
+                                    f_out.write(up_f.getvalue())
+
+                                entry = f"{dest_path}|{batch_caption.strip()}"
+                                curr_val = str(st.session_state.df.at[r_idx, "[Vlastní] Fotografie"]).strip()
+                                if curr_val and curr_val != "nan":
+                                    st.session_state.df.at[r_idx, "[Vlastní] Fotografie"] = f"{curr_val}; {entry}"
+                                else:
+                                    st.session_state.df.at[r_idx, "[Vlastní] Fotografie"] = entry
+                                matched_count += 1
 
                         succ_msg = f"Hromadné párování dokončeno! Úspěšně přiřazeno {matched_count} z {len(uploaded_batch_photos)} fotografií."
                         st.session_state["custom_photo_pairing_msg"] = succ_msg
