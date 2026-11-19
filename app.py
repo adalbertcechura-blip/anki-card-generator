@@ -4640,11 +4640,25 @@ def smart_merge_apkg_and_excel(apkg_df, table_df, keep_only_table=False):
     return merged_df, matched_count, len(table_df) - matched_count, unmatched_apkg_count
 
 def auto_match_columns(table_cols, apkg_cols):
-\
-\
-\
-\
-\
+    """Automaticky spáruje sloupce tabulky se sloupci importovaného .apkg balíčku."""
+    def normalize_col_key(c_name):
+        if not c_name:
+            return ""
+        s = str(c_name).strip()
+        s = re.sub(r'^\[[^\]]+\]\s*', '', s)
+        s = unicodedata.normalize('NFKD', s).encode('ascii', 'ignore').decode('ascii').lower()
+        return re.sub(r'[^a-z0-9]+', '', s)
+
+    SYNONYM_GROUPS = [
+        {"druh", "taxon", "species", "vedeckenazev", "vedeckynazev", "vedeckeimeno", "vedeckejmeno", "latina", "latinsky", "latinskenazev", "latinskynazev", "latinskejmeno", "scientificname", "binomial"},
+        {"ceskenazev", "ceskynazev", "ceskejmeno", "cesky", "cz", "czechname", "commonname"},
+        {"celed", "family"},
+        {"rad", "order"},
+        {"foto", "fotky", "obrazek", "obrazky", "image", "images", "photo", "photos", "celarostlina", "habitus"},
+        {"popis", "popisdruhu", "description", "desc", "poznamka", "poznamky", "notes"},
+        {"mapa", "maparozsireni", "mapapozorovani", "map"},
+        {"odkaz", "url", "link", "profil", "profiltaxonu"},
+    ]
 
     mapping = {}
     used_apkg = set()
@@ -4652,9 +4666,11 @@ def auto_match_columns(table_cols, apkg_cols):
 
     for tc in table_cols:
         norm_tc = normalize_col_key(tc)
-        if not norm_tc: continue
+        if not norm_tc:
+            continue
         for ac in clean_apkg:
-            if ac in used_apkg: continue
+            if ac in used_apkg:
+                continue
             norm_ac = normalize_col_key(ac)
             if norm_tc == norm_ac:
                 mapping[tc] = ac
@@ -4662,15 +4678,27 @@ def auto_match_columns(table_cols, apkg_cols):
                 break
 
     for tc in table_cols:
-        if tc in mapping: continue
+        if tc in mapping:
+            continue
         norm_tc = normalize_col_key(tc)
-        if not norm_tc: continue
+        if not norm_tc:
+            continue
 
         matched_group = None
         for group in SYNONYM_GROUPS:
             if norm_tc in group:
                 matched_group = group
                 break
+        if matched_group:
+            for ac in clean_apkg:
+                if ac in used_apkg:
+                    continue
+                if normalize_col_key(ac) in matched_group:
+                    mapping[tc] = ac
+                    used_apkg.add(ac)
+                    break
+
+    return mapping
 
 def check_col_is_image(col, df=None):
 
