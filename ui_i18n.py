@@ -479,6 +479,218 @@ CZ_TO_EN = {
     "Střední (16px)": "Medium (16px)",
     "Velké (20px)": "Large (20px)",
     "Obrovské (24px)": "Huge (24px)",
+
+    # Additional UI strings, presets, sample categories, module labels & multi-line help blocks
+    "Rub": "Back",
+    "⬇Stáhnout Batch Replacer (.html)": "⬇ Download Batch Replacer (.html)",
+    "Pladias.cz taxonomie": "Pladias.cz Taxonomy",
+    "Odkaz na profil na Pladias.cz": "Link to Pladias.cz Profile",
+    "Popis druhu a vlastnosti z Pladias.cz": "Species Description & Traits from Pladias.cz",
+    "Odkaz na profil na dalib.cz": "Link to dalib.cz Profile",
+    "GBIF fotky - Zoologie": "GBIF Photos - Zoology",
+    "Přesunout na začátek": "Move to start",
+    "Posunout o 1 výše": "Move up 1",
+    "Posunout o 1 níže": "Move down 1",
+    "Přesunout na konec": "Move to end",
+    "Celá rostlina (habitus)": "Whole plant (habit)",
+    "Květ / květenství": "Flower / inflorescence",
+    "Herbář / sken (Clo-Pla)": "Herbarium / scan (Clo-Pla)",
+    "Všechny fotky dohromady (obecný sloupec)": "All photos combined (general column)",
+    "Vyberte části rostliny...": "Select plant parts...",
+    "Každá vybraná kategorie vytvoří v tabulce vlastní samostatný sloupec (např. [Pladias] Květ, [Pladias] List). Můžete je pak na kartičce libovolně umístit na líc či rub.": "Each selected category creates its own column in the table (e.g., [Pladias] Flower, [Pladias] Leaf). You can place them freely on the front or back of cards.",
+    "Pokud je vypnuto (doporučeno), do sloupce se načtou výhradně fotografie dané části rostliny. Pokud je zapnuto a rostlina danou část vyfocenu nemá, použije se náhradní dostupná fotografie.": "When off (recommended), only photos of that specific plant part are loaded. When on, a fallback photo is used if that part has no photo.",
+    "iNaturalist (mapa pozorování)": "iNaturalist (observation map)",
+    "DaLiBor (atlas lišejníků)": "DaLiBor (lichen atlas)",
+    "Čeština": "Čeština",
+    "Balíček Anki": "Anki Package",
+    "Můžete nahrát tabulku i balíček Anki současně. Program je inteligentně sloučí a zachová historii učení!": "You can upload a table and an Anki package at the same time. The app will merge them and preserve your study history!",
+    "Např.:\nPlantago lanceolata\nBellis perennis\nTaraxacum officinale": "E.g.:\nPlantago lanceolata\nBellis perennis\nTaraxacum officinale",
+    "Všechny kategorie dohromady (29 položek)": "All categories combined (29 items)",
+    "Kytky (3 položky)": "Plants (3 items)",
+    "Houby (3 položky)": "Fungi (3 items)",
+    "Mechy (3 položky)": "Bryophytes (3 items)",
+    "Lišejníky (3 položky)": "Lichens (3 items)",
+    "Řasy (2 položky)": "Algae (2 items)",
+    "Hmyz (3 položky)": "Insects (3 items)",
+    "Ptáci (3 položky)": "Birds (3 items)",
+    "Ostatní živočichové (3 položky)": "Other animals (3 items)",
+    "Státy (3 položky)": "Countries (3 items)",
+    "Slovíčka (3 položky)": "Vocabulary (3 items)",
+    "Upravte libovolné textové informace (včetně sloupců z Pladias.cz jako Popis druhu, Listy, Plod apod.) buď jednotlivě v poli níže, nebo hromadně v tabulce.": "Edit any text fields (including Pladias.cz columns like Description, Leaves, Fruit, etc.) either individually below or in bulk in the table.",
+    "Vymaže všechny duplicitní řádky podle prvního sloupce": "Removes all duplicate rows based on the first column",
+    "Odstraní subsp., var., agg. a automaticky sloučí vzniklé duplicity": "Strips subsp., var., agg. and automatically merges resulting duplicates",
+    "Co znamená převod na druhovou úroveň?": "What does converting to species level mean?",
+    """**Co tato funkce dělá?**
+                    * Odstraní ze jmen taxonů poddruhy (`subsp.`, `ssp.`), variety (`var.`), formy (`f.`), agregáty (`agg.`), sekce (`sect.`) apod.
+                    * Ponechá pouze základní binomické jméno (*Rod + druh*).
+
+                    **Proč to použít?**
+                    * Mezinárodní databáze (GBIF, POWO Kew, Animal Diversity Web, Wikipedie) často lokální středoevropské poddruhy neznají, ale pro základní druh najdou kompletní fotografie, popisy a mapy.
+                    * Po převodu aplikace **automaticky sloučí duplicitní řádky**, takže v tabulce nezůstane stejný druh dvakrát.""": """**What does this do?**
+                    * Strips subspecies (`subsp.`, `ssp.`), varieties (`var.`), forms (`f.`), aggregates (`agg.`), sections (`sect.`), etc. from taxon names.
+                    * Keeps only the base binomial name (*Genus + species*).
+
+                    **Why use it?**
+                    * International databases (GBIF, POWO Kew, Animal Diversity Web, Wikipedia) often lack local subspecies, but have complete photos, descriptions, and maps for the base species.
+                    * After conversion, the app **automatically merges duplicate rows** so the same species never appears twice.""",
+    "Jména byla úspěšně převedena na druhovou úroveň.": "Names were successfully converted to species level.",
+    "Umožňuje sjednotit nebo převést vědecká jména na platnou nomenklaturu (např. Pladias $\\leftrightarrow$ iNaturalist, stará synonyma na platná jména) pomocí dvousloupcové převodní tabulky (CSV nebo Excel).": "Allows unifying or converting scientific names to accepted nomenclature (e.g., Pladias ↔ iNaturalist, old synonyms to accepted names) using a two-column conversion table (CSV or Excel).",
+    "Klíč ke květeně ČR (Kaplan et al. 2019)": "Key to the Flora of the Czech Republic (Kaplan et al. 2019)",
+    "Chytré párování (všechna synonyma: Klíč 2019, Danihelka 2012 i Final)": "Smart matching (all synonyms: Key 2019, Danihelka 2012 & Final)",
+    "Pokud název není nalezen v lokálním checklistu, vyhledá jeho platný mezinárodní status v taxonomických databázích.": "If a name is not found in the local checklist, looks up its accepted international status in taxonomic databases.",
+    "1. **Nahrajete soubory fotografií** (hromadně např. 30 souborů).\n2. **Nahrajete tabulku se zdroji** (`Soubor; Autor`) a spárujete je mezi sebou.\n3. **Přiřadíte spárované fotografie do hlavní tabulky dat**.": "1. **Upload photo files** (in bulk, e.g. 30 files).\n2. **Upload a citations table** (`File; Author`) and pair them together.\n3. **Assign the paired photos to the main data table**.",
+    "1. Automaticky: podle názvu druhu v souboru / tabulce zdrojů": "1. Automatically: by species name in filename / citations table",
+    "2. Podle sloupce se jmény souborů v hlavní tabulce": "2. By filename column in the main table",
+    "Vlastní foto": "Own photo",
+    "Můžete vybrat i více fotek najednou – všechny se připojí k tomuto druhu.": "You can select multiple photos at once – all of them will be attached to this species.",
+    "Nahrajte více fotografií najednou. Aplikace automaticky spáruje název souboru (např. `Polytrichum_formosum.jpg` nebo `sedmikraska.png`) s odpovídajícím druhem v tabulce.": "Upload multiple photos at once. The app will automatically match each filename (e.g. `Polytrichum_formosum.jpg` or `daisy.png`) to the corresponding species in the table.",
+    "Kytky (Botanika) – Jednoduchý mód (foto na líci; jména, čeleď a odkaz na rubu)": "Plants (Botany) – Simple mode (photo on front; names, family & link on back)",
+    "Kytky (Botanika) – Pokročilý mód (všechny zdroje: habitus/květ/list, mapa ČR, Květena ČR, AOPK, Ellenberg, Biotopy...)": "Plants (Botany) – Advanced mode (all sources: habit/flower/leaf, CZ map, Flora of CZ, AOPK, Ellenberg, Habitats...)",
+    "Houby – Jednoduchý mód (foto na líci; jména, čeleď a profil na rubu)": "Fungi – Simple mode (photo on front; names, family & profile on back)",
+    "Houby – Pokročilý mód (Mykologie.net popis/jedlost, Mushroom Color Atlas, Červený seznam, GBIF...)": "Fungi – Advanced mode (Mykologie.net description/edibility, Mushroom Color Atlas, Red List, GBIF...)",
+    "Mechorosty – Jednoduchý mód (foto na líci; jména, čeleď a odkaz na rubu)": "Bryophytes – Simple mode (photo on front; names, family & link on back)",
+    "Mechorosty – Pokročilý mód (Mechorosty ČR popis/ekologie, Červený seznam, GBIF...)": "Bryophytes – Advanced mode (Bryophytes CZ description/ecology, Red List, GBIF...)",
+    "Lišejníky – Jednoduchý mód (foto na líci; jména, čeleď a odkaz DaLiBor na rubu)": "Lichens – Simple mode (photo on front; names, family & DaLiBor link on back)",
+    "Lišejníky – Pokročilý mód (DaLiBor foto/profil/ekologie/chemismus, Červený seznam, GBIF...)": "Lichens – Advanced mode (DaLiBor photo/profile/ecology/chemistry, Red List, GBIF...)",
+    "Řasy & Rozsivky – Jednoduchý mód (foto na líci; jména, čeleď a odkaz na rubu)": "Algae & Diatoms – Simple mode (photo on front; names, family & link on back)",
+    "Řasy & Rozsivky – Pokročilý mód (DiatomBase/AlgaeBase taxonomie WoRMS, popis, iNat...)": "Algae & Diatoms – Advanced mode (DiatomBase/AlgaeBase WoRMS taxonomy, description, iNat...)",
+    "Zoologie – Jednoduchý mód (foto na líci; jména, čeleď a odkaz na rubu)": "Zoology – Simple mode (photo on front; names, family & link on back)",
+    "Zoologie – Pokročilý mód (foto, hlasy ptáků Xeno-canto, Červený seznam živočichů, GBIF, Wikipedia...)": "Zoology – Advanced mode (photos, Xeno-canto bird sounds, Animal Red List, GBIF, Wikipedia...)",
+    "Jednoduchý mód zapne fotografie na líci a základní identifikační údaje s odkazem na rubu. Pokročilý mód aktivuje veškeré dostupné odborné registry a popisy pro danou kategorii.": "Simple mode enables photos on the front and basic identification info + link on the back. Advanced mode activates all available specialist databases and descriptions for the category.",
+    "Hromadně nastaví maximální limit fotografií pro všechny povolené fotomoduly (Pladias.cz, iNaturalist, GBIF, Mykologie, DaLiBor...)": "Sets the maximum photo limit across all enabled photo modules at once (Pladias.cz, iNaturalist, GBIF, Mykologie, DaLiBor...)",
+    "Vygeneruje přímý odkaz a živou mapu pozorování druhu z iNaturalist s možností vlastního územního filtru.": "Generates a direct link and live iNaturalist observation map for the species with an optional regional filter.",
+    "Česká republika (celá ČR)": "Czech Republic (entire CZ)",
+    "Celý svět (bez filtru)": "Worldwide (no filter)",
+    "Vlastní území (okres, město, NP...)": "Custom region (district, city, national park...)",
+    "Celá ČR (bez oříznutí)": "Entire CZ (uncropped)",
+    "Vlastní území (okres, město, CHKO...)": "Custom region (district, city, PLA...)",
+    "Doplní vědecké taxonomické zařazení z globální databáze GBIF do sloupců [GBIF] Říše, [GBIF] Kmen atd.": "Fills scientific taxonomic classification from GBIF into [GBIF] Kingdom, [GBIF] Phylum, etc.",
+    "Vyhledá a doplní vědecké jméno druhu i ze zadaného českého jména a uloží jej do sloupce [GBIF] Vědecké jméno.": "Looks up the scientific species name even from a Czech name and saves it to [GBIF] Scientific Name.",
+    "Sloupec s vyhledávaným slovem pro obrázek": "Column with search term for image",
+    "Stáhne českou botanickou taxonomii z portálu Pladias.cz (Klíč / Květena ČR / Danihelka 2012) odpovídající českému školnímu pensu.": "Downloads Czech botanical taxonomy from Pladias.cz (Flora of CZ / Danihelka 2012).",
+    "Uloží oficiální české jméno rostliny z portálu Pladias.cz do sloupce [Pladias] České jméno a doplní jej i do prázdných položek sloupce České jméno.": "Saves the official Czech plant name from Pladias.cz to [Pladias] Czech Name and fills empty cells in Czech Name.",
+    "Stáhne podrobný botanický popis a morfologické vlastnosti (habitus, výška, list, květ, plod, kvetení) z portálu Pladias.cz.": "Downloads detailed botanical description and morphological traits (habit, height, leaf, flower, fruit, flowering) from Pladias.cz.",
+    "Každá vybraná vlastnost se uloží do vlastního sloupce (např. [Pladias.cz] Doba kvetení, [Pladias.cz] Životní forma), případně je můžete stáhnout všechny najednou do jednoho obecného sloupce.": "Each selected trait is saved to its own column (e.g., [Pladias.cz] Flowering time, [Pladias.cz] Life form), or you can download all into one general column.",
+    "Dohledá vědecké jméno houby přímo z Mykologie.net a uloží do sloupce [Mykologie.net] Vědecké jméno.": "Looks up the fungal scientific name directly from Mykologie.net and saves it to [Mykologie.net] Scientific Name.",
+    "Obohatí tabulku o odkaz na mezinárodní registr Mushroom Color Atlas (včetně popisu barevné palety a pigmentů) u barvířských druhů hub.": "Enriches the table with a link to Mushroom Color Atlas (including color palette and pigments) for dye fungi.",
+    "Dohledá taxonomické zařazení (třída > řád > čeleď), platný vědecký taxon a autoritu pro rozsivky, řasy i sinice.": "Looks up taxonomic classification (class > order > family), accepted taxon, and authority for diatoms, algae, and cyanobacteria.",
+    "Sloupec s textem k překladu": "Column with text to translate",
+    "Sloupec s vědeckým názvem pro hlasové audio": "Column with scientific name for voice audio",
+    "Sloupec s textem k namluvení": "Column with text for speech synthesis",
+    "Sloupec s anglickým slovem k definici": "Column with English word to define",
+    "Sloupec s názvem státu (česky nebo anglicky)": "Column with country name (Czech or English)",
+    "Pokud sloupec nebo buňka již obsahuje informace (např. z importovaného balíčku nebo tabulky), stahování se pro daný druh přeskočí a stávající hodnota zůstane zachována.": "If a column or cell already has data (e.g. from an imported deck or table), fetching is skipped for that species and the existing value is preserved.",
+    "Nastaví pořadí nových karet (due = 1, 2, 3...) při importu do Anki.": "Sets the order of new cards (due = 1, 2, 3...) when importing into Anki.",
+    "Např.: Poznávačka rostlin České republiky: základní pensum druhů pro studenty...\nAutoři: ...": "E.g.: Flora of Central Europe: core species list for students...\nAuthors: ...",
+    "Text se zobrazí na úvodní obrazovce balíčku v Anki. Můžete sem uvést název předmětu, autory, účel balíčku atd.": "Displayed on the deck overview screen in Anki. You can include course name, authors, deck purpose, etc.",
+    "Zaškrtněte, pokud chcete v Anki vytvořit nový samostatný balíček a předejít přeskočení karet kvůli předchozím importům.": "Check to create a separate new deck in Anki and prevent cards from being skipped due to previous imports.",
+    "Po vytvoření .apkg rovnou vygeneruje i .zip balíček pro Obsidian a webový přehrávač Karty.html se stejným nastavením líce, rubu a stylů.": "Immediately generates a .zip package for Obsidian and Karty.html web player with the same front/back layout and styles right after .apkg.",
+    "Otevřít profil na Pladias.cz": "Open Pladias.cz profile",
+    "Otevřít profil na Mykologie.net": "Open Mykologie.net profile",
+    "Otevřít profil na DaLiBor": "Open DaLiBor profile",
+    "Otevřít profil na DiatomBase": "Open DiatomBase profile",
+    "Otevřít vyhledávání na AlgaeBase": "Open AlgaeBase search",
+    "Otevřít profil na Wikipedii": "Open Wikipedia profile",
+    "Vygenerovaný **.zip** balíček můžete otevřít **přímo v telefonu nebo PC** pomocí samostatného přehrávače (**Karty.html / index.html** uvnitř balíčku), nebo jej otevřít v bezplatné aplikaci **Obsidian** s doplňkem *Spaced Repetition*. Obě varianty jsou 100% zdarma, fungují offline a pamatují si postup učení!": "You can open the generated **.zip** package **directly on your phone or PC** using the standalone player (**Karty.html / index.html** inside the archive), or in the free **Obsidian** app with the *Spaced Repetition* plugin. Both are 100% free, work offline, and track your study progress!",
+    "Zkopíruje aktuálně vybrané sloupce líce, rubu, jejich pořadí a stylování z 1. záložky (Anki) do Obsidianu.": "Copies the currently selected front/back columns, order, and styling from Tab 1 (Anki) to Obsidian.",
+    "Jednosměrné používá '?' a zkouší vás z líce na rub (např. z fotky na název a popis). Obousměrné používá '??' a vytvoří z každého druhu dvě kartičky.": "One-way uses '?' and tests front → back (e.g. photo to name and description). Two-way uses '??' and creates two cards per species.",
+    "**Tip ke stažení:** Samostatný soubor přehrávače si můžete stáhnout níže v rozbalovací záložce **Doplňkové nástroje** (nebo využít soubor `index.html` zabalený přímo v exportovaném .zip archivu).": "**Download tip:** You can download the standalone player below in **Additional Tools** (or use `index.html` bundled inside the exported .zip archive).",
+    "Po vytvoření .zip balíčku pro Obsidian rovnou vygeneruje i .apkg balíček pro Anki se stejným rozvržením líce, rubu a formátováním.": "Immediately generates an Anki .apkg package with the same front/back layout and formatting right after the Obsidian .zip.",
+    "Do tabulky vlastností": "Into properties table",
+    "Jako samostatný text": "As standalone text",
+    "Kurzívou (italic)": "Italic",
+    "Normální (výchozí)": "Normal (default)",
+    "Tučná kurzíva": "Bold italic",
+    "Tučně (bold)": "Bold",
+    "Např.: Studijní materiál a přehled druhů pro studenty botaniky • Přírodovědecká fakulta\nAutoři: ...": "E.g.: Study material and species overview for botany students • Faculty of Science\nAuthors: ...",
+    "Zvolte sloupec, který se má použít jako hlavní název/nadpis položky v záhlaví každé stránky a v obsahu.": "Select the column used as the main item heading on each page and in the table of contents.",
+    "Při zaškrtnutí zobrazí za vybraným názvem i původní název (pouze pokud se neduplikuje).": "When checked, displays the original name in parentheses after the selected heading (if not identical).",
+    "1 sloupec (na celou šířku – zabrání přetékání řádků)": "1 column (full width – prevents line wrapping)",
+    "2 sloupce (vedle sebe – úspornější)": "2 columns (side by side – more compact)",
+    "1 sloupec poskytuje dostatek místa na celou šířku stránky a zabraňuje zalomení delších názvů na dva řádky.": "1 column provides full page width and prevents longer names from wrapping onto two lines.",
+    "Kompaktní: šetří papír. 1 druh na stránku: ucelený atlasový list. Dvojstrana pro taxon: na jedné stránce velká fotogalerie, na protilehlé stránce kompletní popis, vlastnosti a QR kódy.": "Compact: saves paper. 1 species per page: complete atlas sheet. 2-page spread: large photo gallery on one page, full description, traits, and QR codes on the facing page.",
+    "Plynulé nastavení velikosti veškerého textu v PDF brožuře.": "Smoothly adjusts the size of all text in the PDF booklet.",
+    "Standardní: běžné stránky za sebou. Sešitová vazba: vytvoří tiskové archy (2 strany na list), které po oboustranném tisku stačí přeložit napůl a sešít na hřbetu. Knižní vazba: rozdělí tisk do knihařských složek po 6 nebo 8 listech pro vazbu knih.": "Standard: sequential pages. Saddle-stitch booklet: creates imposed sheets (2 pages per sheet) ready to fold in half and staple. Book signatures: splits print into 6- or 8-sheet signatures for bookbinding.",
+    "Plynulé nastavení velikosti fotografií. Vyšší hodnoty maximálně využijí volnou plochu stránky.": "Smoothly adjusts photo size. Higher values maximize use of available page space.",
+    "Zajišťuje, že se mapy rozšíření ČR a pozorování iNaturalist nevynechají na úkor fotografií. Při volbě 'Až 6' se zobrazí až 4 fotografie i obě mapy současně.": "Ensures CZ distribution maps and iNaturalist observation maps are not omitted in favor of photos. With 'Up to 6', up to 4 photos plus both maps are shown.",
+    "Pokud je volba zapnuta, u vybraných odkazů a zvukových nahrávek se vytvoří interaktivní QR kódy. Pokud je vypnuta, odkazy se vypíší jako běžný text a QR kódy se nevytvářejí.": "When enabled, interactive QR codes are generated for links and audio recordings. When disabled, links are printed as plain text.",
+    "Např.: Výukový materiál a atlas druhů pro studenty biologie • Přírodovědecká fakulta": "E.g.: Study guide and species atlas for biology students • Faculty of Science",
+    "Zvolte sloupec pro hlavní název položky ve Wordu a v obsahu.": "Select the column used as the main item heading in Word and the table of contents.",
+    "Vymazat historii vygenerovaných souborů": "Clear generated files history",
+    """**1. Proč se tato hláška v programu Anki objevuje?**
+                Generátor vytváří balíčky kompatibilní s moderním standardem Anki (Anki 23 a 24+). Pokud máte na počítači nainstalou starší verzi Anki (např. 2.1.x z minulých let), Anki zobrazí výzvu k aktualizaci.""": "",
+    """**1. Proč se tato hláška v programu Anki objevuje?**
+                Generátor vytváří balíčky kompatibilní s moderním standardem Anki (Anki 23 a 24+). Pokud máte na počítači nainstalovanou starší verzi Anki (např. 2.1.x z minulých let), Anki zobrazí výzvu k aktualizaci.
+                **Řešení pro PC/Mac:** Stačí si stáhnout a nainstalovat bezplatnou aktualizaci z oficiálního webu [apps.ankiweb.net](https://apps.ankiweb.net). Všechny vaše dosavadní balíčky a postup zůstanou zachovány.
+
+                **2. Jak používat kartičky na iPhone / iPad zdarma?**
+                - Oficiální mobilní aplikace **AnkiMobile** pro iOS je placená (cca 700 Kč, jednorázově).
+                - Neoficiální aplikace třetích stran v App Store (jako *AnkiPro* nebo *AnkiApp*) jsou placené kopie s předplatným a standardní `.apkg` nepodporují.
+                - **Možnost zdarma A:** Použijte **bezplatný AnkiWeb** přímo v Safari na iPhone po bezplatné synchronizaci z PC.
+                - **Možnost zdarma B (Doporučeno):** Použijte náš export do **Obsidianu (záložka 2 nahoře)** – aplikace Obsidian je na iPhone i iPad 100% zdarma, funguje plně offline a s bezplatným doplňkem *Spaced Repetition* se učíte úplně stejně jako v Anki!""": """**1. Why does this message appear in Anki?**
+                The generator creates decks compatible with modern Anki (Anki 23 and 24+). If you have an older version installed (e.g. 2.1.x), Anki will prompt you to update.
+                **Fix for PC/Mac:** Download and install the free update from [apps.ankiweb.net](https://apps.ankiweb.net). All your existing decks and progress remain intact.
+
+                **2. How to use cards on iPhone / iPad for free?**
+                - The official **AnkiMobile** iOS app is paid (one-time purchase).
+                - Unofficial third-party apps on the App Store (like *AnkiPro* or *AnkiApp*) are paid subscription clones and do not support standard `.apkg` properly.
+                - **Free Option A:** Use **free AnkiWeb** directly in Safari on iPhone after syncing from your PC.
+                - **Free Option B (Recommended):** Use our **Obsidian export (Tab 2 above)** – Obsidian is 100% free on iPhone & iPad, works fully offline, and with the free *Spaced Repetition* plugin works just like Anki!""",
+    """**1. Samostatný přehrávač (Karty.html):**
+                    - Přibalen přímo uvnitř vygenerovaného `.zip` souboru jako `index.html`.
+                    - Stačí balíček stáhnout a otevřít v jakémkoliv prohlížeči na mobilu i PC.
+                    - Žádná instalace ani registrace, 100% offline, chytré opakování (SM-2), zvětšování fotografií klepnutím, podpora více balíčků najednou.
+
+                    **2. Aplikace Obsidian (iOS / Android / PC):**
+                    - Bezplatná aplikace z App Store / Google Play.
+                    - Složku z balíčku otevřete v Obsidianu jako nový trezor (*Vault*).
+                    - V komunitních doplňcích zapnete *Spaced Repetition*.""": """**1. Standalone Player (Karty.html):**
+                    - Bundled directly inside the generated `.zip` archive as `index.html`.
+                    - Just download, extract, and open in any browser on mobile or PC.
+                    - No installation or sign-up, 100% offline, spaced repetition (SM-2), tap-to-zoom photos, multi-deck support.
+
+                    **2. Obsidian App (iOS / Android / PC):**
+                    - Free app from the App Store / Google Play.
+                    - Open the extracted folder in Obsidian as a new *Vault*.
+                    - Enable the *Spaced Repetition* community plugin.""",
+    """Kompletní samostatný HTML přehrávač pro offline studium na mobilu, tabletu i počítači:
+            - **100% offline & soukromé:** Nevyžaduje instalaci, registraci ani internet.
+            - **Chytré opakování (SM-2):** Algoritmus s hodnocením Znovu / Těžké / Dobré / Snadné.
+            - **Vlastní denní limit:** Nastavení počtu nových karet za den a odhad doučení.
+            - **Otáčecí i vepisovací karty:** Možnost procvičovat psaním s vizuálním diffem.
+            - **Heatmapa & statistiky:** Kalendářní přehled učení a detailní Anki statistiky.""": """Complete standalone HTML player for offline study on mobile, tablet, and desktop:
+            - **100% offline & private:** No installation, sign-up, or internet required.
+            - **Spaced repetition (SM-2):** Algorithm with Again / Hard / Good / Easy ratings.
+            - **Custom daily limit:** Set new cards per day and completion estimate.
+            - **Flip & type-in cards:** Practice typing answers with visual diff.
+            - **Heatmap & stats:** Study calendar overview and detailed Anki-style statistics.""",
+    """Rychlý offline nástroj pro přípravu a normalizaci tabulkových dat:
+            - **1. Hromadné nahrazování:** Dávková úprava textů podle tabulky pravidel.
+            - **2. Chytré párování:** Párování synonym s referenčním seznamem (Fuzzy / Levenshtein shoda).
+            - **3. Dvousloupcová kontrola:** Rychlé porovnání tabulek a odhalení chybějících položek.
+            - **4. Generátor pravidel:** Automatické vytvoření pravidel z dvojic sloupců.""": """Fast offline tool for preparing and normalizing tabular data:
+            - **1. Batch Replace:** Bulk text replacement using a rules table.
+            - **2. Smart Matching:** Match synonyms against a reference list (Fuzzy / Levenshtein).
+            - **3. Two-column Check:** Quickly compare tables and spot missing items.
+            - **4. Rule Generator:** Automatically generate replacement rules from column pairs.""",
+    """- **Aktivní vybavování (Active Recall):** Vždy se snažte vybavit jméno druhu či znaky ještě před otočením kartičky. Pouhé pasivní prohlížení vytváří falešný pocit znalosti.
+                - **Pravidelnost (Spaced Repetition):** 15 minut denně po dobu dvou týdnů je pro dlouhodobou paměť mnohem účinnější než 8 hodin biflování noc před zkouškou.
+                - **Poctivé hodnocení:** Pokud jste váhali, volte *Těžké* nebo *Znovu*. Program se postará o naplánování přesně v momentě, kdy by hrozilo zapomnění.""": """- **Active Recall:** Always try to recall the species name or traits before flipping the card. Passive browsing creates an illusion of competence.
+                - **Consistency (Spaced Repetition):** 15 minutes a day for two weeks is far more effective for long-term memory than cramming 8 hours the night before an exam.
+                - **Honest Grading:** If you hesitated, choose *Hard* or *Again*. The scheduler will bring the card back right before you would forget it.""",
+    """- **Možnost A (Karty.html – bez instalace):** Stáhněte si balíček pro Obsidian / Karty (.zip), v aplikaci *Soubory* na iPhonu jej rozbalte a klepněte na `index.html`. Otevře se v Safari a můžete se rovnou offline učit.
+                - **Možnost B (Obsidian):** Stáhněte si bezplatnou aplikaci Obsidian z App Store, otevřete složku balíčku jako Vault a zapněte bezplatný komunitní doplněk *Spaced Repetition*.
+                - **Možnost C (AnkiWeb):** Zaregistrujte se zdarma na [ankiweb.net](https://ankiweb.net), synchronizujte balíček z PC a v Safari na mobilu si uložte zástupce na plochu.""": """- **Option A (Karty.html – no install):** Download the Obsidian / Karty package (.zip), unzip it in the iPhone *Files* app, and tap `index.html`. It opens in Safari ready for offline study.
+                - **Option B (Obsidian):** Download the free Obsidian app from the App Store, open the package folder as a Vault, and enable the free *Spaced Repetition* community plugin.
+                - **Option C (AnkiWeb):** Sign up for free at [ankiweb.net](https://ankiweb.net), sync your deck from PC, and add a Home Screen shortcut in Safari.""",
+    """- **Proč se hláška objevuje?** Generátor vytváří balíčky podle moderního formátu Anki 24+ s kompresí Zstandard. Starší verze Anki na počítači (např. verze 2.1.x) tento formát nerozeznají a zobrazí upozornění.
+                - **Řešení:** Stáhněte si bezplatnou aktualizaci přímo z oficiálního webu [apps.ankiweb.net](https://apps.ankiweb.net). Aktualizace je zdarma a všechny vaše stávající balíčky i postup učení zůstanou netknuté.""": """- **Why does it appear?** The generator builds decks using the modern Anki 24+ format with Zstandard compression. Older desktop versions (e.g. 2.1.x) do not recognize this format and show a warning.
+                - **Solution:** Download the free update from [apps.ankiweb.net](https://apps.ankiweb.net). It is free and keeps all your existing decks and progress intact.""",
+    """- Pokud máte v Anki rozečtený balíček a chcete k němu přidat nové druhy, nahrajte starý `.apkg` i nový Excel najednou.
+                - Generátor automaticky zachová historii zkoušení u existujících druhů a přidá nové.
+                - Pokud se sloupce jmenují jinak (např. *Poznámky* vs. *Popis*), v sekci *1. Načtení dat → Sloučení a doplnění* si můžete ručně určit propojení a nastavit prioritu, ze kterého souboru se mají data zachovat.""": """- If you have an in-progress Anki deck and want to add new species to it, upload the old `.apkg` and the new Excel file together.
+                - The generator automatically preserves review history for existing species and adds the new ones.
+                - If column names differ (e.g. *Notes* vs. *Description*), you can manually map them and set source priority in *1. Input Data → Merge & Supplement*.""",
 }
 
 _REGEX_RULES = [
@@ -495,7 +707,29 @@ _REGEX_RULES = [
     (re.compile(r'^Max fotek z (.+?) na řádek$'), r'Max \1 photos per row'),
     (re.compile(r'^Stahuji a optimalizuji média \((\d+)/(\d+)\)\.\.\.$'), r'Downloading and optimizing media (\1/\2)...'),
     (re.compile(r'^Stahuji multimediální soubory pro Obsidian \((\d+)/(\d+)\)\.\.\.$'), r'Downloading Obsidian media files (\1/\2)...'),
-    (re.compile(r'^(\w+) \((\d+) položek\)$'), r'\1 (\2 items)'),
+    (re.compile(r'^(.+?)\s*\((\d+)\s+položek\)$'), r'\1 (\2 items)'),
+    (re.compile(r'^Náhled pro řádek \((\d+)\s+z\s+(\d+)\):$'), r'Preview for row (\1 of \2):'),
+    (re.compile(r'^Vyberte nové obrázky pro druh:\s*(.+)$'), r'Select new images for species: \1'),
+    (re.compile(r'^Načten checklist z Klíče ke květeně ČR:\s*\*\*(\d+)\*\*\s*taxonů\.$'), r'Loaded Flora of CZ checklist: **\1** taxa.'),
+    (re.compile(r'^Načten checklist z Klíče ke květeně ČR:\s*(\d+)\s*taxonů\.$'), r'Loaded Flora of CZ checklist: \1 taxa.'),
+    (re.compile(r'^Historie vygenerovaných balíčků \((\d+)\)$'), r'Generated Packages History (\1)'),
+    (re.compile(r'^Anki balíček obsahuje \*\*(\d+)\*\* kartiček a \*\*(\d+)\*\* multimediálních souborů\.$'), r'Anki package contains **\1** cards and **\2** media files.'),
+    (re.compile(r'^Stahuji a optimalizuji obrázky pro PDF \((\d+)/(\d+)\)\.\.\.$'), r'Downloading and optimizing PDF images (\1/\2)...'),
+    (re.compile(r'^Stahuji a optimalizuji obrázky pro Word \((\d+)/(\d+)\)\.\.\.$'), r'Downloading and optimizing Word images (\1/\2)...'),
+    (re.compile(r'^Obohacování dat:\s*(\d+)/(\d+)\s*\((\d+%)\)\s*—\s*(.+)$'), r'Enriching data: \1/\2 (\3) — \4'),
+    (re.compile(r'^Obohacování dat dokončeno \((\d+)/(\d+) položek\)\.$'), r'Data enrichment complete (\1/\2 items).'),
+    (re.compile(r'^Aktivní územní filtr:\s*(.+)$'), r'Active region filter: \1'),
+    (re.compile(r'^Aktivní výřez mapy Pladias:\s*\*\*(.+?)\*\*$'), r'Active Pladias map crop: **\1**'),
+    (re.compile(r'^Úspěšně načteno \*\*(\d+)\*\* položek\.$'), r'Successfully loaded **\1** items.'),
+    (re.compile(r'^Načteno celkem (\d+) položek do paměti\.$'), r'Loaded \1 total items into memory.'),
+    (re.compile(r'^Výslovnost \(Audio\):\s*(.+)$'), r'Pronunciation (Audio): \1'),
+    (re.compile(r'^Uloženo:\s*\*\*(.+?)\*\*\s*→\s*\*\*(.+?)\*\*$'), r'Saved: **\1** → **\2**'),
+    (re.compile(r'^Uloženo (\d+) fotografií pro \*\*(.+?)\*\* do sloupce \*\*(.+?)\*\*\.$'), r'Saved \1 photos for **\2** to column **\3**.'),
+    (re.compile(r'^K druhu \'(.+?)\' bylo úspěšně přiřazeno (\d+) fotografií\.$'), r"Successfully assigned \2 photos to '\1'."),
+    (re.compile(r'^Hromadné párování dokončeno! Úspěšně přiřazeno (\d+) z (\d+) fotografií\.$'), r'Batch matching complete! Successfully assigned \1 of \2 photos.'),
+    (re.compile(r'^\*\*Již přiřazené fotografie \((\d+)\):\*\*$'), r'**Already assigned photos (\1):**'),
+    (re.compile(r'^Při generování PDF došlo k chybě:\s*(.+)$'), r'Error generating PDF: \1'),
+    (re.compile(r'^Při generování Word dokumentu došlo k chybě:\s*(.+)$'), r'Error generating Word document: \1'),
 ]
 
 _UI_LANG_GETTER = None
@@ -527,20 +761,36 @@ def tr(text):
         prefix, body = m_hdr.group(1), m_hdr.group(2).strip()
         if body in CZ_TO_EN:
             return prefix + CZ_TO_EN[body]
+        for pat, repl in _REGEX_RULES:
+            if pat.match(body):
+                return prefix + pat.sub(repl, body)
 
     for pat, repl in _REGEX_RULES:
         m = pat.match(stripped)
         if m:
             return pat.sub(repl, stripped)
 
-    # HTML header / badge fallback
-    if '<div class="main-title">' in text or '<div class="subtitle">' in text or 'položek &bull;' in text:
+    # HTML header / badge / preview card fallback
+    if '<div' in text or '<span' in text or 'položek &bull;' in text:
         out = text
         for cz, en in [
             ("Generátor kartiček Anki", "Anki Card Generator"),
             ("Nahrajte tabulku, obohaťte ji o data přes API a sestavte líc a rub kartiček.", "Upload a table, enrich it via APIs, and build card fronts, backs, or study booklets."),
+            ("Žádný modul není vybrán.", "No module selected."),
+            ("Zobrazit mapu rozšíření na Pladias.cz", "View distribution map on Pladias.cz"),
+            ("Zobrazit mapu pozorování na iNaturalist.org", "View observation map on iNaturalist.org"),
+            ("Lokální obrázek nenalezen:", "Local image not found:"),
+            ("Vepisovací pole v Anki:", "Type-in answer field in Anki:"),
+            ("[ Napište odpověď:", "[ Type your answer:"),
+            ("[ Zde se zobrazí líc karty ]", "[ Card front will appear here ]"),
+            ("Kontrolovaná správná odpověď:", "Checked correct answer:"),
+            ("Pladias.cz • Mapa rozšíření ČR", "Pladias.cz • CZ Distribution Map"),
+            ("iNaturalist.org • Mapa pozorování", "iNaturalist.org • Observation Map"),
+            ("Přednost pro ", "Priority for "),
+            ("Přednost: ", "Priority: "),
         ]:
             out = out.replace(cz, en)
+        out = re.sub(r'Aktivní moduly \((\d+)\):', r'Active modules (\1):', out)
         out = re.sub(r'(\d+)\s+položek\s+&bull;\s+(\d+)\s+sloupců', r'\1 items &bull; \2 columns', out)
         return out
     return text
@@ -551,6 +801,8 @@ def install_streamlit_i18n(st_mod):
     st_mod._i18n_installed = True
 
     def _wrap_first_arg(fn):
+        if getattr(fn, "_i18n_wrapped", False):
+            return fn
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
             if args and isinstance(args[0], str):
@@ -564,9 +816,12 @@ def install_streamlit_i18n(st_mod):
             if "placeholder" in kwargs and isinstance(kwargs["placeholder"], str):
                 kwargs["placeholder"] = tr(kwargs["placeholder"])
             return fn(*args, **kwargs)
+        wrapper._i18n_wrapped = True
         return wrapper
 
     def _wrap_choice(fn):
+        if getattr(fn, "_i18n_wrapped", False):
+            return fn
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
             if args and isinstance(args[0], str):
@@ -578,30 +833,43 @@ def install_streamlit_i18n(st_mod):
             if is_en() and "format_func" not in kwargs:
                 kwargs["format_func"] = lambda x: tr(str(x))
             return fn(*args, **kwargs)
+        wrapper._i18n_wrapped = True
         return wrapper
 
     def _wrap_tabs(fn):
+        if getattr(fn, "_i18n_wrapped", False):
+            return fn
         @functools.wraps(fn)
         def wrapper(tabs, *args, **kwargs):
             if isinstance(tabs, (list, tuple)):
                 tabs = [tr(t) if isinstance(t, str) else t for t in tabs]
             return fn(tabs, *args, **kwargs)
+        wrapper._i18n_wrapped = True
         return wrapper
 
-    for name in [
-        "markdown", "title", "header", "subheader", "caption", "text",
-        "info", "warning", "error", "success", "toast",
-        "expander", "button", "download_button", "checkbox",
-        "text_input", "text_area", "slider", "number_input", "file_uploader"
-    ]:
-        orig = getattr(st_mod, name, None)
-        if orig is not None:
-            setattr(st_mod, name, _wrap_first_arg(orig))
+    # Wrap both module-level st.* and DeltaGenerator.* (columns, tabs, expanders, st.empty)
+    targets = [st_mod]
+    try:
+        from streamlit.delta_generator import DeltaGenerator
+        targets.append(DeltaGenerator)
+    except Exception:
+        pass
 
-    for cname in ["radio", "selectbox", "multiselect"]:
-        orig = getattr(st_mod, cname, None)
-        if orig is not None:
-            setattr(st_mod, cname, _wrap_choice(orig))
+    for target in targets:
+        for name in [
+            "markdown", "title", "header", "subheader", "caption", "text",
+            "info", "warning", "error", "success", "toast",
+            "expander", "button", "download_button", "checkbox",
+            "text_input", "text_area", "slider", "number_input", "file_uploader"
+        ]:
+            orig = getattr(target, name, None)
+            if orig is not None:
+                setattr(target, name, _wrap_first_arg(orig))
 
-    if hasattr(st_mod, "tabs"):
-        st_mod.tabs = _wrap_tabs(st_mod.tabs)
+        for cname in ["radio", "selectbox", "multiselect"]:
+            orig = getattr(target, cname, None)
+            if orig is not None:
+                setattr(target, cname, _wrap_choice(orig))
+
+        if hasattr(target, "tabs"):
+            target.tabs = _wrap_tabs(target.tabs)
