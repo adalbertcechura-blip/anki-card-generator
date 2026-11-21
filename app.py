@@ -5483,69 +5483,95 @@ def generate_pdf_booklet(
                 ]))
                 story.append(t_toc)
             else:
-                half = (len(df) + 1) // 2
-                col1_indices = list(range(half))
-                col2_indices = list(range(half, len(df)))
-
                 half_w = available_width / 2.0
                 p_w = 1.6 * cm
                 n_w = half_w - p_w - 0.2 * cm
+                n_w_inner = max(2.0 * cm, n_w - 4.0)
+                p_w_inner = max(0.8 * cm, p_w - 4.0)
 
-                for i_r in range(max(len(col1_indices), len(col2_indices))):
-                    if i_r < len(col1_indices):
-                        it1 = col1_indices[i_r]
-                        r_t1 = df.iloc[it1]
-                        n1 = str(r_t1[title_col]).strip() if (title_col and title_col in r_t1 and pd.notna(r_t1[title_col])) else (str(r_t1.iloc[0]).strip() if len(r_t1) > 0 else f"Položka {it1+1}")
-                        p1_num = page_tracker.get(it1, it1 + 2 if is_atlas_page else "") if page_tracker else (it1 + 2 if is_atlas_page else "")
-                        p1_str = f"str. {p1_num}" if p1_num else ""
-                        t_cfg_toc1 = col_styles.get(title_col, {}) if (title_col and col_styles) else (col_styles.get(df.columns[0], {}) if col_styles else {})
-                        t_st_toc1 = t_cfg_toc1.get("style", "normal")
-                        n1_clean = html_to_reportlab(n1)
-                        if t_st_toc1 == "bold_italic":
-                            n1_clean = f"<b><i>{n1_clean}</i></b>"
-                        elif t_st_toc1 == "italic" or t_cfg_toc1.get("italic", False):
-                            n1_clean = f"<i>{n1_clean}</i>"
-                        elif t_st_toc1 == "bold" or t_cfg_toc1.get("bold", False):
-                            n1_clean = f"<b>{n1_clean}</b>"
-                        c1_item = Paragraph(f"<b>{it1+1}.</b> {n1_clean}", toc_style)
-                        c1_page = Paragraph(p1_str, toc_page_style)
-                    else:
-                        c1_item = Paragraph("", toc_style)
-                        c1_page = Paragraph("", toc_page_style)
+                def _make_toc_pair(it_idx):
+                    r_t = df.iloc[it_idx]
+                    n_txt = str(r_t[title_col]).strip() if (title_col and title_col in r_t and pd.notna(r_t[title_col])) else (str(r_t.iloc[0]).strip() if len(r_t) > 0 else f"Položka {it_idx+1}")
+                    p_num = page_tracker.get(it_idx, it_idx + 2 if is_atlas_page else "") if page_tracker else (it_idx + 2 if is_atlas_page else "")
+                    p_str = f"str. {p_num}" if p_num else ""
+                    t_cfg = col_styles.get(title_col, {}) if (title_col and col_styles) else (col_styles.get(df.columns[0], {}) if col_styles else {})
+                    t_st = t_cfg.get("style", "normal")
+                    n_clean = html_to_reportlab(n_txt)
+                    if t_st == "bold_italic":
+                        n_clean = f"<b><i>{n_clean}</i></b>"
+                    elif t_st == "italic" or t_cfg.get("italic", False):
+                        n_clean = f"<i>{n_clean}</i>"
+                    elif t_st == "bold" or t_cfg.get("bold", False):
+                        n_clean = f"<b>{n_clean}</b>"
+                    p_l = Paragraph(f"<b>{it_idx+1}.</b> {n_clean}", toc_style)
+                    p_r = Paragraph(p_str, toc_page_style)
+                    _, hl = p_l.wrap(n_w_inner, avail_page_h)
+                    _, hr = p_r.wrap(p_w_inner, avail_page_h)
+                    return p_l, p_r, max(hl, hr) + 2.4
 
-                    if i_r < len(col2_indices):
-                        it2 = col2_indices[i_r]
-                        r_t2 = df.iloc[it2]
-                        n2 = str(r_t2[title_col]).strip() if (title_col and title_col in r_t2 and pd.notna(r_t2[title_col])) else (str(r_t2.iloc[0]).strip() if len(r_t2) > 0 else f"Položka {it2+1}")
-                        p2_num = page_tracker.get(it2, it2 + 2 if is_atlas_page else "") if page_tracker else (it2 + 2 if is_atlas_page else "")
-                        p2_str = f"str. {p2_num}" if p2_num else ""
-                        t_cfg_toc2 = col_styles.get(title_col, {}) if (title_col and col_styles) else (col_styles.get(df.columns[0], {}) if col_styles else {})
-                        t_st_toc2 = t_cfg_toc2.get("style", "normal")
-                        n2_clean = html_to_reportlab(n2)
-                        if t_st_toc2 == "bold_italic":
-                            n2_clean = f"<b><i>{n2_clean}</i></b>"
-                        elif t_st_toc2 == "italic" or t_cfg_toc2.get("italic", False):
-                            n2_clean = f"<i>{n2_clean}</i>"
-                        elif t_st_toc2 == "bold" or t_cfg_toc2.get("bold", False):
-                            n2_clean = f"<b>{n2_clean}</b>"
-                        c2_item = Paragraph(f"<b>{it2+1}.</b> {n2_clean}", toc_style)
-                        c2_page = Paragraph(p2_str, toc_page_style)
-                    else:
-                        c2_item = Paragraph("", toc_style)
-                        c2_page = Paragraph("", toc_page_style)
+                toc_items = [_make_toc_pair(i) for i in range(len(df))]
 
-                    toc_table_rows.append([c1_item, c1_page, c2_item, c2_page])
+                used_first_h = 18.0
+                for f_pre in story:
+                    try:
+                        _, fh_pre = f_pre.wrap(max(4.0 * cm, available_width - 14.0), avail_page_h)
+                        st_pre = getattr(f_pre, 'style', None)
+                        sb_pre = getattr(st_pre, 'spaceBefore', 0.0) or 0.0
+                        sa_pre = getattr(st_pre, 'spaceAfter', 0.0) or 0.0
+                        if isinstance(f_pre, HRFlowable):
+                            sb_pre = getattr(f_pre, 'spaceBefore', 0.0) or 0.0
+                            sa_pre = getattr(f_pre, 'spaceAfter', 0.0) or 0.0
+                        used_first_h += fh_pre + sb_pre + sa_pre
+                    except Exception:
+                        pass
 
-                t_toc = Table(toc_table_rows, colWidths=[n_w, p_w, n_w, p_w])
-                t_toc.setStyle(TableStyle([
+                toc_tbl_style = TableStyle([
                     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                     ('TOPPADDING', (0, 0), (-1, -1), 1.2),
                     ('BOTTOMPADDING', (0, 0), (-1, -1), 1.2),
                     ('LEFTPADDING', (0, 0), (-1, -1), 2),
                     ('RIGHTPADDING', (0, 0), (-1, -1), 2),
                     ('LINEBELOW', (0, 0), (-1, -1), 0.3, colors.HexColor('#f1f5f9')),
-                ]))
-                story.append(t_toc)
+                ])
+
+                total_toc = len(toc_items)
+                cur_start = 0
+                is_first_toc_page = True
+                while cur_start < total_toc:
+                    cap_h = max(4.0 * cm, avail_page_h - (used_first_h if is_first_toc_page else 20.0))
+                    best_end = cur_start + 1
+                    for cand_end in range(cur_start + 1, total_toc + 1):
+                        cnt = cand_end - cur_start
+                        half_c = (cnt + 1) // 2
+                        tot_row_h = 0.0
+                        for r_i in range(half_c):
+                            h1 = toc_items[cur_start + r_i][2]
+                            h2 = toc_items[cur_start + half_c + r_i][2] if (cur_start + half_c + r_i) < cand_end else 0.0
+                            tot_row_h += max(h1, h2)
+                        if tot_row_h <= cap_h:
+                            best_end = cand_end
+                        else:
+                            break
+
+                    page_cnt = best_end - cur_start
+                    page_half = (page_cnt + 1) // 2
+                    page_rows = []
+                    for r_i in range(page_half):
+                        p_l1, p_r1, _ = toc_items[cur_start + r_i]
+                        idx2 = cur_start + page_half + r_i
+                        if idx2 < best_end:
+                            p_l2, p_r2, _ = toc_items[idx2]
+                        else:
+                            p_l2, p_r2 = Paragraph("", toc_style), Paragraph("", toc_page_style)
+                        page_rows.append([p_l1, p_r1, p_l2, p_r2])
+
+                    t_toc = Table(page_rows, colWidths=[n_w, p_w, n_w, p_w])
+                    t_toc.setStyle(toc_tbl_style)
+                    story.append(t_toc)
+                    cur_start = best_end
+                    is_first_toc_page = False
+                    if cur_start < total_toc:
+                        story.append(PageBreak())
 
             story.append(Spacer(1, 8))
             if is_atlas_page:
