@@ -5996,27 +5996,23 @@ def generate_pdf_booklet(
                     rl_img1 = _make_img_or_spacer(imgs_list[0][0], tw1, th1)
 
                     bot_imgs = []
+                    bot_tws = []
                     for lpath, col_lbl, attr in imgs_list[1:]:
                         iw, ih = _get_image_dims(lpath)
                         aspect = ih / float(iw) if iw > 0 else 0.75
-                        tw = half_w - 3.0
+                        tw = half_w - 4.0
                         th = tw * aspect
                         if th > max_h_bot:
                             th = max_h_bot
                             tw = th / aspect
                         bot_imgs.append(_make_img_or_spacer(lpath, tw, th))
+                        bot_tws.append(tw)
 
-                    t_grid_data = [[rl_img1, '']]
-                    span_cmds = [('SPAN', (0, 0), (1, 0))]
+                    t_top_data = [[rl_img1]]
                     if cap1:
-                        r_idx = len(t_grid_data)
-                        t_grid_data.append([Paragraph(cap1, caption_style), ''])
-                        span_cmds.append(('SPAN', (0, r_idx), (1, r_idx)))
-                    t_grid_data.append([bot_imgs[0], bot_imgs[1]])
-                    if cap2 or cap3:
-                        t_grid_data.append([Paragraph(cap2, caption_style), Paragraph(cap3, caption_style)])
-                    t_imgs = Table(t_grid_data, colWidths=[half_w, half_w])
-                    t_imgs.setStyle(TableStyle(span_cmds + [
+                        t_top_data.append([Paragraph(cap1, caption_style)])
+                    t_top = Table(t_top_data, colWidths=[tw1 + 4.0], hAlign='CENTER')
+                    t_top.setStyle(TableStyle([
                         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                         ('TOPPADDING', (0, 0), (-1, -1), 1),
@@ -6024,7 +6020,21 @@ def generate_pdf_booklet(
                         ('LEFTPADDING', (0, 0), (-1, -1), 1.5),
                         ('RIGHTPADDING', (0, 0), (-1, -1), 1.5),
                     ]))
-                    out_flowables.append(t_imgs)
+                    out_flowables.append(t_top)
+
+                    t_bot_data = [[bot_imgs[0], bot_imgs[1]]]
+                    if cap2 or cap3:
+                        t_bot_data.append([Paragraph(cap2, caption_style), Paragraph(cap3, caption_style)])
+                    t_bot = Table(t_bot_data, colWidths=[bot_tws[0] + 4.0, bot_tws[1] + 4.0], hAlign='CENTER')
+                    t_bot.setStyle(TableStyle([
+                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                        ('TOPPADDING', (0, 0), (-1, -1), 1),
+                        ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+                        ('LEFTPADDING', (0, 0), (-1, -1), 2.0),
+                        ('RIGHTPADDING', (0, 0), (-1, -1), 2.0),
+                    ]))
+                    out_flowables.append(t_bot)
                     out_flowables.append(Spacer(1, 2))
                     return out_flowables
 
@@ -8735,6 +8745,12 @@ if st.session_state.df is not None:
                         accept_multiple_files=True,
                         key="custom_batch_uploader"
                     )
+                    batch_match_col = st.selectbox(
+                        "Sloupec v tabulce pro spárování názvu souboru:",
+                        options=columns,
+                        index=0,
+                        key="custom_batch_match_col"
+                    )
                     batch_caption = st.text_input("Výchozí popisek pro spárované fotografie:", value="Vlastní foto", key="custom_batch_caption")
                     if uploaded_batch_photos and st.button("Provést hromadné spárování", key="btn_run_custom_batch"):
                         matched_count = 0
@@ -8746,7 +8762,7 @@ if st.session_state.df is not None:
                             return re.sub(r'\s+', ' ', re.sub(r'[^a-z0-9]+', ' ', s_n)).strip()
 
                         row_candidates = []
-                        for r_idx, r_val in enumerate(st.session_state.df[columns[0]]):
+                        for r_idx, r_val in enumerate(st.session_state.df[batch_match_col]):
                             rc = _norm_batch_txt(r_val)
                             if rc:
                                 row_candidates.append((r_idx, r_val, rc))
@@ -8840,10 +8856,15 @@ if st.session_state.df is not None:
                         for def_ic in ["[Pladias] Fotky", "[Pladias] Celá rostlina", "[Pladias] Květ", "[Pladias] List", "[iNat] Obrázky (URL)", "[Wikimedia] Obrázky (URL)", "[Vlastní] Fotografie"]:
                             if def_ic not in img_col_cands:
                                 img_col_cands.append(def_ic)
+                        img_col_cands.append("— Vytvořit nový sloupec —")
 
                         cur_c1, cur_c2, cur_c3 = st.columns([1.8, 1.8, 1.0])
                         with cur_c1:
-                            cur_target_col = st.selectbox("Cílový sloupec v tabulce:", options=img_col_cands, key="cur_target_col_sel")
+                            cur_target_col_sel = st.selectbox("Cílový sloupec v tabulce:", options=img_col_cands, key="cur_target_col_sel")
+                            if cur_target_col_sel == "— Vytvořit nový sloupec —":
+                                cur_target_col = st.text_input("Název nového sloupce:", value="[Vlastní] Vybrané fotky", key="cur_new_col_name").strip() or "[Vlastní] Vybrané fotky"
+                            else:
+                                cur_target_col = cur_target_col_sel
                         with cur_c2:
                             cur_src_opts = [
                                 "Pladias.cz (všechny fotky v pořadí)",

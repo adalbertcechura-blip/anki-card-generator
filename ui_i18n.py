@@ -154,6 +154,8 @@ CZ_TO_EN = {
     "Pladias.cz – List": "Pladias.cz – Leaf",
     "Pladias.cz – Plod / semeno": "Pladias.cz – Fruit / seed",
     "Výchozí popisek pro spárované fotografie:": "Default caption for matched photos:",
+    "Sloupec v tabulce pro spárování názvu souboru:": "Table column to match filename against:",
+    "— Vytvořit nový sloupec —": "— Create new column —",
     "Vyberte fotografie pro hromadné spárování:": "Select photos for batch matching:",
     "Provést hromadné spárování": "Run batch matching",
 
