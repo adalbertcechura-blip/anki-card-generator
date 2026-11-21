@@ -71,6 +71,42 @@ def _safe_download_button(*args, **kwargs):
         kwargs["on_click"] = "ignore"
     return st.download_button(*args, **kwargs)
 
+def _record_generated_export(kind: str, src_path: str, filename: str, info_str: str = "", move_file: bool = True) -> dict:
+    """Uloží vygenerovaný export na disk a přidá ho do historie bez přepisování předchozích balíčků."""
+    export_dir = os.path.join(tempfile.gettempdir(), "anki_card_gen_exports")
+    os.makedirs(export_dir, exist_ok=True)
+    ext = os.path.splitext(filename or src_path)[1]
+    fd, dst_path = tempfile.mkstemp(prefix=f"exp_{kind}_", suffix=ext, dir=export_dir)
+    os.close(fd)
+    if move_file:
+        shutil.move(src_path, dst_path)
+    else:
+        shutil.copy2(src_path, dst_path)
+    size_mb = round(os.path.getsize(dst_path) / (1024.0 * 1024.0), 2) if os.path.exists(dst_path) else 0.0
+    hist = st.session_state.get("generated_history")
+    if not isinstance(hist, list):
+        hist = []
+    uid = hashlib.md5(f"{time.time()}_{filename}_{len(hist)}_{dst_path}".encode("utf-8")).hexdigest()[:10]
+    entry = {
+        "id": uid,
+        "kind": kind,
+        "filename": filename,
+        "path": dst_path,
+        "size_mb": size_mb,
+        "created_at": time.strftime("%H:%M:%S"),
+        "info": info_str,
+    }
+    hist.insert(0, entry)
+    while len(hist) > 12:
+        old_item = hist.pop()
+        try:
+            if old_item.get("path") and os.path.exists(old_item["path"]):
+                os.remove(old_item["path"])
+        except Exception:
+            pass
+    st.session_state.generated_history = hist
+    return entry
+
 @st.cache_data(show_spinner=False)
 def _get_cached_table_exports(dataframe_obj):
     c_data = dataframe_obj.to_csv(index=False, encoding='utf-8-sig')
@@ -12778,9 +12814,14 @@ if st.session_state.df is not None:
 
                     status.text("Balíček Anki byl úspěšně vygenerován.")
 
-                    st.session_state.generated_apkg_path = _persist_export_file(
-                        apkg_path, st.session_state.get("generated_apkg_path")
+                    apkg_entry = _record_generated_export(
+                        "apkg",
+                        apkg_path,
+                        apkg_filename,
+                        info_str=f"{notes_total_cnt} kartiček • {media_total_cnt} médií",
+                        move_file=True,
                     )
+                    st.session_state.generated_apkg_path = apkg_entry["path"]
                     st.session_state.generated_apkg_data = None
                     st.session_state.generated_apkg_filename = apkg_filename
                     st.session_state.notes_count = notes_total_cnt
@@ -12800,7 +12841,6 @@ if st.session_state.df is not None:
                             for fn, t_data in media_tasks.items()
                             if t_data and t_data[0] and os.path.isfile(os.path.join(media_dir, fn)) and os.path.getsize(os.path.join(media_dir, fn)) > 0
                         }
-                        old_obs_path = st.session_state.get("generated_obsidian_path")
                         obs_path, obs_fname = build_obsidian_zip_package(
                             df=df,
                             vault_name=obs_vault_auto,
@@ -12816,13 +12856,8 @@ if st.session_state.df is not None:
                             preloaded_url_map=preloaded_map,
                             return_path=True
                         )
-                        if old_obs_path and old_obs_path != obs_path:
-                            try:
-                                if os.path.exists(old_obs_path):
-                                    os.remove(old_obs_path)
-                            except Exception:
-                                pass
-                        st.session_state.generated_obsidian_path = obs_path
+                        obs_entry = _record_generated_export("zip", obs_path, obs_fname, move_file=True)
+                        st.session_state.generated_obsidian_path = obs_entry["path"]
                         st.session_state.generated_obsidian_data = None
                         st.session_state.generated_obsidian_filename = obs_fname
                         if clear_temp_on_finish:
@@ -13172,13 +13207,8 @@ if st.session_state.df is not None:
                         status_cb=status.text,
                         return_path=True
                     )
-                    if old_obs_path and old_obs_path != obs_path:
-                        try:
-                            if os.path.exists(old_obs_path):
-                                os.remove(old_obs_path)
-                        except Exception:
-                            pass
-                    st.session_state.generated_obsidian_path = obs_path
+                    obs_entry = _record_generated_export("zip", obs_path, out_zip_filename, move_file=True)
+                    st.session_state.generated_obsidian_path = obs_entry["path"]
                     st.session_state.generated_obsidian_data = None
                     st.session_state.generated_obsidian_filename = out_zip_filename
 
@@ -13814,15 +13844,15 @@ if st.session_state.df is not None:
                             map_position=pdf_map_pos_param
                         )
 
-                        with open(pdf_path, "rb") as f:
-                            pdf_bytes = f.read()
-
                         if is_preview:
-                            st.session_state.pdf_preview_data = pdf_bytes
+                            with open(pdf_path, "rb") as f:
+                                st.session_state.pdf_preview_data = f.read()
                             st.session_state.pdf_preview_filename = f"nahled_{slugify(pdf_title_input)}.pdf"
                             st.success("Rychlý náhled 1. položky v PDF byl úspěšně vygenerován.")
                         else:
-                            st.session_state.generated_pdf_data = pdf_bytes
+                            pdf_entry = _record_generated_export("pdf", pdf_path, pdf_filename, move_file=True)
+                            st.session_state.generated_pdf_path = pdf_entry["path"]
+                            st.session_state.generated_pdf_data = None
                             st.session_state.generated_pdf_filename = pdf_filename
                             st.success("Studijní brožura v PDF byla úspěšně vygenerována.")
                     except Exception as e:
@@ -14133,10 +14163,9 @@ if st.session_state.df is not None:
                             max_images_mode=docx_max_imgs_choice
                         )
 
-                        with open(docx_path, "rb") as f:
-                            docx_bytes = f.read()
-
-                        st.session_state.generated_docx_data = docx_bytes
+                        docx_entry = _record_generated_export("docx", docx_path, docx_filename, move_file=True)
+                        st.session_state.generated_docx_path = docx_entry["path"]
+                        st.session_state.generated_docx_data = None
                         st.session_state.generated_docx_filename = docx_filename
                         st.success("Dokument Microsoft Word (.docx) byl úspěšně vygenerován.")
                     except Exception as e:
@@ -14146,52 +14175,65 @@ if st.session_state.df is not None:
                     gc.collect()
                     st.rerun()
 
-    _has_apkg = bool(st.session_state.get('generated_apkg_path') and os.path.isfile(st.session_state.get('generated_apkg_path'))) or st.session_state.generated_apkg_data is not None
-    _has_obs = bool(st.session_state.get('generated_obsidian_path') and os.path.isfile(st.session_state.get('generated_obsidian_path'))) or st.session_state.get('generated_obsidian_data') is not None
-    if _has_apkg or _has_obs or st.session_state.generated_pdf_data is not None or st.session_state.generated_docx_data is not None:
+    _hist_all = [h for h in st.session_state.get("generated_history", []) if h.get("path") and os.path.isfile(h["path"])]
+    _latest_by_kind = {}
+    for _h in _hist_all:
+        if _h["kind"] not in _latest_by_kind:
+            _latest_by_kind[_h["kind"]] = _h
+
+    _has_apkg = ("apkg" in _latest_by_kind) or bool(st.session_state.get('generated_apkg_path') and os.path.isfile(st.session_state.get('generated_apkg_path'))) or st.session_state.generated_apkg_data is not None
+    _has_obs = ("zip" in _latest_by_kind) or bool(st.session_state.get('generated_obsidian_path') and os.path.isfile(st.session_state.get('generated_obsidian_path'))) or st.session_state.get('generated_obsidian_data') is not None
+    _has_pdf = ("pdf" in _latest_by_kind) or st.session_state.generated_pdf_data is not None
+    _has_docx = ("docx" in _latest_by_kind) or st.session_state.generated_docx_data is not None
+
+    if _has_apkg or _has_obs or _has_pdf or _has_docx or _hist_all:
         with st.expander("5. Stažení výsledků", expanded=False):
 
             col_res1, col_res2 = st.columns(2)
             with col_res1:
                 if _has_apkg:
-                    _apkg_p = st.session_state.get('generated_apkg_path')
+                    _apkg_it = _latest_by_kind.get("apkg")
+                    _apkg_p = _apkg_it["path"] if _apkg_it else st.session_state.get('generated_apkg_path')
+                    _apkg_id = _apkg_it["id"] if _apkg_it else "legacy_apkg"
                     if _apkg_p and os.path.isfile(_apkg_p):
                         with open(_apkg_p, "rb") as _f_apkg:
                             _safe_download_button(
                                 label="Stáhnout .apkg balíček pro Anki",
                                 data=_f_apkg,
-                                file_name=st.session_state.generated_apkg_filename,
+                                file_name=(_apkg_it["filename"] if _apkg_it else st.session_state.generated_apkg_filename),
                                 mime="application/octet-stream",
-                                key="download_apkg_btn"
+                                key=f"download_apkg_btn_{_apkg_id}"
                             )
-                    else:
+                    elif st.session_state.generated_apkg_data is not None:
                         _safe_download_button(
                             label="Stáhnout .apkg balíček pro Anki",
                             data=st.session_state.generated_apkg_data,
                             file_name=st.session_state.generated_apkg_filename,
                             mime="application/octet-stream",
-                            key="download_apkg_btn"
+                            key=f"download_apkg_btn_{_apkg_id}"
                         )
                     st.info(f"Anki balíček obsahuje **{st.session_state.notes_count}** kartiček a **{st.session_state.media_count}** multimediálních souborů.")
 
                 if _has_obs:
-                    _obs_p = st.session_state.get('generated_obsidian_path')
+                    _obs_it = _latest_by_kind.get("zip")
+                    _obs_p = _obs_it["path"] if _obs_it else st.session_state.get('generated_obsidian_path')
+                    _obs_id = _obs_it["id"] if _obs_it else "legacy_obs"
                     if _obs_p and os.path.isfile(_obs_p):
                         with open(_obs_p, "rb") as _f_obs:
                             _safe_download_button(
                                 label="Stáhnout balíček kartiček (.zip – obsahuje i index.html přehrávač)",
                                 data=_f_obs,
-                                file_name=st.session_state.get('generated_obsidian_filename', 'Studijni_Karticky.zip'),
+                                file_name=(_obs_it["filename"] if _obs_it else st.session_state.get('generated_obsidian_filename', 'Studijni_Karticky.zip')),
                                 mime="application/zip",
-                                key="download_obsidian_btn"
+                                key=f"download_obsidian_btn_{_obs_id}"
                             )
-                    else:
+                    elif st.session_state.get('generated_obsidian_data') is not None:
                         _safe_download_button(
                             label="Stáhnout balíček kartiček (.zip – obsahuje i index.html přehrávač)",
                             data=st.session_state.generated_obsidian_data,
                             file_name=st.session_state.get('generated_obsidian_filename', 'Studijni_Karticky.zip'),
                             mime="application/zip",
-                            key="download_obsidian_btn"
+                            key=f"download_obsidian_btn_{_obs_id}"
                         )
                     st.success("Balíček kartiček (.zip) je připraven. Můžete jej otevřít rovnou poklepáním na index.html uvnitř, nebo naimportovat do přehrávače či Obsidianu.")
                     k_bytes = _read_karty_html_bytes()
@@ -14205,25 +14247,88 @@ if st.session_state.df is not None:
                         )
                         st.caption("Samostatný webový přehrávač (Karty.html) funguje plně offline a umožňuje pohodlné procvičování na libovolném zařízení.")
 
-                if st.session_state.generated_pdf_data is not None:
-                    _safe_download_button(
-                        label="Stáhnout studijní brožuru (.pdf)",
-                        data=st.session_state.generated_pdf_data,
-                        file_name=st.session_state.generated_pdf_filename,
-                        mime="application/pdf",
-                        key="download_pdf_btn"
-                    )
+                if _has_pdf:
+                    _pdf_it = _latest_by_kind.get("pdf")
+                    _pdf_p = _pdf_it["path"] if _pdf_it else None
+                    _pdf_id = _pdf_it["id"] if _pdf_it else "legacy_pdf"
+                    if _pdf_p and os.path.isfile(_pdf_p):
+                        with open(_pdf_p, "rb") as _f_pdf:
+                            _safe_download_button(
+                                label="Stáhnout studijní brožuru (.pdf)",
+                                data=_f_pdf,
+                                file_name=_pdf_it["filename"],
+                                mime="application/pdf",
+                                key=f"download_pdf_btn_{_pdf_id}"
+                            )
+                    elif st.session_state.generated_pdf_data is not None:
+                        _safe_download_button(
+                            label="Stáhnout studijní brožuru (.pdf)",
+                            data=st.session_state.generated_pdf_data,
+                            file_name=st.session_state.generated_pdf_filename,
+                            mime="application/pdf",
+                            key=f"download_pdf_btn_{_pdf_id}"
+                        )
                     st.success("PDF brožura je připravena ke stažení a tisku.")
 
-                if st.session_state.generated_docx_data is not None:
-                    _safe_download_button(
-                        label="Stáhnout dokument Word (.docx)",
-                        data=st.session_state.generated_docx_data,
-                        file_name=st.session_state.generated_docx_filename,
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        key="download_docx_btn"
-                    )
+                if _has_docx:
+                    _docx_it = _latest_by_kind.get("docx")
+                    _docx_p = _docx_it["path"] if _docx_it else None
+                    _docx_id = _docx_it["id"] if _docx_it else "legacy_docx"
+                    if _docx_p and os.path.isfile(_docx_p):
+                        with open(_docx_p, "rb") as _f_docx:
+                            _safe_download_button(
+                                label="Stáhnout dokument Word (.docx)",
+                                data=_f_docx,
+                                file_name=_docx_it["filename"],
+                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                key=f"download_docx_btn_{_docx_id}"
+                            )
+                    elif st.session_state.generated_docx_data is not None:
+                        _safe_download_button(
+                            label="Stáhnout dokument Word (.docx)",
+                            data=st.session_state.generated_docx_data,
+                            file_name=st.session_state.generated_docx_filename,
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            key=f"download_docx_btn_{_docx_id}"
+                        )
                     st.success("Dokument Word (.docx) je připraven k úpravám a tisku.")
+
+            if len(_hist_all) > 1:
+                st.markdown("---")
+                st.markdown(f"##### Historie vygenerovaných balíčků ({len(_hist_all)})")
+                _mime_map = {
+                    "apkg": "application/octet-stream",
+                    "zip": "application/zip",
+                    "pdf": "application/pdf",
+                    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                }
+                for _hi, _hitem in enumerate(_hist_all):
+                    hc1, hc2, hc3 = st.columns([2.6, 1.2, 1.2])
+                    with hc1:
+                        _extra_inf = f" • {_hitem['info']}" if _hitem.get("info") else ""
+                        st.markdown(f"**{_hi + 1}. {_hitem['filename']}** (`{_hitem['created_at']}` • {_hitem['size_mb']} MB{_extra_inf})")
+                    with hc2:
+                        with open(_hitem["path"], "rb") as _f_hist:
+                            _safe_download_button(
+                                label="Stáhnout",
+                                data=_f_hist,
+                                file_name=_hitem["filename"],
+                                mime=_mime_map.get(_hitem["kind"], "application/octet-stream"),
+                                key=f"dl_hist_{_hitem['id']}",
+                            )
+                if st.button("Vymazat historii vygenerovaných souborů", key="btn_clear_export_history"):
+                    for _hitem in _hist_all:
+                        try:
+                            if os.path.exists(_hitem["path"]):
+                                os.remove(_hitem["path"])
+                        except Exception:
+                            pass
+                    st.session_state.generated_history = []
+                    st.session_state.generated_apkg_path = None
+                    st.session_state.generated_obsidian_path = None
+                    st.session_state.generated_pdf_path = None
+                    st.session_state.generated_docx_path = None
+                    st.rerun()
 
             with col_res2:
                 if st.session_state.unfound_csv_data is not None:
