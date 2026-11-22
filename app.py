@@ -12109,6 +12109,8 @@ if st.session_state.df is not None:
                                         else:
                                             img_url = entry.strip()
                                             attr_txt = ""
+                                        if not attr_txt:
+                                            attr_txt = _infer_photo_source_label(c, img_url)
                                         img_src = format_img_src_for_html(img_url)
                                         caption_html = f'<div style="font-size: 10px; color: {preview_label}; margin-top: 3px; text-align: center; opacity: 0.85;">{attr_txt}</div>' if (show_media_attr_val and attr_txt) else ''
                                         if img_src:
@@ -12228,6 +12230,8 @@ if st.session_state.df is not None:
                                         else:
                                             img_url = entry.strip()
                                             attr_txt = ""
+                                        if not attr_txt:
+                                            attr_txt = _infer_photo_source_label(c, img_url)
                                         img_src = format_img_src_for_html(img_url)
                                         caption_html = f'<div style="font-size: 10px; color: {preview_label}; margin-top: 3px; text-align: center; opacity: 0.85;">{attr_txt}</div>' if (show_media_attr_val and attr_txt) else ''
                                         if img_src:
@@ -12500,8 +12504,9 @@ if st.session_state.df is not None:
                                             ext = ".jpeg"
                                         safe_filename = f"{clean_species}_{organ}{ext}" if u_idx == 0 else f"{clean_species}_{organ}_{u_idx}{ext}"
                                         media_tasks[safe_filename] = (url, 'image')
-                                        if attr_txt:
-                                            media_attributions[safe_filename] = attr_txt
+                                        resolved_attr = attr_txt or _infer_photo_source_label(col, url)
+                                        if resolved_attr:
+                                            media_attributions[safe_filename] = resolved_attr
 
                             elif is_image_col(col, val):
                                 raw_entries = [u.strip() for u in str(val).split(';') if u.strip()]
@@ -12536,8 +12541,9 @@ if st.session_state.df is not None:
                                         media_tasks[safe_filename] = (loc_src, 'local_image')
                                     else:
                                         media_tasks[safe_filename] = (url, 'image')
-                                    if attr_txt:
-                                        media_attributions[safe_filename] = attr_txt
+                                    resolved_attr = attr_txt or _infer_photo_source_label(col, url)
+                                    if resolved_attr:
+                                        media_attributions[safe_filename] = resolved_attr
 
                     downloaded_media = []
                     total_tasks = len(media_tasks)
@@ -13908,8 +13914,9 @@ if st.session_state.df is not None:
                                         elif ".jpeg" in url.lower(): ext = ".jpeg"
                                         safe_filename = f"{clean_species}_{organ}{ext}" if u_idx == 0 else f"{clean_species}_{organ}_{u_idx}{ext}"
                                         media_tasks[safe_filename] = (url, 'image')
-                                        if attr_txt:
-                                            media_attributions[safe_filename] = attr_txt
+                                        resolved_attr = attr_txt or _infer_photo_source_label(col, url)
+                                        if resolved_attr:
+                                            media_attributions[safe_filename] = resolved_attr
 
                             elif is_image_col(col, val):
                                 raw_entries = [u.strip() for u in str(val).split(';') if u.strip()]
@@ -14345,8 +14352,9 @@ if st.session_state.df is not None:
                                         url_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()[:6]
                                         safe_filename = f"{clean_species}_{safe_col}_{idx}_{img_idx}_{url_hash}{ext}"
                                         media_tasks[safe_filename] = (loc_src, 'local_image')
-                                        if attr_txt:
-                                            media_attributions[safe_filename] = attr_txt
+                                        resolved_attr = attr_txt or _infer_photo_source_label(col, url)
+                                        if resolved_attr:
+                                            media_attributions[safe_filename] = resolved_attr
                                     elif url.startswith('http://') or url.startswith('https://'):
                                         ext = ".jpg"
                                         if ".png" in url.lower(): ext = ".png"
@@ -14356,8 +14364,9 @@ if st.session_state.df is not None:
                                         url_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()[:6]
                                         safe_filename = f"{clean_species}_{safe_col}_{idx}_{img_idx}_{url_hash}{ext}"
                                         media_tasks[safe_filename] = (url, 'image')
-                                        if attr_txt:
-                                            media_attributions[safe_filename] = attr_txt
+                                        resolved_attr = attr_txt or _infer_photo_source_label(col, url)
+                                        if resolved_attr:
+                                            media_attributions[safe_filename] = resolved_attr
 
                     total_tasks = len(media_tasks)
                     if total_tasks > 0:
