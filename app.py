@@ -1,4 +1,6 @@
 import streamlit as st
+import warnings
+warnings.filterwarnings("ignore", message=".*xlrd engine is deprecated.*")
 import pandas as pd
 import requests
 import os
@@ -1799,7 +1801,7 @@ def get_or_render_pladias_map_image(species_name, place_filter=None):
 def extract_pladias_category_photos(all_items, target_succ, max_photos=3, fallback=False, exclude_urls=None):
     if not all_items:
         return []
-    excluded = set(exclude_urls) if exclude_urls else set()
+    excluded = {str(e).split('|')[0].strip() for e in exclude_urls} if exclude_urls else set()
     real_photos_only = [it for it in all_items if it.get('succession') not in (None, 7)]
     if target_succ is None:
         matched = real_photos_only
@@ -1821,8 +1823,10 @@ def extract_pladias_category_photos(all_items, target_succ, max_photos=3, fallba
         if not fn or succ is None or succ == 7:
             continue
         u = f"https://files.ibot.cas.cz/cevs/images/taxa/large/{fn}"
-        if u not in photos and u not in excluded and not is_herbarium_image(u):
-            photos.append(u)
+        if not any(p.split('|')[0] == u for p in photos) and u not in excluded and not is_herbarium_image(u):
+            author_raw = str(it.get('author') or it.get('photographer') or it.get('copyright') or '').strip()
+            attr = f"{author_raw} (Pladias.cz)" if author_raw else "Pladias.cz"
+            photos.append(f"{u}|{attr}")
             if len(photos) >= max_photos:
                 break
     return photos
@@ -1924,7 +1928,7 @@ def fetch_pladias_overview_photos(species_name, max_photos=3, exclude_urls=None)
                 if syn not in candidates:
                     candidates.append(syn)
 
-    excluded = set(exclude_urls) if exclude_urls else set()
+    excluded = {str(e).split('|')[0].strip() for e in exclude_urls} if exclude_urls else set()
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
     photos = []
 
@@ -1941,9 +1945,9 @@ def fetch_pladias_overview_photos(species_name, max_photos=3, exclude_urls=None)
                     if not fn or not fn.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
                         continue
                     full_u = f"https://files.ibot.cas.cz/cevs/images/taxa/large/{fn}"
-                    if full_u in photos or full_u in excluded or is_herbarium_image(full_u):
+                    if any(p.split('|')[0] == full_u for p in photos) or full_u in excluded or is_herbarium_image(full_u):
                         continue
-                    photos.append(full_u)
+                    photos.append(f"{full_u}|Pladias.cz")
                     if len(photos) >= max_photos:
                         return photos
                 if photos:
@@ -1989,8 +1993,8 @@ def fetch_dalibor_data(species_name, max_photos=3):
                 if '/image/' in src:
                     full_img = src.replace('/thumb/', '/web/')
                     full_img_url = urllib.parse.urljoin('https://dalib.cz', full_img)
-                    if full_img_url not in photos:
-                        photos.append(full_img_url)
+                    if not any(p.split('|')[0] == full_img_url for p in photos):
+                        photos.append(f"{full_img_url}|DaLiBor (dalib.cz)")
 
             desc_parts = []
             content_div = soup.find('div', class_='content') or soup
@@ -2598,8 +2602,8 @@ def _cached_mykologie_data(query_str: str):
                     src = img.get('src', '')
                     if src:
                         img_url = urllib.parse.urljoin('https://www.mykologie.net', src)
-                        if img_url not in images:
-                            images.append(img_url)
+                        if not any(x.split('|')[0] == img_url for x in images):
+                            images.append(f"{img_url}|Mykologie.net")
 
                 p_text = p.get_text(separator=' ', strip=True)
                 if p_text and '(c)' not in p_text and '©' not in p_text:
@@ -2610,8 +2614,8 @@ def _cached_mykologie_data(query_str: str):
                 src = img.get('src', '')
                 if src:
                     img_url = urllib.parse.urljoin('https://www.mykologie.net', src)
-                    if img_url not in images:
-                        images.append(img_url)
+                    if not any(x.split('|')[0] == img_url for x in images):
+                        images.append(f"{img_url}|Mykologie.net")
 
             if paragraphs:
                 res['description'] = '\n\n'.join(paragraphs)
@@ -7769,7 +7773,7 @@ with col_custom_card:
                     )
                 with c_btn_r:
                     st.markdown("<div style='height: 25px;'></div>", unsafe_allow_html=True)
-                    reload_clicked = st.button("Zpracovat soubory", key="btn_reload_files", use_container_width=True, type="primary")
+                    reload_clicked = st.button("Zpracovat soubory", key="btn_reload_files", width="stretch", type="primary")
             else:
                 reload_clicked = False
                 mode_upload = "Nahradit stávající data"
@@ -7919,9 +7923,9 @@ with col_custom_card:
 
             col_btn_m1, col_btn_m2 = st.columns(2)
             with col_btn_m1:
-                load_new_clicked = st.button("Načíst jako nový seznam", key="btn_manual_new", use_container_width=True)
+                load_new_clicked = st.button("Načíst jako nový seznam", key="btn_manual_new", width="stretch")
             with col_btn_m2:
-                append_clicked = st.button("Přidat k existující tabulce", key="btn_manual_append", use_container_width=True)
+                append_clicked = st.button("Přidat k existující tabulce", key="btn_manual_append", width="stretch")
 
             if load_new_clicked or append_clicked:
                 lines = text_input_value.splitlines()
@@ -7988,7 +7992,7 @@ with col_test_card:
             key="sel_test_sheet_category"
         )
         st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
-        load_test_btn = st.button("Načíst testovací data", use_container_width=True, key="btn_load_test_sample_all", type="primary")
+        load_test_btn = st.button("Načíst testovací data", width="stretch", key="btn_load_test_sample_all", type="primary")
 
         if load_test_btn:
             test_path_desktop = r"C:\Users\adalb\Desktop\Testovací soubor.xlsx"
@@ -8132,7 +8136,7 @@ if st.session_state.df is not None:
                     file_name="tabulka_dat.csv",
                     mime="text/csv",
                     key="dl_table_preview_csv",
-                    use_container_width=True
+                    width="stretch"
                 )
             with c_xlsx:
                 _safe_download_button(
@@ -8141,7 +8145,7 @@ if st.session_state.df is not None:
                     file_name="tabulka_dat.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     key="dl_table_preview_xlsx",
-                    use_container_width=True
+                    width="stretch"
                 )
 
         with st.expander("Editace textových sloupců a popisů (např. Pladias)", expanded=False):
@@ -8204,7 +8208,7 @@ if st.session_state.df is not None:
                         edit_subset[c_ed] = edit_subset[c_ed].apply(lambda x: "" if pd.isna(x) else str(x))
                     edited_df = st.data_editor(
                         edit_subset,
-                        use_container_width=True,
+                        width="stretch",
                         num_rows="fixed",
                         key="bulk_text_data_editor"
                     )
@@ -8220,7 +8224,7 @@ if st.session_state.df is not None:
             with c_dedup_box:
                 st.markdown("**1. Odstranění duplicitních řádků**")
                 st.caption("Vymaže všechny duplicitní záznamy podle prvního sloupce tabulky.")
-                if st.button("Odstranit duplicity", key="btn_manual_dedup_action", help="Vymaže všechny duplicitní řádky podle prvního sloupce", use_container_width=True):
+                if st.button("Odstranit duplicity", key="btn_manual_dedup_action", help="Vymaže všechny duplicitní řádky podle prvního sloupce", width="stretch"):
                     before_len = len(st.session_state.df)
                     st.session_state.df = st.session_state.df.drop_duplicates(subset=[columns[0]]).reset_index(drop=True)
                     after_len = len(st.session_state.df)
@@ -8239,7 +8243,7 @@ if st.session_state.df is not None:
                 with c_del_sel:
                     item_to_delete = st.selectbox("Položka k odstranění:", options=all_items, key="sb_delete_single_item", label_visibility="collapsed")
                 with c_del_b:
-                    if st.button("Smazat řádek", key="btn_confirm_delete_row", use_container_width=True):
+                    if st.button("Smazat řádek", key="btn_confirm_delete_row", width="stretch"):
                         st.session_state.df = st.session_state.df[st.session_state.df[columns[0]].astype(str) != str(item_to_delete)].reset_index(drop=True)
                         st.success(f"Položka '{item_to_delete}' byla úspěšně odstraněna.")
                         st.rerun()
@@ -8253,7 +8257,7 @@ if st.session_state.df is not None:
                 clean_col_choice = st.selectbox("Sloupec se jmény k vyčištění:", options=columns, index=0, key="clean_col_choice")
             with col_clean2:
                 st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-                btn_clean_run = st.button("Převést na druhovou úroveň", key="btn_clean_run_species", help="Odstraní subsp., var., agg. a automaticky sloučí vzniklé duplicity", use_container_width=True)
+                btn_clean_run = st.button("Převést na druhovou úroveň", key="btn_clean_run_species", help="Odstraní subsp., var., agg. a automaticky sloučí vzniklé duplicity", width="stretch")
             with col_clean3:
                 st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
                 with st.popover("?", help="Co znamená převod na druhovou úroveň?"):
@@ -8327,7 +8331,10 @@ if st.session_state.df is not None:
                     if nom_source_choice == "Klíč ke květeně ČR (Kaplan et al. 2019)":
                         klic_p = get_local_dataset_path("klic_2019")
                         try:
-                            map_df = pd.read_excel(klic_p)
+                            try:
+                                map_df = pd.read_excel(klic_p, engine="calamine")
+                            except Exception:
+                                map_df = pd.read_excel(klic_p)
                             loaded_source_name = "Klíč ke květeně ČR (Kaplan et al. 2019)"
                             st.info(f"Načten checklist z Klíče ke květeně ČR: **{len(map_df)}** taxonů.")
                         except Exception as e:
@@ -8999,11 +9006,11 @@ if st.session_state.df is not None:
 
                         cur_nav1, cur_nav2, cur_nav3 = st.columns([0.8, 3.4, 0.8])
                         with cur_nav1:
-                            if st.button("◀ Předchozí", key="cur_prev_btn", use_container_width=True):
+                            if st.button("◀ Předchozí", key="cur_prev_btn", width="stretch"):
                                 st.session_state.curator_row_idx = max(0, st.session_state.curator_row_idx - 1)
                                 st.rerun()
                         with cur_nav3:
-                            if st.button("Další ▶", key="cur_next_btn", use_container_width=True):
+                            if st.button("Další ▶", key="cur_next_btn", width="stretch"):
                                 st.session_state.curator_row_idx = min(len(df) - 1, st.session_state.curator_row_idx + 1)
                                 st.rerun()
 
@@ -9100,7 +9107,7 @@ if st.session_state.df is not None:
                                 c_attr = c_entry.split("|")[1].strip() if "|" in c_entry else ""
                                 with grid_cols[ci % 3]:
                                     try:
-                                        st.image(c_url, use_container_width=True)
+                                        st.image(c_url, width="stretch")
                                     except Exception:
                                         st.caption(c_url)
                                     is_def_chk = (c_url in existing_urls) or (not existing_urls and ci == 0)
@@ -10612,7 +10619,7 @@ if st.session_state.df is not None:
             help="Pokud sloupec nebo buňka již obsahuje informace (např. z importovaného balíčku nebo tabulky), stahování se pro daný druh přeskočí a stávající hodnota zůstane zachována."
         )
 
-        btn_enrich_clicked = st.button("Spustit obohacení dat (API)", key="btn_run_api_enrichment_main", use_container_width=True, type="primary")
+        btn_enrich_clicked = st.button("Spustit obohacení dat (API)", key="btn_run_api_enrichment_main", width="stretch", type="primary")
 
         if st.session_state.get("enrichment_success_info"):
             e_info = st.session_state.enrichment_success_info
@@ -12366,7 +12373,7 @@ if st.session_state.df is not None:
                 key="cb_also_gen_obsidian",
                 help="Po vytvoření .apkg rovnou vygeneruje i .zip balíček pro Obsidian a webový přehrávač Karty.html se stejným nastavením líce, rubu a stylů."
             )
-            btn_gen_apkg_clicked = st.button("Generovat balíček pro Anki (.apkg)", key="btn_gen_apkg", use_container_width=True, type="primary")
+            btn_gen_apkg_clicked = st.button("Generovat balíček pro Anki (.apkg)", key="btn_gen_apkg", width="stretch", type="primary")
 
             _anki_from_obs = st.session_state.pop("_trigger_anki_from_obsidian", None)
             if btn_gen_apkg_clicked or _anki_from_obs is not None:
@@ -13474,7 +13481,7 @@ if st.session_state.df is not None:
                 key="cb_also_gen_anki",
                 help="Po vytvoření .zip balíčku pro Obsidian rovnou vygeneruje i .apkg balíček pro Anki se stejným rozvržením líce, rubu a formátováním."
             )
-            btn_gen_obs_clicked = st.button("Generovat balíček pro Obsidian (.zip)", key="btn_gen_obsidian", use_container_width=True, type="primary")
+            btn_gen_obs_clicked = st.button("Generovat balíček pro Obsidian (.zip)", key="btn_gen_obsidian", width="stretch", type="primary")
 
             if btn_gen_obs_clicked:
                 if not obs_front_cols and not obs_back_cols:
@@ -13736,9 +13743,9 @@ if st.session_state.df is not None:
             st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
             col_p_btn1, col_p_btn2 = st.columns([1, 1], gap="medium")
             with col_p_btn1:
-                btn_preview_pdf_clicked = st.button("Rychlý náhled 1. položky (PDF)", key="btn_preview_pdf", use_container_width=True)
+                btn_preview_pdf_clicked = st.button("Rychlý náhled 1. položky (PDF)", key="btn_preview_pdf", width="stretch")
             with col_p_btn2:
-                btn_generate_pdf_clicked = st.button("Generovat celou PDF brožuru (.pdf)", key="btn_generate_pdf", use_container_width=True, type="primary")
+                btn_generate_pdf_clicked = st.button("Generovat celou PDF brožuru (.pdf)", key="btn_generate_pdf", width="stretch", type="primary")
 
             if st.session_state.get('pdf_preview_data') is not None:
                 with st.expander("Interaktivní náhled PDF (1. položka)", expanded=True):
@@ -14267,7 +14274,7 @@ if st.session_state.df is not None:
                     render_citations_selector_ui(key_prefix="docx")
 
             st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
-            btn_generate_docx_clicked = st.button("Generovat dokument ve Wordu (.docx)", key="btn_generate_docx", use_container_width=True, type="primary")
+            btn_generate_docx_clicked = st.button("Generovat dokument ve Wordu (.docx)", key="btn_generate_docx", width="stretch", type="primary")
 
             if btn_generate_docx_clicked:
                 st.session_state.api_errors = []
@@ -14667,7 +14674,7 @@ if st.session_state.df is not None:
                     mime="text/html",
                     key="tools_dl_karty_html",
                     help="Stáhne samostatný HTML soubor přehrávače kartiček pro offline použití v prohlížeči.",
-                    use_container_width=True
+                    width="stretch"
                 )
                 st.caption("*(Poznámka: Tento přehrávač je také automaticky přibalen uvnitř každého vygenerovaného .zip balíčku jako index.html).*")
 
@@ -14689,7 +14696,7 @@ if st.session_state.df is not None:
                     mime="text/html",
                     key="tools_dl_batch_replacer",
                     help="Stáhne samostatný HTML soubor pro čištění dat v prohlížeči bez internetu.",
-                    use_container_width=True
+                    width="stretch"
                 )
                 st.caption("*(Jednosouborová HTML aplikace bez nutnosti instalace).*")
 
@@ -14706,7 +14713,7 @@ if st.session_state.df is not None:
                     file_name="O_generatoru.pdf",
                     mime="application/pdf",
                     key="man_dl_gen_pdf",
-                    use_container_width=True
+                    width="stretch"
                 )
         with col_m2:
             if pdf_anki_data:
@@ -14716,7 +14723,7 @@ if st.session_state.df is not None:
                     file_name="O_Anki.pdf",
                     mime="application/pdf",
                     key="man_dl_anki_pdf",
-                    use_container_width=True
+                    width="stretch"
                 )
         with col_m3:
             if 'pdf_karty_data' in locals() and pdf_karty_data:
@@ -14726,7 +14733,7 @@ if st.session_state.df is not None:
                     file_name="O_Karty_html.pdf",
                     mime="application/pdf",
                     key="man_dl_karty_pdf",
-                    use_container_width=True
+                    width="stretch"
                 )
         with col_m4:
             cit_pdf_data = generate_citations_pdf()
@@ -14736,7 +14743,7 @@ if st.session_state.df is not None:
                 file_name="Citace_a_databaze.pdf",
                 mime="application/pdf",
                 key="man_dl_cit_pdf",
-                use_container_width=True
+                width="stretch"
             )
 
         st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
