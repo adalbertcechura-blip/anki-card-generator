@@ -2053,7 +2053,7 @@ def resolve_scientific_name(name: str, prefer_fungi: bool = False) -> str:
     def _query_mykologie(query_term):
         try:
             s_url = f"https://www.mykologie.net/index.php?option=com_k2&view=itemlist&task=search&searchword={urllib.parse.quote(query_term)}"
-            r = requests.get(s_url, headers=headers, timeout=5)
+            r = _scrape_session.get(s_url, headers=headers, timeout=(2.5, 4))
             if r.status_code == 200:
                 soup = BeautifulSoup(r.text, 'html.parser')
                 items = []
@@ -2504,7 +2504,7 @@ def _cached_mykologie_data(query_str: str):
     def _do_search(search_term):
         s_url = f"https://www.mykologie.net/index.php?option=com_k2&view=itemlist&task=search&searchword={urllib.parse.quote(search_term)}"
         try:
-            r = _scrape_session.get(s_url, headers=headers, timeout=(3, 5))
+            r = _scrape_session.get(s_url, headers=headers, timeout=(2.5, 4))
             if r.status_code != 200:
                 return []
             soup = BeautifulSoup(r.text, 'html.parser')
@@ -2520,25 +2520,27 @@ def _cached_mykologie_data(query_str: str):
                         items.append((a.get_text(strip=True), href))
             return items
         except Exception:
-            return []
+            return None
 
     try:
         found_items = _do_search(clean_q)
+        if found_items is None:
+            return res
 
         if not found_items and (any(ord(c) > 127 for c in clean_q) or len(clean_q.split()) != 2):
             try:
-                r_tax = requests.get(
+                r_tax = _scrape_session.get(
                     "https://api.inaturalist.org/v1/taxa",
                     params={"q": clean_q, "locale": "cs", "per_page": 3},
                     headers=headers,
-                    timeout=5
+                    timeout=(2.5, 4)
                 )
                 if r_tax.status_code == 200:
                     tax_results = r_tax.json().get("results", [])
                     if tax_results:
                         sci_candidate = tax_results[0].get("name", "")
                         if sci_candidate:
-                            found_items = _do_search(sci_candidate)
+                            found_items = _do_search(sci_candidate) or []
             except Exception:
                 pass
 
@@ -2641,7 +2643,7 @@ def _resolve_fungi_binomial(species_name: str) -> str:
     clean_q = re.sub(r'\s+sp(p)?\.?$', '', clean_q).strip()
     if not clean_q:
         return ""
-    if any(ord(c) > 127 for c in clean_q) or len(clean_q.split()) != 2:
+    if any(ord(c) > 127 for c in clean_q) or len(clean_q.split()) < 2:
         try:
             res_sci = resolve_scientific_name(clean_q, prefer_fungi=True)
             if res_sci:
