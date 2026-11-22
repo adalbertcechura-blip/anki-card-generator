@@ -50,6 +50,11 @@ _session.mount("http://", _adapter)
 requests.get = _session.get
 requests.head = _session.head
 
+_scrape_session = requests.Session()
+_scrape_adapter = HTTPAdapter(pool_connections=20, pool_maxsize=20, max_retries=0)
+_scrape_session.mount("https://", _scrape_adapter)
+_scrape_session.mount("http://", _scrape_adapter)
+
 _COUNTRIES_DB_CACHE = None
 _LOCAL_FLORA_DB_CACHE = None
 _img_dim_cache = {}
@@ -2499,7 +2504,7 @@ def _cached_mykologie_data(query_str: str):
     def _do_search(search_term):
         s_url = f"https://www.mykologie.net/index.php?option=com_k2&view=itemlist&task=search&searchword={urllib.parse.quote(search_term)}"
         try:
-            r = requests.get(s_url, headers=headers, timeout=6)
+            r = _scrape_session.get(s_url, headers=headers, timeout=(3, 5))
             if r.status_code != 200:
                 return []
             soup = BeautifulSoup(r.text, 'html.parser')
@@ -2562,7 +2567,7 @@ def _cached_mykologie_data(query_str: str):
 
         item_href = best_item[1]
         full_url = urllib.parse.urljoin('https://www.mykologie.net', item_href)
-        r_item = requests.get(full_url, headers=headers, timeout=8)
+        r_item = _scrape_session.get(full_url, headers=headers, timeout=(3, 5))
         if r_item.status_code != 200:
             return res
 
@@ -2659,7 +2664,7 @@ def _cached_first_nature_fungi(species_name: str):
     page_url = f"https://www.first-nature.com/fungi/{slug}.php"
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
     try:
-        r = requests.get(page_url, headers=headers, timeout=6)
+        r = _scrape_session.get(page_url, headers=headers, timeout=(3, 5))
         if r.status_code != 200:
             return res
         soup = BeautifulSoup(r.text, 'html.parser')
@@ -2713,11 +2718,11 @@ def _cached_mushroom_observer_photos(species_name: str, max_photos: int = 5):
         return tuple()
     photos = []
     try:
-        r = requests.get(
+        r = _scrape_session.get(
             "https://mushroomobserver.org/api2/observations",
             params={"name": binomial, "has_images": "true", "detail": "high", "format": "json"},
             headers={"User-Agent": "AnkiCardGenerator/1.0 (educational use)"},
-            timeout=7
+            timeout=(3, 6)
         )
         if r.status_code != 200:
             return tuple()
@@ -5120,6 +5125,8 @@ ALL_AVAILABLE_CITATIONS = {
     "iNaturalist": "iNaturalist Community. Pozorování, mapy a fotografie pod licencemi Creative Commons. (inaturalist.org)",
     "GBIF": "Global Biodiversity Information Facility (GBIF.org) Backbone Taxonomy, Occurrences & Multimedia.",
     "Mykologie.net": "Mykologická databáze mykologie.net – popisy, fotografie a určování hub v ČR. (mykologie.net)",
+    "First Nature": "First Nature – Wildlife & Fungi of Britain and Europe (fotografie a mykologické popisy). (first-nature.com/fungi)",
+    "Mushroom Observer": "Mushroom Observer Community – mezinárodní mykologická databáze fotografií pod licencemi Creative Commons. (mushroomobserver.org)",
     "DaLiBor": "Botanický ústav AV ČR: DaLiBor – Atlas českých lišejníků. (dalib.cz)",
     "Mushroom Color Atlas": "Beeler J. (2024): The Mushroom Color Atlas – A Guide to Dyes and Pigments Made from Fungi. (mushroomcoloratlas.com)",
     "Wikimedia Commons": "Multimediální repozitář Wikimedia Foundation pod volnými licencemi Creative Commons.",
@@ -5168,6 +5175,12 @@ def get_active_citations(cols=None, df=None, selected_sources=None) -> list:
 
     if "[Mykologie.net]" in combined_check or "mykologie.net" in combined_check:
         citations.append(("Mykologie.net", ALL_AVAILABLE_CITATIONS["Mykologie.net"]))
+
+    if "[First Nature]" in combined_check or "first-nature.com" in combined_check:
+        citations.append(("First Nature", ALL_AVAILABLE_CITATIONS["First Nature"]))
+
+    if "[Mushroom Observer]" in combined_check or "mushroomobserver.org" in combined_check:
+        citations.append(("Mushroom Observer", ALL_AVAILABLE_CITATIONS["Mushroom Observer"]))
 
     if "[DaLiBor]" in combined_check or "dalib.cz" in combined_check:
         citations.append(("DaLiBor", ALL_AVAILABLE_CITATIONS["DaLiBor"]))
@@ -9010,7 +9023,7 @@ if st.session_state.df is not None:
                         cur_sp_name = str(df.iloc[cur_idx][columns[0]]).strip() if pd.notna(df.iloc[cur_idx][columns[0]]) else ""
 
                         img_col_cands = [c for c in columns if check_col_is_image(c, df) or is_image_col(c)]
-                        for def_ic in ["[Pladias] Fotky", "[Pladias] Celá rostlina", "[Pladias] Květ", "[Pladias] List", "[iNat] Obrázky (URL)", "[Wikimedia] Obrázky (URL)", "[Vlastní] Fotografie"]:
+                        for def_ic in ["[Pladias] Fotky", "[Pladias] Celá rostlina", "[Pladias] Květ", "[Pladias] List", "[iNat] Obrázky (URL)", "[Wikimedia] Obrázky (URL)", "[First Nature] Fotky", "[Mushroom Observer] Fotky", "[Mykologie.net] Fotky", "[GBIF] Houby", "[Vlastní] Fotografie"]:
                             if def_ic not in img_col_cands:
                                 img_col_cands.append(def_ic)
                         img_col_cands.append("— Vytvořit nový sloupec —")
@@ -9031,6 +9044,10 @@ if st.session_state.df is not None:
                                 "Pladias.cz – Plod / semeno",
                                 "iNaturalist",
                                 "Wikimedia Commons",
+                                "First Nature (Houby)",
+                                "Mushroom Observer (Houby)",
+                                "Mykologie.net (Houby)",
+                                "GBIF (Houby)",
                                 "Aktuální fotky v buňce"
                             ]
                             cur_src_choice = st.selectbox("Zdroj kandidátů:", options=cur_src_opts, key="cur_src_sel")
@@ -9060,6 +9077,14 @@ if st.session_state.df is not None:
                                     loaded_cands = fetch_inaturalist_data(sp_q, max_photos=cur_limit).get("photo_urls", [])
                                 elif cur_src_choice == "Wikimedia Commons":
                                     loaded_cands = fetch_wikimedia_images(sp_q, max_photos=cur_limit)
+                                elif cur_src_choice == "First Nature (Houby)":
+                                    loaded_cands = fetch_first_nature_fungi(sp_q, max_photos=cur_limit).get("photo_urls", [])
+                                elif cur_src_choice == "Mushroom Observer (Houby)":
+                                    loaded_cands = fetch_mushroom_observer_photos(sp_q, max_photos=cur_limit)
+                                elif cur_src_choice == "Mykologie.net (Houby)":
+                                    loaded_cands = fetch_mykologie_data(sp_q, max_photos=cur_limit).get("photo_urls", [])
+                                elif cur_src_choice == "GBIF (Houby)":
+                                    loaded_cands = fetch_gbif_fungi_photos(sp_q, max_photos=cur_limit)
                             st.session_state["curator_loaded_key"] = cur_cache_key
                             st.session_state["curator_loaded_cands"] = loaded_cands
 
@@ -11776,8 +11801,9 @@ if st.session_state.df is not None:
             unfound_list = []
 
             if total > 0:
-                workers = min(6, total)
+                workers = min(4, total)
                 completed_count = 0
+                status.text(f"Obohacování dat: 0/{total} (0%) — spouštím...")
                 with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as enrich_exec:
                     future_to_meta = {}
                     for idx, row in df.iterrows():
@@ -11818,10 +11844,12 @@ if st.session_state.df is not None:
         active_cols_for_desc = list(dict.fromkeys(st.session_state.front_cols_ordered + st.session_state.back_cols_ordered))
         has_pladias = any(("[Pladias]" in str(c) or "[Pladias.cz]" in str(c)) for c in active_cols_for_desc)
         has_myko = any("[Mykologie.net]" in str(c) for c in active_cols_for_desc)
+        has_first_nature = any("[First Nature]" in str(c) for c in active_cols_for_desc)
+        has_mushroom_obs = any("[Mushroom Observer]" in str(c) for c in active_cols_for_desc)
         has_dalibor = any("[DaLiBor]" in str(c) for c in active_cols_for_desc)
         has_diatom = any("[DiatomBase]" in str(c) for c in active_cols_for_desc)
         has_algae = any("[AlgaeBase]" in str(c) for c in active_cols_for_desc)
-        has_attribution = has_pladias or has_myko or has_dalibor or has_diatom or has_algae
+        has_attribution = has_pladias or has_myko or has_first_nature or has_mushroom_obs or has_dalibor or has_diatom or has_algae
         default_attribution_desc = build_deck_attribution(active_cols_for_desc) if has_attribution else ""
 
         tab_anki, tab_obsidian, tab_pdf, tab_docx = st.tabs([
