@@ -5411,6 +5411,29 @@ def register_pdf_fonts():
                 pass
     return fn_normal, fn_bold, fn_italic, fn_bold_italic
 
+def _infer_photo_source_label(col_name: str, url_str: str = "") -> str:
+    c_low = str(col_name or "").lower()
+    u_low = str(url_str or "").lower()
+    if "mykologie.net" in c_low or "mykologie.net" in u_low:
+        return "Mykologie.net"
+    if "pladias" in c_low or "files.ibot.cas.cz/cevs" in u_low or "pladias.cz" in u_low:
+        return "Pladias.cz"
+    if "dalibor" in c_low or "dalib.cz" in u_low:
+        return "DaLiBor (dalib.cz)"
+    if "first nature" in c_low or "first-nature.com" in u_low:
+        return "First Nature (first-nature.com)"
+    if "mushroom observer" in c_low or "mushroomobserver.org" in u_low:
+        return "Mushroom Observer"
+    if "inat" in c_low or "inaturalist" in u_low:
+        return "iNaturalist"
+    if "gbif" in c_low:
+        return "GBIF"
+    if "wikimedia" in c_low or "wikimedia.org" in u_low:
+        return "Wikimedia Commons"
+    if "mechorosty" in c_low:
+        return "Mechorosty ČR"
+    return ""
+
 def generate_pdf_booklet(
     df: pd.DataFrame,
     output_pdf_path: str,
@@ -6036,7 +6059,7 @@ def generate_pdf_booklet(
                         safe_fn = f"{clean_sp}_{organ}{ext}" if u_idx == 0 else f"{clean_sp}_{organ}_{u_idx}{ext}"
                         lpath = os.path.join(media_dir, safe_fn)
                         if os.path.exists(lpath) and os.path.getsize(lpath) > 0:
-                            attr = media_attributions.get(safe_fn, "")
+                            attr = media_attributions.get(safe_fn, "") or _infer_photo_source_label(col, url)
                             if is_herbarium_image(lpath, attr, col):
                                 continue
                             if not any(img[0] == lpath for img in gathered_photos):
@@ -6065,13 +6088,13 @@ def generate_pdf_booklet(
                             safe_fn = f"{clean_sp}_{safe_col}_{idx}_{img_idx}_{url_hash}{ext}"
                             opt_lpath = os.path.join(media_dir, safe_fn) if media_dir else ""
                             lpath = opt_lpath if (opt_lpath and os.path.exists(opt_lpath) and os.path.getsize(opt_lpath) > 0) else loc_cand
-                            attr = attr_item or media_attributions.get(safe_fn, "") or media_attributions.get(url, "") or media_attributions.get(os.path.basename(url.replace("\\", "/")), "") or media_attributions.get(loc_cand, "")
+                            attr = attr_item or media_attributions.get(safe_fn, "") or media_attributions.get(url, "") or media_attributions.get(os.path.basename(url.replace("\\", "/")), "") or media_attributions.get(loc_cand, "") or _infer_photo_source_label(col, url)
                             _w, _h = _get_image_dims(lpath)
                             if _w > 0 and _h > 0 and not any(img[0] == lpath for img in gathered_photos):
                                 gathered_photos.append((lpath, col, attr))
                         elif os.path.isfile(url):
                             lpath = url
-                            attr = attr_item or media_attributions.get(url, "") or media_attributions.get(os.path.basename(url.replace("\\", "/")), "")
+                            attr = attr_item or media_attributions.get(url, "") or media_attributions.get(os.path.basename(url.replace("\\", "/")), "") or _infer_photo_source_label(col, url)
                             _w, _h = _get_image_dims(lpath)
                             if _w > 0 and _h > 0 and not any(img[0] == lpath for img in gathered_photos):
                                 gathered_photos.append((lpath, col, attr))
@@ -6085,7 +6108,7 @@ def generate_pdf_booklet(
                             safe_fn = f"{clean_sp}_{safe_col}_{idx}_{img_idx}_{url_hash}{ext}"
                             lpath = os.path.join(media_dir, safe_fn)
                             if os.path.exists(lpath) and os.path.getsize(lpath) > 0:
-                                attr = media_attributions.get(safe_fn, "") or attr_item
+                                attr = media_attributions.get(safe_fn, "") or attr_item or _infer_photo_source_label(col, url)
                                 _w, _h = _get_image_dims(lpath)
                                 if _w > 0 and _h > 0 and not any(img[0] == lpath for img in gathered_photos):
                                     gathered_photos.append((lpath, col, attr))
