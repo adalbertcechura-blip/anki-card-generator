@@ -1,10 +1,4 @@
 import streamlit as st
-try:
-    import ui_i18n
-    ui_i18n.set_lang_getter(lambda: st.session_state.get("ui_lang", "cs"))
-    ui_i18n.install_streamlit_i18n(st)
-except ImportError:
-    ui_i18n = None
 import pandas as pd
 import requests
 import os
@@ -7388,19 +7382,6 @@ with col_head1:
     st.markdown('<div class="subtitle">Nahrajte tabulku, obohaťte ji o data přes API a sestavte líc a rub kartiček.</div>', unsafe_allow_html=True)
 with col_head2:
     st.markdown("<div style='margin-top: 6px;'></div>", unsafe_allow_html=True)
-    if "ui_lang" not in st.session_state:
-        st.session_state.ui_lang = "cs"
-    lang_sel = st.radio(
-        "Jazyk / Language:",
-        options=["Čeština", "English"],
-        index=0 if st.session_state.ui_lang == "cs" else 1,
-        horizontal=True,
-        key="w_app_ui_lang_radio"
-    )
-    new_lang = "en" if lang_sel == "English" else "cs"
-    if new_lang != st.session_state.ui_lang:
-        st.session_state.ui_lang = new_lang
-        st.rerun()
     theme_sel = st.radio(
         "Vzhled aplikace:",
         options=["Světlý režim", "Tmavý režim"],
