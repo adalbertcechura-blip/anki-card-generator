@@ -4563,6 +4563,124 @@ def build_obsidian_zip_package(
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
 
+def _parse_karty_zip_to_df(zip_file_or_bytes, media_target_dir=None):
+    """Načte balíček Karty.html / Obsidian (.zip) do DataFrame a extrahuje média do custom_media."""
+    if media_target_dir is None:
+        media_target_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "custom_media")
+    os.makedirs(media_target_dir, exist_ok=True)
+
+    if hasattr(zip_file_or_bytes, 'read'):
+        zip_file_or_bytes.seek(0)
+        zf_src = io.BytesIO(zip_file_or_bytes.read())
+    elif isinstance(zip_file_or_bytes, (bytes, bytearray)):
+        zf_src = io.BytesIO(zip_file_or_bytes)
+    else:
+        zf_src = str(zip_file_or_bytes)
+
+    media_exts = ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.mp3', '.wav', '.ogg', '.m4a')
+    cards_raw = []
+    deck_name = ""
+
+    with zipfile.ZipFile(zf_src, 'r') as zf:
+        names = zf.namelist()
+        for entry in names:
+            low = entry.lower()
+            if not entry.endswith('/') and low.endswith(media_exts):
+                bname = os.path.basename(entry)
+                if bname:
+                    target_p = os.path.join(media_target_dir, bname)
+                    if not os.path.exists(target_p):
+                        with open(target_p, 'wb') as f_m:
+                            f_m.write(zf.read(entry))
+
+        js_candidates = [n for n in names if n.lower().endswith('deck_data.js')]
+        if js_candidates:
+            raw_js = zf.read(js_candidates[0]).decode('utf-8', errors='replace').strip()
+            eq_idx = raw_js.find('=')
+            if eq_idx != -1:
+                json_part = raw_js[eq_idx + 1:].strip().rstrip(';')
+                deck_obj = json.loads(json_part)
+                deck_name = str(deck_obj.get('name', '') or '').strip()
+                cards_raw = deck_obj.get('cards', []) or []
+        else:
+            md_files = [
+                n for n in names
+                if n.lower().endswith('.md')
+                and not os.path.basename(n).startswith('00_')
+                and not os.path.basename(n).startswith('.')
+            ]
+            for md_n in sorted(md_files):
+                txt = zf.read(md_n).decode('utf-8', errors='replace')
+                if txt.startswith('---'):
+                    end_fm = txt.find('\n---', 3)
+                    if end_fm != -1:
+                        txt = txt[end_fm + 4:]
+                txt = re.sub(r'(?m)^#flashcards\S*\s*$', '', txt).strip()
+                parts = re.split(r'\n\s*(?:\?\?\?|\?|--+|---)\s*\n', txt, maxsplit=1)
+                front_p = parts[0].strip() if parts else txt
+                back_p = parts[1].strip() if len(parts) > 1 else ''
+                title_p = os.path.splitext(os.path.basename(md_n))[0].replace('_', ' ')
+                cards_raw.append({'title': title_p, 'front': front_p, 'back': back_p})
+
+    def _clean_md_val(val):
+        val = html.unescape(re.sub(r'<[^>]+>', '', str(val or ''))).strip()
+        while len(val) >= 2 and val.startswith('*') and val.endswith('*'):
+            val = val[1:-1].strip()
+        return val
+
+    rows = []
+    for c in cards_raw:
+        row = {}
+        title_val = str(c.get('title', '') or '').strip()
+        row['Pojem'] = title_val
+        if c.get('subdeck'):
+            row['Podbalíček'] = str(c.get('subdeck')).strip()
+
+        imgs = []
+        extra_front = []
+        extra_back = []
+
+        for side_key, extra_buf in (('front', extra_front), ('back', extra_back)):
+            side_txt = str(c.get(side_key, '') or '')
+            for line in side_txt.splitlines():
+                s = line.strip()
+                if not s:
+                    continue
+                wiki_imgs = re.findall(r'!\[\[([^\]|]+)(?:\|[^\]]*)?\]\]', s)
+                md_imgs = re.findall(r'!\[[^\]]*\]\(([^)]+)\)', s)
+                found_imgs = wiki_imgs + md_imgs
+                if found_imgs:
+                    for im in found_imgs:
+                        im_b = os.path.basename(im.strip())
+                        if im_b and im_b not in imgs:
+                            imgs.append(im_b)
+                    s_wo = re.sub(r'!\[\[[^\]]+\]\]|!\[[^\]]*\]\([^)]+\)', '', s).strip()
+                    if not s_wo:
+                        continue
+                    s = s_wo
+                m_field = re.match(r'^\*\*([^*:]+?):\*\*\s*(.*)$', s)
+                if m_field:
+                    col_name = m_field.group(1).strip()
+                    col_val = _clean_md_val(m_field.group(2))
+                    if col_name and col_name != 'Pojem':
+                        row[col_name] = col_val
+                else:
+                    cleaned = _clean_md_val(s)
+                    if cleaned and cleaned != title_val:
+                        extra_buf.append(cleaned)
+
+        if imgs:
+            row['Obrázky'] = '; '.join(imgs)
+        if extra_front:
+            row['Líc (text)'] = '\n'.join(extra_front)
+        if extra_back:
+            row['Rub (text)'] = '\n'.join(extra_back)
+        rows.append(row)
+
+    df_out = pd.DataFrame(rows) if rows else pd.DataFrame()
+    return df_out, deck_name
+
+
 def extract_apkg_to_dataframe(apkg_file_or_bytes, media_target_dir=None):
     if media_target_dir is None:
         media_target_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "custom_media")
@@ -7629,10 +7747,10 @@ with col_custom_card:
 
         if input_method == "Nahrát soubor (Excel, CSV, TXT, APKG)":
             uploaded_files = st.file_uploader(
-                "Nahrajte jeden nebo více souborů (Excel .xlsx, CSV, TXT nebo balíček Anki .apkg / .colpkg):",
-                type=["csv", "xlsx", "xls", "txt", "apkg", "colpkg"],
+                "Nahrajte jeden nebo více souborů (Excel .xlsx, CSV, TXT, balíček Anki .apkg / .colpkg nebo Karty.html .zip):",
+                type=["csv", "xlsx", "xls", "txt", "apkg", "colpkg", "zip"],
                 accept_multiple_files=True,
-                help="Můžete nahrát tabulku i balíček Anki současně. Program je inteligentně sloučí a zachová historii učení!"
+                help="Můžete nahrát tabulku, balíček Anki (.apkg/.colpkg) i exportovaný balíček pro Karty.html (.zip) – při re-exportu zůstane postup učení v Karty.html zachován!"
             )
 
             merge_anki_policy = "merge_all"
@@ -7642,7 +7760,7 @@ with col_custom_card:
 
             if uploaded_files:
                 has_apkg_file = any(f.name.lower().endswith(('.apkg', '.colpkg')) for f in uploaded_files)
-                has_table_file = any(f.name.lower().endswith(('.xlsx', '.xls', '.csv', '.txt')) for f in uploaded_files)
+                has_table_file = any(f.name.lower().endswith(('.xlsx', '.xls', '.csv', '.txt', '.zip')) for f in uploaded_files)
                 is_mixed = has_apkg_file and (has_table_file or st.session_state.df is not None)
 
                 if is_mixed:
@@ -7788,6 +7906,12 @@ with col_custom_card:
                             sub_df, imported_deck = extract_apkg_to_dataframe(up_f)
                             apkg_dfs.append(sub_df)
                             apkg_loaded_info.append((up_f.name, len(sub_df), imported_deck))
+                        elif f_low.endswith('.zip'):
+                            sub_df, imported_zip_deck = _parse_karty_zip_to_df(up_f)
+                            if not sub_df.empty:
+                                table_dfs.append(sub_df)
+                                if imported_zip_deck:
+                                    st.session_state.imported_zip_deck_name = imported_zip_deck
                         elif f_low.endswith('.csv'):
                             sub_df = pd.read_csv(up_f)
                             if len(sub_df.columns) <= 1:

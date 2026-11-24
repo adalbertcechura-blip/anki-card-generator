@@ -501,27 +501,6 @@ main {
   margin-top: 18px;
   animation: fadeIn 0.2s ease-in-out;
 }
-.flashcard.side-mode-separate .card-answer {
-  border-top: none;
-  margin-top: 0;
-  padding-top: 0;
-}
-.btn-side-peek {
-  align-self: center;
-  background: var(--bg-surface);
-  color: var(--text-muted);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 6px 14px;
-  font-size: 0.88rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-.btn-side-peek:hover {
-  color: var(--text-main);
-  border-color: var(--accent);
-}
 
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(4px); }
@@ -529,25 +508,6 @@ main {
 }
 
 /* Card images */
-.card-img-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin: 6px 0;
-}
-.flashcard.img-layout-2col .card-img-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  align-items: start;
-}
-.flashcard.img-layout-2col .card-img-grid .card-img-thumb {
-  width: 100%;
-  max-height: 320px;
-  min-height: 140px;
-  margin: 0;
-  object-fit: contain;
-}
 .card-img-thumb {
   display: block;
   margin: 8px auto;
@@ -1020,16 +980,21 @@ main {
       </div>
     </div>
 
-    <div class="drop-zone" id="dropZone" style="position: relative;">
+    <div class="drop-zone" id="dropZone">
       <div class="drop-icon">📦</div>
       <div class="drop-title">Přetáhněte sem balíček .zip nebo klikněte</div>
       <div class="drop-subtitle">Otevřete balíček s kartičkami vygenerovaný generátorem (nebo vyberte soubory kartiček)</div>
-      <input type="file" id="fileZipInput" accept=".zip,application/zip,application/x-zip-compressed,application/octet-stream,.md,text/markdown,*/*" multiple style="position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:2;">
+      <input type="file" id="fileZipInput" accept=".zip,application/zip,application/x-zip-compressed,application/octet-stream,.md,text/markdown,*/*" multiple style="display:none">
     </div>
 
-    <div style="display:flex; justify-content:space-between; align-items:center;">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
       <h2 style="font-size:1.15rem; font-weight:700;">Moje balíčky</h2>
-      <span id="deckCountInfo" style="font-size:0.85rem; color:var(--text-muted);">0 balíčků</span>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <button class="btn btn-sm" id="btnExportProgress" title="Stáhnout lehký soubor .json s postupem učení pro přenos na jiné zařízení">📤 Export postupu (.json)</button>
+        <button class="btn btn-sm" id="btnImportProgress" title="Načíst a sloučit postup učení ze souboru .json">📥 Import postupu (.json)</button>
+        <input type="file" id="fileProgressInput" accept=".json,application/json" style="display:none">
+        <span id="deckCountInfo" style="font-size:0.85rem; color:var(--text-muted);">0 balíčků</span>
+      </div>
     </div>
 
     <div class="deck-list" id="deckList">
@@ -1059,14 +1024,6 @@ main {
           <button class="btn-mode-tgl active" id="btnModeFlip" title="Režim otáčení karty">🔄 Otáčecí</button>
           <button class="btn-mode-tgl" id="btnModeType" title="Režim vepisování z klávesnice">⌨️ Vepisovací</button>
         </div>
-        <div class="mode-toggle-group" title="Zobrazení rubu karty">
-          <button class="btn-mode-tgl active" id="btnBackStacked" title="Zobrazit líc i rub pod sebou">📄 Pod sebe</button>
-          <button class="btn-mode-tgl" id="btnBackSeparate" title="Zobrazit rub na druhé straně karty">🃏 Na druhou stranu</button>
-        </div>
-        <div class="mode-toggle-group" title="Rozložení obrázků">
-          <button class="btn-mode-tgl active" id="btnImg1Col" title="Obrázky pod sebou (1 sloupec)">↕️ 1 sloupec</button>
-          <button class="btn-mode-tgl" id="btnImg2Col" title="Obrázky vedle sebe (2 sloupce)">◫ 2 sloupce</button>
-        </div>
         <label class="switch-label">
           <input type="checkbox" id="chkReverseStudy">
           <span>Otočit směr</span>
@@ -1075,7 +1032,6 @@ main {
           <input type="checkbox" id="chkQuickReview">
           <span>Rychlé procvičení</span>
         </label>
-        <button class="btn-mode-tgl" id="btnStudySrsSettings" title="Nastavení denního limitu a logiky zapomínání">⚙ Limity &amp; SRS</button>
       </div>
     </div>
 
@@ -1105,7 +1061,6 @@ main {
 
       <div class="study-controls">
         <button class="btn-flip" id="btnFlip">Zobrazit odpověď (Mezerník / Klepnutí)</button>
-        <button class="btn-side-peek" id="btnSidePeek" style="display:none;">↻ Zobrazit líc</button>
         <div class="rating-grid" id="ratingGrid">
           <button class="btn-rate btn-rate-again" id="btnAgain" title="Klávesa 1">
             <span>Znovu (1)</span>
@@ -1221,65 +1176,6 @@ main {
   </div>
 </div>
 
-<!-- SRS & DAILY LIMIT SETTINGS MODAL -->
-<div class="modal-overlay" id="srsSettingsModal">
-  <div class="modal-content" style="max-width:460px;">
-    <div class="modal-header">
-      <div class="modal-title" id="srsModalTitle">⚙ Nastavení učení a zapomínání</div>
-      <button class="modal-close" id="srsModalClose">&times;</button>
-    </div>
-    <div style="display:flex; flex-direction:column; gap:12px; font-size:0.9rem;">
-      <div class="daily-limit-control" style="margin:0;">
-        <span style="color:#d4d4d8; font-weight:600;">Denní limit nových karet <small style="color:#95ab9e;">(0 = ∞)</small>:</span>
-        <div style="display:flex; align-items:center; gap:6px;">
-          <input type="number" id="inpSrsDailyLimit" min="0" max="500" step="1" value="20" style="width:78px; background:#09090b; border:1px solid #3f3f46; color:#fff; padding:5px 8px; border-radius:6px; text-align:center; font-weight:700;">
-          <span style="font-size:0.8rem; color:#95ab9e;">/ den</span>
-        </div>
-      </div>
-      <div class="daily-limit-control" style="margin:0;">
-        <span style="color:#d4d4d8;">Znovu (Again) – krok <small style="color:#95ab9e;">(min. 1 min)</small>:</span>
-        <div style="display:flex; align-items:center; gap:6px;">
-          <input type="number" id="inpSrsAgainMin" min="1" max="1440" step="1" value="10" style="width:78px; background:#09090b; border:1px solid #3f3f46; color:#fff; padding:5px 8px; border-radius:6px; text-align:center; font-weight:700;">
-          <span style="font-size:0.8rem; color:#95ab9e;">min</span>
-        </div>
-      </div>
-      <div class="daily-limit-control" style="margin:0;">
-        <span style="color:#d4d4d8;">Těžké (Hard) – první krok <small style="color:#95ab9e;">(min. 1 min)</small>:</span>
-        <div style="display:flex; align-items:center; gap:6px;">
-          <input type="number" id="inpSrsHardMin" min="1" max="10080" step="1" value="1440" style="width:78px; background:#09090b; border:1px solid #3f3f46; color:#fff; padding:5px 8px; border-radius:6px; text-align:center; font-weight:700;">
-          <span style="font-size:0.8rem; color:#95ab9e;">min</span>
-        </div>
-      </div>
-      <div class="daily-limit-control" style="margin:0;">
-        <span style="color:#d4d4d8;">Dobré (Good) – první krok <small style="color:#95ab9e;">(min. 1 min)</small>:</span>
-        <div style="display:flex; align-items:center; gap:6px;">
-          <input type="number" id="inpSrsGoodMin" min="1" max="10080" step="1" value="1440" style="width:78px; background:#09090b; border:1px solid #3f3f46; color:#fff; padding:5px 8px; border-radius:6px; text-align:center; font-weight:700;">
-          <span style="font-size:0.8rem; color:#95ab9e;">min</span>
-        </div>
-      </div>
-      <div class="daily-limit-control" style="margin:0;">
-        <span style="color:#d4d4d8;">Snadné (Easy) – první krok:</span>
-        <div style="display:flex; align-items:center; gap:6px;">
-          <input type="number" id="inpSrsEasyDays" min="1" max="365" step="1" value="4" style="width:78px; background:#09090b; border:1px solid #3f3f46; color:#fff; padding:5px 8px; border-radius:6px; text-align:center; font-weight:700;">
-          <span style="font-size:0.8rem; color:#95ab9e;">dní</span>
-        </div>
-      </div>
-      <div class="daily-limit-control" style="margin:0;">
-        <span style="color:#d4d4d8;">Násobitel intervalů <small style="color:#95ab9e;">(0.5× častěji – 2.0× méně často)</small>:</span>
-        <div style="display:flex; align-items:center; gap:6px;">
-          <input type="number" id="inpSrsMult" min="0.5" max="2.0" step="0.1" value="1.0" style="width:78px; background:#09090b; border:1px solid #3f3f46; color:#fff; padding:5px 8px; border-radius:6px; text-align:center; font-weight:700;">
-          <span style="font-size:0.8rem; color:#95ab9e;">×</span>
-        </div>
-      </div>
-      <div style="font-size:0.78rem; color:#95ab9e;">Tip: 60 min = 1 hodina, 1440 min = 1 den. Nastavení se ukládá zvlášť pro každý balíček.</div>
-      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:4px;">
-        <button class="btn btn-sm" id="btnSrsResetDef" type="button">Výchozí hodnoty</button>
-        <button class="btn btn-primary btn-sm" id="btnSrsSave" type="button">Uložit nastavení</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- INLINED JSZIP LIBRARY -->
 <script>
 /*!
@@ -1309,105 +1205,60 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 const DB_NAME = "KartyFlashcardsDB";
 const DB_VERSION = 2;
 let db = null;
-const _memDecks = new Map();
-const _memMedia = new Map();
-const _memReviews = [];
 
 function initDB() {
-  return new Promise((resolve) => {
-    try {
-      if (typeof indexedDB === "undefined") {
-        resolve(null);
-        return;
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains("decks")) {
+        d.createObjectStore("decks", { keyPath: "id" });
       }
-      const req = indexedDB.open(DB_NAME, DB_VERSION);
-      req.onupgradeneeded = (e) => {
-        const d = e.target.result;
-        if (!d.objectStoreNames.contains("decks")) {
-          d.createObjectStore("decks", { keyPath: "id" });
-        }
-        if (!d.objectStoreNames.contains("media")) {
-          d.createObjectStore("media");
-        }
-        if (!d.objectStoreNames.contains("reviews")) {
-          const revStore = d.createObjectStore("reviews", { keyPath: "id", autoIncrement: true });
-          revStore.createIndex("deckId", "deckId", { unique: false });
-          revStore.createIndex("dateStr", "dateStr", { unique: false });
-        }
-      };
-      req.onsuccess = (e) => {
-        db = e.target.result;
-        resolve(db);
-      };
-      req.onerror = () => {
-        db = null;
-        resolve(null);
-      };
-    } catch (err) {
-      db = null;
-      resolve(null);
-    }
+      if (!d.objectStoreNames.contains("media")) {
+        d.createObjectStore("media");
+      }
+      if (!d.objectStoreNames.contains("reviews")) {
+        const revStore = d.createObjectStore("reviews", { keyPath: "id", autoIncrement: true });
+        revStore.createIndex("deckId", "deckId", { unique: false });
+        revStore.createIndex("dateStr", "dateStr", { unique: false });
+      }
+    };
+    req.onsuccess = (e) => {
+      db = e.target.result;
+      resolve(db);
+    };
+    req.onerror = (e) => reject(e);
   });
 }
 
 function dbSaveDeck(deck) {
-  if (!db) {
-    _memDecks.set(deck.id, deck);
-    return Promise.resolve();
-  }
   return new Promise((resolve, reject) => {
-    try {
-      const tx = db.transaction(["decks"], "readwrite");
-      tx.objectStore("decks").put(deck);
-      tx.oncomplete = () => resolve();
-      tx.onerror = (e) => reject(e);
-    } catch (err) {
-      _memDecks.set(deck.id, deck);
-      resolve();
-    }
+    const tx = db.transaction(["decks"], "readwrite");
+    tx.objectStore("decks").put(deck);
+    tx.oncomplete = () => resolve();
+    tx.onerror = (e) => reject(e);
   });
 }
 
 function dbGetAllDecks() {
-  if (!db) {
-    return Promise.resolve(Array.from(_memDecks.values()));
-  }
   return new Promise((resolve, reject) => {
-    try {
-      const tx = db.transaction(["decks"], "readonly");
-      const req = tx.objectStore("decks").getAll();
-      req.onsuccess = () => resolve(req.result || []);
-      req.onerror = (e) => reject(e);
-    } catch (err) {
-      resolve(Array.from(_memDecks.values()));
-    }
+    const tx = db.transaction(["decks"], "readonly");
+    const req = tx.objectStore("decks").getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = (e) => reject(e);
   });
 }
 
 function dbGetDeck(id) {
-  if (!db) {
-    return Promise.resolve(_memDecks.get(id));
-  }
   return new Promise((resolve, reject) => {
-    try {
-      const tx = db.transaction(["decks"], "readonly");
-      const req = tx.objectStore("decks").get(id);
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = (e) => reject(e);
-    } catch (err) {
-      resolve(_memDecks.get(id));
-    }
+    const tx = db.transaction(["decks"], "readonly");
+    const req = tx.objectStore("decks").get(id);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = (e) => reject(e);
   });
 }
 
 function dbDeleteDeck(id) {
-  if (!db) {
-    _memDecks.delete(id);
-    for (const k of Array.from(_memMedia.keys())) {
-      if (String(k).startsWith(id + ":")) _memMedia.delete(k);
-    }
-    return Promise.resolve();
-  }
   return new Promise(async (resolve, reject) => {
     try {
       const stores = ["decks", "media"];
@@ -1448,44 +1299,24 @@ function dbDeleteDeck(id) {
 }
 
 function dbSaveMedia(deckId, filename, blob) {
-  if (!db) {
-    _memMedia.set(deckId + ":" + filename, blob);
-    return Promise.resolve();
-  }
   return new Promise((resolve, reject) => {
-    try {
-      const tx = db.transaction(["media"], "readwrite");
-      tx.objectStore("media").put(blob, deckId + ":" + filename);
-      tx.oncomplete = () => resolve();
-      tx.onerror = (e) => reject(e);
-    } catch (err) {
-      _memMedia.set(deckId + ":" + filename, blob);
-      resolve();
-    }
+    const tx = db.transaction(["media"], "readwrite");
+    tx.objectStore("media").put(blob, deckId + ":" + filename);
+    tx.oncomplete = () => resolve();
+    tx.onerror = (e) => reject(e);
   });
 }
 
 function dbGetMedia(deckId, filename) {
-  if (!db) {
-    return Promise.resolve(_memMedia.get(deckId + ":" + filename));
-  }
   return new Promise((resolve, reject) => {
-    try {
-      const tx = db.transaction(["media"], "readonly");
-      const req = tx.objectStore("media").get(deckId + ":" + filename);
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => resolve(undefined);
-    } catch (err) {
-      resolve(_memMedia.get(deckId + ":" + filename));
-    }
+    const tx = db.transaction(["media"], "readonly");
+    const req = tx.objectStore("media").get(deckId + ":" + filename);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = (e) => reject(e);
   });
 }
 
 function dbAddReview(entry) {
-  if (!db) {
-    _memReviews.push(entry);
-    return Promise.resolve();
-  }
   return new Promise((resolve) => {
     try {
       if (!db.objectStoreNames.contains("reviews")) {
@@ -1503,9 +1334,6 @@ function dbAddReview(entry) {
 }
 
 function dbGetAllReviews() {
-  if (!db) {
-    return Promise.resolve(_memReviews.slice());
-  }
   return new Promise((resolve) => {
     try {
       if (!db.objectStoreNames.contains("reviews")) {
@@ -1567,94 +1395,52 @@ let currentDeck = null;
 let studyQueue = [];
 let currentIndex = 0;
 let isCardFlipped = false;
-let showingFrontOnFlipped = false;
 let sessionStats = { newCount: 0, dueCount: 0, doneCount: 0 };
 let currentCard = null;
 let cardStudyMode = "flip"; // "flip" or "type"
-let backLayoutMode = localStorage.getItem("karty_back_layout") || "stacked"; // "stacked" or "separate"
-let imgLayoutMode = localStorage.getItem("karty_img_layout") || (window.innerWidth > 768 ? "2col" : "1col"); // "1col" or "2col"
 let heatmapYear = new Date().getFullYear();
 let statsModalDeck = null;
 let extraNewCardsGranted = 0;
 
 // --- SPACED REPETITION (SM-2) CALCULATION ---
-function getDeckSrsSettings(deck) {
-  const s = (deck && deck.settings) ? deck.settings : {};
-  return {
-    newCardsPerDay: (s.newCardsPerDay !== undefined && typeof s.newCardsPerDay === "number") ? Math.max(0, s.newCardsPerDay) : 20,
-    againMinutes: Math.max(1, parseInt(s.againMinutes, 10) || 10),
-    hardMinutes: Math.max(1, parseInt(s.hardMinutes, 10) || 1440),
-    goodMinutes: Math.max(1, parseInt(s.goodMinutes, 10) || 1440),
-    easyDays: Math.max(1, parseInt(s.easyDays, 10) || 4),
-    intervalMultiplier: Math.min(2.0, Math.max(0.5, parseFloat(s.intervalMultiplier) || 1.0))
-  };
-}
-
-function formatMinutesLabel(mins) {
-  if (mins < 60) return `${mins} min`;
-  if (mins < 1440) {
-    const hrs = Math.round((mins / 60) * 10) / 10;
-    return `${hrs} hod`;
-  }
-  return formatDays(Math.max(1, Math.round(mins / 1440)));
-}
-
-function calcNextIntervals(card, deckArg) {
+function calcNextIntervals(card) {
   const reps = card.reps || 0;
   const ease = card.ease || 2.5;
   const interval = card.interval || 0;
-  const cfg = getDeckSrsSettings(deckArg || currentDeck);
-  const mult = cfg.intervalMultiplier;
 
-  // 1. Znovu (Again) - min. 1 minuta
-  const againMinutes = cfg.againMinutes;
-
+  // 1. Znovu (Again)
+  const againMinutes = 10;
+  
   // 2. Těžké (Hard)
-  let hardMs, hardText, hardIntervalDays;
+  let hardDays;
   if (reps === 0) {
-    const m = Math.max(1, Math.round(cfg.hardMinutes));
-    hardMs = m * 60 * 1000;
-    hardIntervalDays = m / 1440;
-    hardText = formatMinutesLabel(m);
+    hardDays = 1;
   } else {
-    const baseMins = Math.max(cfg.hardMinutes, interval * 1440);
-    const nextMins = Math.max(1, Math.round(baseMins * 1.2 * mult));
-    hardMs = nextMins * 60 * 1000;
-    hardIntervalDays = nextMins / 1440;
-    hardText = formatMinutesLabel(nextMins);
+    hardDays = Math.max(1, Math.round(interval * 1.2));
   }
 
   // 3. Dobré (Good)
-  let goodMs, goodText, goodIntervalDays;
+  let goodDays;
   if (reps === 0) {
-    const m = Math.max(1, Math.round(cfg.goodMinutes));
-    goodMs = m * 60 * 1000;
-    goodIntervalDays = m / 1440;
-    goodText = formatMinutesLabel(m);
+    goodDays = 1;
   } else if (reps === 1) {
-    const d = Math.max(1, Math.round(4 * mult));
-    goodMs = d * 86400000;
-    goodIntervalDays = d;
-    goodText = formatDays(d);
+    goodDays = 4;
   } else {
-    const d = Math.max(2, Math.round(interval * ease * mult));
-    goodMs = d * 86400000;
-    goodIntervalDays = d;
-    goodText = formatDays(d);
+    goodDays = Math.max(2, Math.round(interval * ease));
   }
 
   // 4. Snadné (Easy)
   let easyDays;
   if (reps === 0) {
-    easyDays = cfg.easyDays;
+    easyDays = 4;
   } else {
-    easyDays = Math.max(Math.round(goodIntervalDays) + 1, Math.round(interval * ease * 1.3 * mult));
+    easyDays = Math.max(goodDays + 1, Math.round(interval * ease * 1.3));
   }
 
   return {
-    again: { text: `< ${againMinutes} min`, ms: againMinutes * 60 * 1000, newInterval: againMinutes / 1440, newEase: Math.max(1.3, ease - 0.2), newReps: 0 },
-    hard: { text: hardText, ms: hardMs, newInterval: hardIntervalDays, newEase: Math.max(1.3, ease - 0.15), newReps: reps + 1 },
-    good: { text: goodText, ms: goodMs, newInterval: goodIntervalDays, newEase: ease, newReps: reps + 1 },
+    again: { text: "< 10 min", ms: againMinutes * 60 * 1000, newInterval: 0.007, newEase: Math.max(1.3, ease - 0.2), newReps: 0 },
+    hard: { text: formatDays(hardDays), ms: hardDays * 86400000, newInterval: hardDays, newEase: Math.max(1.3, ease - 0.15), newReps: reps + 1 },
+    good: { text: formatDays(goodDays), ms: goodDays * 86400000, newInterval: goodDays, newEase: ease, newReps: reps + 1 },
     easy: { text: formatDays(easyDays), ms: easyDays * 86400000, newInterval: easyDays, newEase: ease + 0.15, newReps: reps + 1 }
   };
 }
@@ -1672,12 +1458,12 @@ function formatDays(days) {
 // --- RENDER MARKDOWN & IMAGES ---
 async function renderContentToHtml(content, deckId) {
   if (!content) return "";
-
-  const protectedTags = [];
-  const protectTag = (htmlTag) => {
-    const token = `@@HTMLTAG_${protectedTags.length}@@`;
-    protectedTags.push(htmlTag);
-    return token;
+  
+  const htmlTags = [];
+  const protectTag = (tag) => {
+    const idx = htmlTags.length;
+    htmlTags.push(tag);
+    return `@@HTMLTAG_${idx}@@`;
   };
 
   // 1. Nahrazení Obsidian obrázků ![[nazev.jpg]]
@@ -1699,46 +1485,30 @@ async function renderContentToHtml(content, deckId) {
   });
 
   // 4. Odkazy [text](url)
-  text = text.replace(/\[(.*?)\]\((https?:\/\/.*?)\)/g, (match, lbl, url) => {
-    return protectTag(`<a href="${url}" target="_blank" rel="noopener">${lbl}</a>`);
+  text = text.replace(/\[(.*?)\]\((https?:\/\/.*?)\)/g, (match, label, url) => {
+    return protectTag(`<a href="${url}" target="_blank" rel="noopener">${label}</a>`);
   });
 
-  // 5. Tučné písmo a kurzíva (bezpečně mimo chráněné HTML tagy)
-  text = text.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
-  text = text.replace(/___(.*?)___/g, '<strong><em>$1</em></strong>');
+  // 5. Tučné písmo **text**
   text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-  text = text.replace(/__(.*?)__/g, '<strong>$1</strong>');
+
+  // 6. Kurzíva *text*
   text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
-  text = text.replace(/(^|[\s(>])_([^_]+)_([\s)<.,!?;:]|$)/g, '$1<em>$2</em>$3');
 
-  // Obnovení chráněných HTML tagů
-  text = text.replace(/@@HTMLTAG_(\d+)@@/g, (_, idx) => protectedTags[Number(idx)] || "");
+  // Obnovení chráněných HTML tagů (aby se neporušily názvy souborů s podtržítky/hvězdičkami)
+  text = text.replace(/@@HTMLTAG_(\d+)@@/g, (match, idx) => htmlTags[Number(idx)] || '');
 
+  // 7. Odstavce a řádky
   const lines = text.split('\n');
   let html = "";
   let inList = false;
-  let imgGroup = [];
-
-  const flushImgGroup = () => {
-    if (imgGroup.length > 0) {
-      html += `<div class="card-img-grid">${imgGroup.join("")}</div>`;
-      imgGroup = [];
-    }
-  };
 
   for (let l of lines) {
     l = l.trim();
     if (!l) {
-      flushImgGroup();
       if (inList) { html += "</ul>"; inList = false; }
       continue;
     }
-    if (/^(?:<img\b[^>]*>\s*)+$/i.test(l)) {
-      if (inList) { html += "</ul>"; inList = false; }
-      imgGroup.push(l);
-      continue;
-    }
-    flushImgGroup();
     if (l.startsWith('# ')) {
       if (inList) { html += "</ul>"; inList = false; }
       html += `<h2 style="font-size:1.4rem; color:#fff; margin-bottom:8px;">${l.substring(2)}</h2>`;
@@ -1753,7 +1523,6 @@ async function renderContentToHtml(content, deckId) {
       html += `<p style="margin-bottom:8px;">${l}</p>`;
     }
   }
-  flushImgGroup();
   if (inList) html += "</ul>";
 
   return html;
@@ -1801,10 +1570,10 @@ document.getElementById("lightbox").onclick = () => document.getElementById("lig
 // --- ZIP PARSER ---
 async function importZipFile(file) {
   try {
-    const buf = file.arrayBuffer ? await file.arrayBuffer() : file;
-    const zip = await JSZip.loadAsync(buf);
+    const zip = await JSZip.loadAsync(file);
     let deckName = file.name.replace(/\.zip$/i, "").replace(/_/g, " ");
-    
+    let parsedPreloaded = null;
+
     const files = Object.keys(zip.files);
     const mediaBlobs = {};
     const mdCards = [];
@@ -1816,79 +1585,135 @@ async function importZipFile(file) {
       const lower = filename.toLowerCase();
       const baseFn = filename.split('/').pop().split('\\').pop();
 
-      if (lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png') || lower.endsWith('.webp') || lower.endsWith('.svg') || lower.endsWith('.gif')) {
+      if (lower.endsWith('deck_data.js')) {
+        try {
+          const jsTxt = await entry.async("text");
+          const eqIdx = jsTxt.indexOf("=");
+          if (eqIdx !== -1) {
+            const jsonStr = jsTxt.slice(eqIdx + 1).trim().replace(/;\s*$/, "");
+            parsedPreloaded = JSON.parse(jsonStr);
+          }
+        } catch (err) {
+          console.warn("Nepodařilo se načíst deck_data.js:", err);
+        }
+      } else if (lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png') || lower.endsWith('.webp') || lower.endsWith('.svg') || lower.endsWith('.gif')) {
         const blob = await entry.async("blob");
         mediaBlobs[baseFn] = blob;
       } else if (lower.endsWith('.md')) {
         if (baseFn.startsWith("00_")) continue;
         const text = await entry.async("text");
-        mdCards.push({ filename: baseFn, fullPath: filename, text: text });
+        mdCards.push({ filename: baseFn, text: text });
       }
     }
 
-    if (mdCards.length === 0) {
-      alert("V archivu nebyl nalezen žádný soubor s kartičkami (.md).");
-      return;
+    if (parsedPreloaded && parsedPreloaded.name) {
+      deckName = parsedPreloaded.name;
     }
 
-    const deckId = "deck_" + Date.now();
-    const cards = [];
-
-    for (let i = 0; i < mdCards.length; i++) {
-      const { filename, fullPath, text } = mdCards[i];
-      let front = "";
-      let back = "";
-      let title = filename.replace(/\.md$/i, "");
-
-      let cardGroup = "";
-      const tagMatch = text.match(/#flashcards\/([^\s#]+)/i);
-      if (tagMatch && tagMatch[1]) {
-        cardGroup = tagMatch[1].replace(/\//g, " / ").replace(/_/g, " ").trim();
-      } else if (fullPath) {
-        const segs = fullPath.replace(/\\/g, "/").split("/").filter(Boolean);
-        if (segs.length >= 3) {
-          cardGroup = segs.slice(1, -1).join(" / ").replace(/_/g, " ").trim();
-        }
+    let rawCards = [];
+    if (parsedPreloaded && Array.isArray(parsedPreloaded.cards) && parsedPreloaded.cards.length > 0) {
+      rawCards = parsedPreloaded.cards.map((c, i) => ({
+        id: c.id || ("c_" + i + "_" + Date.now()),
+        title: c.title || ("Karta " + (i + 1)),
+        front: c.front || "",
+        back: c.back || "",
+        answer: c.answer || "",
+        answerReverse: c.answerReverse || "",
+        subdeck: c.subdeck || "",
+        interval: c.interval || 0,
+        reps: c.reps || 0,
+        ease: c.ease || 2.5,
+        due: c.due || 0,
+        state: c.state || 0,
+        lastReview: c.lastReview || 0
+      }));
+    } else {
+      if (mdCards.length === 0) {
+        alert("V archivu nebyl nalezen žádný soubor s kartičkami (.md ani deck_data.js).");
+        return;
       }
 
-      const matchQ = text.match(/\n(\?{1,2})\n/);
-      if (matchQ) {
-        const qIndex = matchQ.index;
-        const qLen = matchQ[0].length;
-        front = text.substring(0, qIndex).trim();
-        back = text.substring(qIndex + qLen).trim();
-      } else {
-        const parts = text.split(/^---$/m);
-        if (parts.length >= 3) {
-          const body = parts.slice(2).join("---").trim();
-          const subQ = body.indexOf("\n?\n");
-          if (subQ !== -1) {
-            front = body.substring(0, subQ).trim();
-            back = body.substring(subQ + 3).trim();
+      for (let i = 0; i < mdCards.length; i++) {
+        const { filename, text } = mdCards[i];
+        let front = "";
+        let back = "";
+        let title = filename.replace(/\.md$/i, "");
+
+        const matchQ = text.match(/\n(\?{1,2})\n/);
+        if (matchQ) {
+          const qIndex = matchQ.index;
+          const qLen = matchQ[0].length;
+          front = text.substring(0, qIndex).trim();
+          back = text.substring(qIndex + qLen).trim();
+        } else {
+          const parts = text.split(/^---$/m);
+          if (parts.length >= 3) {
+            const body = parts.slice(2).join("---").trim();
+            const subQ = body.indexOf("\n?\n");
+            if (subQ !== -1) {
+              front = body.substring(0, subQ).trim();
+              back = body.substring(subQ + 3).trim();
+            } else {
+              front = title;
+              back = body;
+            }
           } else {
             front = title;
-            back = body;
+            back = text;
           }
-        } else {
-          front = title;
-          back = text;
         }
+
+        front = front.replace(/^---[\s\S]*?---\s*/, "");
+        front = front.replace(/#flashcards[^\s]*/gi, "").trim();
+
+        rawCards.push({
+          id: "c_" + i + "_" + Date.now(),
+          title: title,
+          front: front,
+          back: back,
+          interval: 0,
+          reps: 0,
+          ease: 2.5,
+          due: 0,
+          state: 0
+        });
       }
+    }
 
-      front = front.replace(/^---[\s\S]*?---\s*/, "");
-      front = front.replace(/#flashcards[^\s]*/gi, "").trim();
+    const allExisting = await dbGetAllDecks();
+    const normName = (s) => (s || "").toLowerCase().replace(/[_\s]+/g, " ").trim();
+    const targetId = parsedPreloaded && parsedPreloaded.id ? parsedPreloaded.id : null;
+    const existingDeck = allExisting.find(d =>
+      (targetId && d.id === targetId) ||
+      normName(d.name) === normName(deckName)
+    );
 
-      cards.push({
-        id: "c_" + i + "_" + Date.now(),
-        title: title,
-        front: front,
-        back: back,
-        group: cardGroup,
-        interval: 0,
-        reps: 0,
-        ease: 2.5,
-        due: 0,
-        state: 0
+    const deckId = existingDeck ? existingDeck.id : (targetId || ("deck_" + Date.now()));
+    let preservedCount = 0;
+
+    if (existingDeck && Array.isArray(existingDeck.cards)) {
+      const oldById = new Map();
+      const oldByTitle = new Map();
+      for (const oc of existingDeck.cards) {
+        if (oc.id) oldById.set(oc.id, oc);
+        if (oc.title) oldByTitle.set(oc.title.trim().toLowerCase(), oc);
+      }
+      rawCards = rawCards.map(nc => {
+        const old = (nc.id && oldById.get(nc.id)) || (nc.title && oldByTitle.get(nc.title.trim().toLowerCase()));
+        if (old) {
+          preservedCount++;
+          return {
+            ...nc,
+            id: old.id || nc.id,
+            interval: old.interval ?? nc.interval ?? 0,
+            reps: old.reps ?? nc.reps ?? 0,
+            ease: old.ease ?? nc.ease ?? 2.5,
+            due: old.due ?? nc.due ?? 0,
+            state: old.state ?? nc.state ?? 0,
+            lastReview: old.lastReview ?? nc.lastReview ?? 0
+          };
+        }
+        return nc;
       });
     }
 
@@ -1896,19 +1721,21 @@ async function importZipFile(file) {
       await dbSaveMedia(deckId, fn, blob);
     }
 
-    const newDeck = {
+    const updatedDeck = {
       id: deckId,
       name: deckName,
-      createdAt: Date.now(),
-      cards: cards,
-      settings: {
-        newCardsPerDay: 20
-      },
-      history: []
+      createdAt: existingDeck ? (existingDeck.createdAt || Date.now()) : Date.now(),
+      cards: rawCards,
+      settings: existingDeck && existingDeck.settings ? existingDeck.settings : { newCardsPerDay: 20 },
+      history: existingDeck && Array.isArray(existingDeck.history) ? existingDeck.history : []
     };
 
-    await dbSaveDeck(newDeck);
-    alert(`Úspěšně importován balíček "${deckName}" (${cards.length} kartiček, ${Object.keys(mediaBlobs).length} fotografií)!`);
+    await dbSaveDeck(updatedDeck);
+    if (existingDeck) {
+      alert(`Aktualizován balíček "${deckName}" (${rawCards.length} kartiček, ${Object.keys(mediaBlobs).length} fotografií). Postup učení zachován u ${preservedCount} kartiček!`);
+    } else {
+      alert(`Úspěšně importován balíček "${deckName}" (${rawCards.length} kartiček, ${Object.keys(mediaBlobs).length} fotografií)!`);
+    }
     await loadDeckList();
   } catch (err) {
     console.error(err);
@@ -1944,21 +1771,10 @@ async function importLooseFiles(files) {
     const cards = [];
 
     for (let i = 0; i < mdCards.length; i++) {
-      const { filename, fullPath, text } = mdCards[i];
+      const { filename, text } = mdCards[i];
       let front = "";
       let back = "";
       let title = filename.replace(/\.md$/i, "");
-
-      let cardGroup = "";
-      const tagMatch = text.match(/#flashcards\/([^\s#]+)/i);
-      if (tagMatch && tagMatch[1]) {
-        cardGroup = tagMatch[1].replace(/\//g, " / ").replace(/_/g, " ").trim();
-      } else if (fullPath) {
-        const segs = fullPath.replace(/\\/g, "/").split("/").filter(Boolean);
-        if (segs.length >= 3) {
-          cardGroup = segs.slice(1, -1).join(" / ").replace(/_/g, " ").trim();
-        }
-      }
 
       const matchQ = text.match(/\n(\?{1,2})\n/);
       if (matchQ) {
@@ -1992,7 +1808,6 @@ async function importLooseFiles(files) {
         title: title,
         front: front,
         back: back,
-        group: cardGroup,
         interval: 0,
         reps: 0,
         ease: 2.5,
@@ -2311,50 +2126,6 @@ document.getElementById("deckStatsModal").onclick = (e) => {
   if (e.target.id === "deckStatsModal") document.getElementById("deckStatsModal").classList.remove("active");
 };
 
-// --- SUBDECKS / GROUPING HELPERS ---
-const _expandedSubdeckPanels = new Set();
-let currentSubdeckFilter = null;
-
-function extractCardFieldNames(deck) {
-  const fields = [];
-  const seen = new Set();
-  const sampleCards = (deck && deck.cards) ? deck.cards.slice(0, 60) : [];
-  let hasGroup = false;
-  for (const c of sampleCards) {
-    if (c.group && String(c.group).trim()) hasGroup = true;
-    const combined = (c.front || "") + "\n" + (c.back || "");
-    const re = /\*\*([^*\n:]+):\*\*/g;
-    let m;
-    while ((m = re.exec(combined)) !== null) {
-      const fname = m[1].trim();
-      if (fname && !seen.has(fname)) {
-        seen.add(fname);
-        fields.push(fname);
-      }
-    }
-  }
-  return { fields, hasGroup };
-}
-
-function extractCardFieldValue(card, fieldName) {
-  if (!fieldName) return "";
-  if (fieldName === "__group__") {
-    return (card.group && String(card.group).trim()) ? String(card.group).trim() : "Ostatní";
-  }
-  const combined = (card.front || "") + "\n" + (card.back || "");
-  const lines = combined.split("\n");
-  const prefix = `**${fieldName}:**`;
-  for (const line of lines) {
-    const idx = line.indexOf(prefix);
-    if (idx !== -1) {
-      let val = line.substring(idx + prefix.length).trim();
-      val = val.replace(/<[^>]+>/g, " ").replace(/[*_`]/g, "").replace(/\s+/g, " ").trim();
-      if (val) return val;
-    }
-  }
-  return "Nezařazeno";
-}
-
 // --- DECK LIST VIEW ---
 async function loadDeckList() {
   const decks = await dbGetAllDecks();
@@ -2373,9 +2144,6 @@ async function loadDeckList() {
   }
 
   const now = Date.now();
-  const endOfToday = new Date();
-  endOfToday.setHours(23, 59, 59, 999);
-  const endOfTodayMs = endOfToday.getTime();
   const todayStr = getLocalDateString();
   const allReviews = await dbGetAllReviews();
 
@@ -2384,7 +2152,7 @@ async function loadDeckList() {
     let dueCards = 0;
     deck.cards.forEach(c => {
       if (!c.due || c.due === 0) newCardsTotal++;
-      else if (c.due <= now || (c.interval > 0 && c.interval < 1 && c.due <= endOfTodayMs)) dueCards++;
+      else if (c.due <= now) dueCards++;
     });
 
     const dailyLimit = (deck.settings && typeof deck.settings.newCardsPerDay === "number") ? deck.settings.newCardsPerDay : 20;
@@ -2396,68 +2164,8 @@ async function loadDeckList() {
 
     const studyCount = dueCards + newCardsToStudyToday;
 
-    const groupByField = (deck.settings && deck.settings.groupByField) ? deck.settings.groupByField : "";
-    const { fields: availFields, hasGroup } = extractCardFieldNames(deck);
-    const showSubPanel = _expandedSubdeckPanels.has(deck.id) || !!groupByField;
-
-    let subPanelHtml = "";
-    if (showSubPanel) {
-      let optsHtml = `<option value="">— Bez rozdělení (vše pohromadě) —</option>`;
-      if (hasGroup) {
-        optsHtml += `<option value="__group__" ${groupByField === "__group__" ? "selected" : ""}>Podle složky / tagu</option>`;
-      }
-      availFields.forEach(fn => {
-        optsHtml += `<option value="${escapeHtml(fn)}" ${groupByField === fn ? "selected" : ""}>${escapeHtml(fn)}</option>`;
-      });
-
-      let subRowsHtml = "";
-      if (groupByField) {
-        const groups = new Map();
-        deck.cards.forEach(c => {
-          const gVal = extractCardFieldValue(c, groupByField);
-          if (!groups.has(gVal)) groups.set(gVal, []);
-          groups.get(gVal).push(c);
-        });
-        const sortedKeys = Array.from(groups.keys()).sort((a, b) => a.localeCompare(b, "cs"));
-        sortedKeys.forEach(gKey => {
-          const gCards = groups.get(gKey);
-          let gDue = 0, gNew = 0;
-          gCards.forEach(c => {
-            if (!c.due || c.due === 0) gNew++;
-            else if (c.due <= now || (c.interval > 0 && c.interval < 1 && c.due <= endOfTodayMs)) gDue++;
-          });
-          const gStudy = gDue + Math.min(gNew, newRemainingToday);
-          subRowsHtml += `
-            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:7px 10px; border-radius:8px; background:rgba(12,18,14,0.65); border:1px solid #24392b; flex-wrap:wrap;">
-              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                <strong style="font-size:0.88rem; color:#edf5f0;">${escapeHtml(gKey)}</strong>
-                <span style="font-size:0.76rem; color:#95ab9e;">${gCards.length} karet • ${gDue} k opak. • ${gNew} nových</span>
-              </div>
-              <div style="display:flex; gap:6px;">
-                <button class="btn btn-primary btn-sm btn-sub-study" data-group="${escapeHtml(gKey)}">Učit se (${gStudy})</button>
-                <button class="btn btn-sm btn-sub-review" data-group="${escapeHtml(gKey)}">Procvičit vše</button>
-              </div>
-            </div>
-          `;
-        });
-      }
-
-      subPanelHtml = `
-        <div class="subdeck-panel" style="width:100%; margin-top:10px; padding-top:10px; border-top:1px solid #24392b; display:flex; flex-direction:column; gap:8px;">
-          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-            <span style="font-size:0.82rem; color:#95ab9e; font-weight:600;">Rozdělit do podbalíčků podle:</span>
-            <select class="sel-subdeck-field" style="background:#0c120e; color:#edf5f0; border:1px solid #3b6348; border-radius:6px; padding:4px 8px; font-size:0.84rem;">
-              ${optsHtml}
-            </select>
-          </div>
-          ${subRowsHtml ? `<div style="display:flex; flex-direction:column; gap:5px; max-height:280px; overflow-y:auto; padding-right:2px;">${subRowsHtml}</div>` : ""}
-        </div>
-      `;
-    }
-
     const cardEl = document.createElement("div");
     cardEl.className = "deck-card";
-    cardEl.style.flexWrap = "wrap";
     cardEl.innerHTML = `
       <div class="deck-info">
         <div class="deck-title">${escapeHtml(deck.name)}</div>
@@ -2465,62 +2173,18 @@ async function loadDeckList() {
           <span class="badge-count">Celkem: ${deck.cards.length}</span>
           <span class="badge-count badge-due" title="Karty vyžadující zopakování">K opakování: ${dueCards}</span>
           <span class="badge-count badge-new" title="Zbývá nových na dnešek z limitu ${dailyLimit}/den">Nové dnes: ${newCardsToStudyToday} / ${dailyLimit > 0 ? dailyLimit : '∞'}</span>
-          <label class="badge-count" style="display:inline-flex; align-items:center; gap:5px; cursor:pointer;" title="Denní limit nových karet (0 = bez limitu)">
-            <span>Limit/den:</span>
-            <input type="number" class="inp-deck-daily-limit" min="0" max="500" step="1" value="${dailyLimit}" style="width:54px; background:#0c120e; border:1px solid #3b6348; color:#fff; border-radius:4px; padding:1px 4px; text-align:center; font-weight:700; font-size:0.8rem;">
-          </label>
         </div>
       </div>
       <div class="deck-actions">
         <button class="btn btn-primary btn-study" data-id="${deck.id}">Učit se (${studyCount})</button>
-        <button class="btn btn-sm btn-subdecks-tgl" data-id="${deck.id}" title="Rozdělit balíček do podbalíčků podle sloupce">📂 Podbalíčky</button>
-        <button class="btn btn-sm btn-srs-cfg" data-id="${deck.id}" title="Nastavení limitu karet a křivky zapomínání">⚙ Nastavení</button>
         <button class="btn btn-sm btn-stats" data-id="${deck.id}" title="Podrobné Anki statistiky balíčku">📊 Statistiky</button>
         <button class="btn btn-sm btn-review" data-id="${deck.id}" title="Procvičit všechny karty z balíčku">Procvičit vše</button>
         <button class="btn btn-sm btn-reset" data-id="${deck.id}" title="Vrátit všechny karty do stavu Nové">↺ Reset</button>
         <button class="btn btn-danger btn-sm btn-del" data-id="${deck.id}" title="Smazat balíček">🗑️</button>
       </div>
-      ${subPanelHtml}
     `;
 
-    cardEl.querySelector(".btn-study").onclick = () => startStudy(deck.id, false, null);
-    cardEl.querySelector(".btn-subdecks-tgl").onclick = async () => {
-      if (_expandedSubdeckPanels.has(deck.id)) {
-        _expandedSubdeckPanels.delete(deck.id);
-        if (deck.settings && deck.settings.groupByField) {
-          deck.settings.groupByField = "";
-          await dbSaveDeck(deck);
-        }
-      } else {
-        _expandedSubdeckPanels.add(deck.id);
-      }
-      await loadDeckList();
-    };
-    const selSub = cardEl.querySelector(".sel-subdeck-field");
-    if (selSub) {
-      selSub.onchange = async (ev) => {
-        deck.settings = deck.settings || {};
-        deck.settings.groupByField = ev.target.value;
-        _expandedSubdeckPanels.add(deck.id);
-        await dbSaveDeck(deck);
-        await loadDeckList();
-      };
-    }
-    cardEl.querySelectorAll(".btn-sub-study").forEach(btn => {
-      btn.onclick = () => startStudy(deck.id, false, btn.getAttribute("data-group"));
-    });
-    cardEl.querySelectorAll(".btn-sub-review").forEach(btn => {
-      btn.onclick = () => startStudy(deck.id, true, btn.getAttribute("data-group"));
-    });
-    cardEl.querySelector(".btn-srs-cfg").onclick = () => openSrsSettingsModal(deck);
-    cardEl.querySelector(".inp-deck-daily-limit").onchange = async (ev) => {
-      const parsed = parseInt(ev.target.value, 10);
-      const val = isNaN(parsed) ? 20 : Math.max(0, Math.min(500, parsed));
-      deck.settings = deck.settings || {};
-      deck.settings.newCardsPerDay = val;
-      await dbSaveDeck(deck);
-      await loadDeckList();
-    };
+    cardEl.querySelector(".btn-study").onclick = () => startStudy(deck.id, false);
     cardEl.querySelector(".btn-stats").onclick = () => openDeckStats(deck);
     cardEl.querySelector(".btn-review").onclick = () => startStudy(deck.id, true);
     cardEl.querySelector(".btn-reset").onclick = async () => {
@@ -2554,32 +2218,24 @@ function escapeHtml(str) {
 }
 
 // --- STUDY ENGINE ---
-async function startStudy(deckId, quickMode = false, subdeckFilter = null) {
+async function startStudy(deckId, quickMode = false) {
   currentDeck = await dbGetDeck(deckId);
   if (!currentDeck || currentDeck.cards.length === 0) {
     alert("Balíček je prázdný.");
     return;
   }
-  currentSubdeckFilter = subdeckFilter || null;
-  const groupField = (currentDeck.settings && currentDeck.settings.groupByField) ? currentDeck.settings.groupByField : "";
-  const activePool = (currentSubdeckFilter && groupField)
-    ? currentDeck.cards.filter(c => extractCardFieldValue(c, groupField) === currentSubdeckFilter)
-    : currentDeck.cards;
 
   const now = Date.now();
-  const endOfToday = new Date();
-  endOfToday.setHours(23, 59, 59, 999);
-  const endOfTodayMs = endOfToday.getTime();
   const todayStr = getLocalDateString();
   const allReviews = await dbGetAllReviews();
 
   document.getElementById("chkQuickReview").checked = quickMode;
 
   if (quickMode) {
-    studyQueue = [...activePool].sort(() => Math.random() - 0.5);
+    studyQueue = [...currentDeck.cards].sort(() => Math.random() - 0.5);
   } else {
-    const due = activePool.filter(c => c.due && c.due > 0 && (c.due <= now || (c.interval > 0 && c.interval < 1 && c.due <= endOfTodayMs)));
-    const newCardsAll = activePool.filter(c => !c.due || c.due === 0);
+    const due = currentDeck.cards.filter(c => c.due && c.due > 0 && c.due <= now);
+    const newCardsAll = currentDeck.cards.filter(c => !c.due || c.due === 0);
 
     // Vymáhání denního limitu nových karet
     const dailyLimit = (currentDeck.settings && typeof currentDeck.settings.newCardsPerDay === "number") ? currentDeck.settings.newCardsPerDay : 20;
@@ -2599,11 +2255,11 @@ async function startStudy(deckId, quickMode = false, subdeckFilter = null) {
   currentIndex = 0;
   sessionStats = {
     newCount: studyQueue.filter(c => !c.due || c.due === 0).length,
-    dueCount: studyQueue.filter(c => c.due && c.due > 0 && (c.due <= now || (c.interval > 0 && c.interval < 1 && c.due <= endOfTodayMs))).length,
+    dueCount: studyQueue.filter(c => c.due && c.due > 0 && c.due <= now).length,
     doneCount: 0
   };
 
-  document.getElementById("activeDeckTitle").innerText = currentSubdeckFilter ? `${currentDeck.name} — ${currentSubdeckFilter}` : currentDeck.name;
+  document.getElementById("activeDeckTitle").innerText = currentDeck.name;
   showView("study");
   loadCard(currentIndex);
 }
@@ -2690,7 +2346,6 @@ async function loadCard(idx) {
 
   currentCard = studyQueue[idx];
   isCardFlipped = false;
-  showingFrontOnFlipped = false;
 
   const isReverse = document.getElementById("chkReverseStudy").checked;
   const isQuick = document.getElementById("chkQuickReview").checked;
@@ -2707,7 +2362,7 @@ async function loadCard(idx) {
   await resolvePendingImages(qBox, currentDeck.id);
   await resolvePendingImages(aBox, currentDeck.id);
 
-  applyBackLayoutVisibility();
+  aBox.style.display = "none";
   document.getElementById("ratingGrid").style.display = "none";
   document.getElementById("quickNavGrid").style.display = isQuick ? "flex" : "none";
 
@@ -2765,44 +2420,10 @@ function flipCard() {
   revealAnswer();
 }
 
-function applyBackLayoutVisibility() {
-  const qBox = document.getElementById("cardQuestion");
-  const aBox = document.getElementById("cardAnswer");
-  const flashcardBox = document.getElementById("flashcardBox");
-  const btnSidePeek = document.getElementById("btnSidePeek");
-  if (!isCardFlipped) {
-    qBox.style.display = "flex";
-    aBox.style.display = "none";
-    flashcardBox.classList.remove("side-mode-separate");
-    if (btnSidePeek) btnSidePeek.style.display = "none";
-    return;
-  }
-  if (backLayoutMode === "separate") {
-    flashcardBox.classList.add("side-mode-separate");
-    if (showingFrontOnFlipped) {
-      qBox.style.display = "flex";
-      aBox.style.display = "none";
-      if (btnSidePeek) btnSidePeek.innerText = "↻ Zobrazit rub";
-    } else {
-      qBox.style.display = "none";
-      aBox.style.display = "flex";
-      if (btnSidePeek) btnSidePeek.innerText = "↻ Zobrazit líc";
-    }
-    if (btnSidePeek) btnSidePeek.style.display = "inline-flex";
-  } else {
-    flashcardBox.classList.remove("side-mode-separate");
-    qBox.style.display = "flex";
-    aBox.style.display = "flex";
-    if (btnSidePeek) btnSidePeek.style.display = "none";
-  }
-}
-
 function revealAnswer() {
   isCardFlipped = true;
-  showingFrontOnFlipped = false;
-  applyBackLayoutVisibility();
+  document.getElementById("cardAnswer").style.display = "flex";
   document.getElementById("btnFlip").style.display = "none";
-  document.getElementById("flashcardBox").scrollTop = 0;
 
   const isQuick = document.getElementById("chkQuickReview").checked;
   if (isQuick) {
@@ -2847,10 +2468,8 @@ async function rateCard(ratingKey) {
     await dbSaveDeck(currentDeck);
   }
 
-  const isSameDayStep = (ratingKey === "again") || (choice.ms < 12 * 3600 * 1000);
-  if (isSameDayStep) {
-    studyQueue.push(cardInDeck || currentCard);
-    sessionStats.dueCount++;
+  if (ratingKey === "again") {
+    studyQueue.push(currentCard);
   }
 
   currentIndex++;
@@ -2911,80 +2530,6 @@ btnModeType.onclick = () => {
   loadCard(currentIndex);
 };
 
-// --- BACK LAYOUT TOGGLES (POD SEBE VS NA DRUHOU STRANU) ---
-const btnBackStacked = document.getElementById("btnBackStacked");
-const btnBackSeparate = document.getElementById("btnBackSeparate");
-const btnSidePeek = document.getElementById("btnSidePeek");
-
-function syncBackLayoutButtons() {
-  if (backLayoutMode === "separate") {
-    btnBackSeparate.classList.add("active");
-    btnBackStacked.classList.remove("active");
-  } else {
-    btnBackStacked.classList.add("active");
-    btnBackSeparate.classList.remove("active");
-  }
-}
-syncBackLayoutButtons();
-
-btnBackStacked.onclick = () => {
-  backLayoutMode = "stacked";
-  localStorage.setItem("karty_back_layout", backLayoutMode);
-  showingFrontOnFlipped = false;
-  syncBackLayoutButtons();
-  applyBackLayoutVisibility();
-};
-
-btnBackSeparate.onclick = () => {
-  backLayoutMode = "separate";
-  localStorage.setItem("karty_back_layout", backLayoutMode);
-  showingFrontOnFlipped = false;
-  syncBackLayoutButtons();
-  applyBackLayoutVisibility();
-  document.getElementById("flashcardBox").scrollTop = 0;
-};
-
-if (btnSidePeek) {
-  btnSidePeek.onclick = () => {
-    showingFrontOnFlipped = !showingFrontOnFlipped;
-    applyBackLayoutVisibility();
-    document.getElementById("flashcardBox").scrollTop = 0;
-  };
-}
-
-// --- IMAGE LAYOUT TOGGLES (1 SLOUPEC VS 2 SLOUPCE) ---
-const btnImg1Col = document.getElementById("btnImg1Col");
-const btnImg2Col = document.getElementById("btnImg2Col");
-
-function applyImgLayoutMode() {
-  const flashcardBox = document.getElementById("flashcardBox");
-  if (imgLayoutMode === "2col") {
-    flashcardBox.classList.add("img-layout-2col");
-    if (btnImg2Col) btnImg2Col.classList.add("active");
-    if (btnImg1Col) btnImg1Col.classList.remove("active");
-  } else {
-    flashcardBox.classList.remove("img-layout-2col");
-    if (btnImg1Col) btnImg1Col.classList.add("active");
-    if (btnImg2Col) btnImg2Col.classList.remove("active");
-  }
-}
-applyImgLayoutMode();
-
-if (btnImg1Col) {
-  btnImg1Col.onclick = () => {
-    imgLayoutMode = "1col";
-    localStorage.setItem("karty_img_layout", imgLayoutMode);
-    applyImgLayoutMode();
-  };
-}
-if (btnImg2Col) {
-  btnImg2Col.onclick = () => {
-    imgLayoutMode = "2col";
-    localStorage.setItem("karty_img_layout", imgLayoutMode);
-    applyImgLayoutMode();
-  };
-}
-
 // Vepisovací tlačítko a Enter
 document.getElementById("btnCheckType").onclick = submitTypeAnswer;
 document.getElementById("typeTextInput").addEventListener("keydown", (e) => {
@@ -3011,65 +2556,6 @@ document.getElementById("btnAgain").onclick = () => rateCard("again");
 document.getElementById("btnHard").onclick = () => rateCard("hard");
 document.getElementById("btnGood").onclick = () => rateCard("good");
 document.getElementById("btnEasy").onclick = () => rateCard("easy");
-
-let _srsModalTargetDeck = null;
-function openSrsSettingsModal(deck) {
-  if (!deck) return;
-  _srsModalTargetDeck = deck;
-  const cfg = getDeckSrsSettings(deck);
-  document.getElementById("srsModalTitle").innerText = `⚙ Nastavení: ${deck.name}`;
-  document.getElementById("inpSrsDailyLimit").value = cfg.newCardsPerDay;
-  document.getElementById("inpSrsAgainMin").value = cfg.againMinutes;
-  document.getElementById("inpSrsHardMin").value = cfg.hardMinutes;
-  document.getElementById("inpSrsGoodMin").value = cfg.goodMinutes;
-  document.getElementById("inpSrsEasyDays").value = cfg.easyDays;
-  document.getElementById("inpSrsMult").value = cfg.intervalMultiplier;
-  document.getElementById("srsSettingsModal").classList.add("active");
-}
-document.getElementById("srsModalClose").onclick = () => document.getElementById("srsSettingsModal").classList.remove("active");
-document.getElementById("srsSettingsModal").addEventListener("click", (e) => {
-  if (e.target.id === "srsSettingsModal") document.getElementById("srsSettingsModal").classList.remove("active");
-});
-document.getElementById("btnSrsResetDef").onclick = () => {
-  document.getElementById("inpSrsDailyLimit").value = 20;
-  document.getElementById("inpSrsAgainMin").value = 10;
-  document.getElementById("inpSrsHardMin").value = 1440;
-  document.getElementById("inpSrsGoodMin").value = 1440;
-  document.getElementById("inpSrsEasyDays").value = 4;
-  document.getElementById("inpSrsMult").value = 1.0;
-};
-document.getElementById("btnSrsSave").onclick = async () => {
-  if (!_srsModalTargetDeck) return;
-  _srsModalTargetDeck.settings = _srsModalTargetDeck.settings || {};
-  const parsedDaily = parseInt(document.getElementById("inpSrsDailyLimit").value, 10);
-  _srsModalTargetDeck.settings.newCardsPerDay = isNaN(parsedDaily) ? 20 : Math.max(0, Math.min(500, parsedDaily));
-  _srsModalTargetDeck.settings.againMinutes = Math.max(1, parseInt(document.getElementById("inpSrsAgainMin").value, 10) || 1);
-  _srsModalTargetDeck.settings.hardMinutes = Math.max(1, parseInt(document.getElementById("inpSrsHardMin").value, 10) || 1);
-  _srsModalTargetDeck.settings.goodMinutes = Math.max(1, parseInt(document.getElementById("inpSrsGoodMin").value, 10) || 1);
-  _srsModalTargetDeck.settings.easyDays = Math.max(1, parseInt(document.getElementById("inpSrsEasyDays").value, 10) || 1);
-  _srsModalTargetDeck.settings.intervalMultiplier = Math.min(2.0, Math.max(0.5, parseFloat(document.getElementById("inpSrsMult").value) || 1.0));
-  await dbSaveDeck(_srsModalTargetDeck);
-  if (currentDeck && currentDeck.id === _srsModalTargetDeck.id) {
-    currentDeck.settings = Object.assign({}, _srsModalTargetDeck.settings);
-    if (currentCard) {
-      const iv = calcNextIntervals(currentCard, currentDeck);
-      const tAg = document.getElementById("timeAgain");
-      const tHd = document.getElementById("timeHard");
-      const tGd = document.getElementById("timeGood");
-      const tEs = document.getElementById("timeEasy");
-      if (tAg) tAg.innerText = iv.again.text;
-      if (tHd) tHd.innerText = iv.hard.text;
-      if (tGd) tGd.innerText = iv.good.text;
-      if (tEs) tEs.innerText = iv.easy.text;
-    }
-  }
-  document.getElementById("srsSettingsModal").classList.remove("active");
-  await loadDeckList();
-};
-const btnStudySrs = document.getElementById("btnStudySrsSettings");
-if (btnStudySrs) {
-  btnStudySrs.onclick = () => { if (currentDeck) openSrsSettingsModal(currentDeck); };
-}
 
 document.getElementById("btnNextCard").onclick = nextQuickCard;
 document.getElementById("btnPrevCard").onclick = prevQuickCard;
@@ -3101,9 +2587,19 @@ document.getElementById("helpModal").onclick = (e) => {
 const dropZone = document.getElementById("dropZone");
 const fileInput = document.getElementById("fileZipInput");
 
+dropZone.addEventListener("click", () => {
+  fileInput.click();
+});
+
 async function handleIncomingFiles(fileList) {
   if (!fileList || fileList.length === 0) return;
   const files = Array.from(fileList);
+
+  // 0. Soubor s postupem učení (.json)
+  const jsonFile = files.find(f => f.name.toLowerCase().endsWith('.json'));
+  if (jsonFile) {
+    return await importProgressJson(jsonFile);
+  }
 
   // 1. Zda je mezi vybranými soubory archiv .zip
   const zipFile = files.find(f => f.name.toLowerCase().endsWith('.zip') || f.type.includes('zip') || f.type === 'application/x-zip-compressed');
@@ -3117,12 +2613,165 @@ async function handleIncomingFiles(fileList) {
     return await importLooseFiles(files);
   }
 
-  alert("Vyberte prosím archiv .zip s kartičkami, nebo soubory kartiček (.md) a případné obrázky.");
+  alert("Vyberte prosím archiv .zip s kartičkami, soubor postupu .json, nebo soubory kartiček (.md) a případné obrázky.");
 }
 
-fileInput.addEventListener("change", async (e) => {
+// --- SYNCHRONIZACE POSTUPU UČENÍ (.json) ---
+async function exportProgressJson() {
+  try {
+    const decks = await dbGetAllDecks();
+    const payload = {
+      version: 1,
+      exportedAt: Date.now(),
+      decks: decks.map(d => ({
+        id: d.id,
+        name: d.name,
+        settings: d.settings || {},
+        history: Array.isArray(d.history) ? d.history : [],
+        cards: (d.cards || []).map(c => ({
+          id: c.id,
+          title: c.title,
+          interval: c.interval || 0,
+          reps: c.reps || 0,
+          ease: c.ease || 2.5,
+          due: c.due || 0,
+          state: c.state || 0,
+          lastReview: c.lastReview || 0
+        }))
+      }))
+    };
+    const jsonStr = JSON.stringify(payload, null, 2);
+    const blob = new Blob([jsonStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const today = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `karty_postup_${today}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (err) {
+    console.error(err);
+    alert("Chyba při exportu postupu: " + err.message);
+  }
+}
+
+async function importProgressJson(file) {
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if (!data || !Array.isArray(data.decks)) {
+      alert("Neplatný formát souboru s postupem učení.");
+      return;
+    }
+
+    const localDecks = await dbGetAllDecks();
+    const normName = (s) => (s || "").toLowerCase().replace(/[_\s]+/g, " ").trim();
+    let updatedDecks = 0;
+    let updatedCards = 0;
+
+    for (const impDeck of data.decks) {
+      const target = localDecks.find(d =>
+        (impDeck.id && d.id === impDeck.id) ||
+        normName(d.name) === normName(impDeck.name)
+      );
+      if (!target) continue;
+
+      const impById = new Map();
+      const impByTitle = new Map();
+      for (const ic of (impDeck.cards || [])) {
+        if (ic.id) impById.set(ic.id, ic);
+        if (ic.title) impByTitle.set(ic.title.trim().toLowerCase(), ic);
+      }
+
+      let deckChanged = false;
+      target.cards = (target.cards || []).map(lc => {
+        const ic = (lc.id && impById.get(lc.id)) || (lc.title && impByTitle.get(lc.title.trim().toLowerCase()));
+        if (!ic) return lc;
+
+        const lLast = lc.lastReview || 0;
+        const iLast = ic.lastReview || 0;
+        const lReps = lc.reps || 0;
+        const iReps = ic.reps || 0;
+
+        // Sloučit: přednost má novější opakování (lastReview) nebo vyšší počet opakování (reps) / due
+        const useImported = (iLast > lLast) || (iLast === lLast && (iReps > lReps || (iReps === lReps && (ic.due || 0) > (lc.due || 0))));
+        if (useImported) {
+          deckChanged = true;
+          updatedCards++;
+          return {
+            ...lc,
+            interval: ic.interval ?? lc.interval ?? 0,
+            reps: ic.reps ?? lc.reps ?? 0,
+            ease: ic.ease ?? lc.ease ?? 2.5,
+            due: ic.due ?? lc.due ?? 0,
+            state: ic.state ?? lc.state ?? 0,
+            lastReview: ic.lastReview ?? lc.lastReview ?? 0
+          };
+        }
+        return lc;
+      });
+
+      if (Array.isArray(impDeck.history) && impDeck.history.length > 0) {
+        const histMap = new Map();
+        for (const h of (target.history || [])) {
+          if (h && h.date) histMap.set(h.date, { ...h });
+        }
+        for (const h of impDeck.history) {
+          if (!h || !h.date) continue;
+          const prev = histMap.get(h.date);
+          if (!prev) {
+            histMap.set(h.date, { ...h });
+            deckChanged = true;
+          } else {
+            const maxRev = Math.max(prev.reviews || 0, h.reviews || 0);
+            const maxNew = Math.max(prev.newLearned || 0, h.newLearned || 0);
+            if (maxRev !== (prev.reviews || 0) || maxNew !== (prev.newLearned || 0)) {
+              histMap.set(h.date, { date: h.date, reviews: maxRev, newLearned: maxNew });
+              deckChanged = true;
+            }
+          }
+        }
+        target.history = Array.from(histMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+      }
+
+      if (impDeck.settings && Object.keys(impDeck.settings).length > 0) {
+        target.settings = { ...(target.settings || {}), ...impDeck.settings };
+        deckChanged = true;
+      }
+
+      if (deckChanged) {
+        await dbSaveDeck(target);
+        updatedDecks++;
+      }
+    }
+
+    await loadDeckList();
+    alert(`Synchronizace dokončena! Aktualizováno ${updatedDecks} balíčků (${updatedCards} kartiček s novějším postupem).`);
+  } catch (err) {
+    console.error(err);
+    alert("Chyba při importu postupu (.json): " + err.message);
+  }
+}
+
+const btnExportProgress = document.getElementById("btnExportProgress");
+const btnImportProgress = document.getElementById("btnImportProgress");
+const fileProgressInput = document.getElementById("fileProgressInput");
+if (btnExportProgress) btnExportProgress.addEventListener("click", exportProgressJson);
+if (btnImportProgress && fileProgressInput) {
+  btnImportProgress.addEventListener("click", () => fileProgressInput.click());
+  fileProgressInput.addEventListener("change", (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      importProgressJson(e.target.files[0]);
+      fileProgressInput.value = "";
+    }
+  });
+}
+
+fileInput.addEventListener("change", (e) => {
   if (e.target.files && e.target.files.length > 0) {
-    await handleIncomingFiles(e.target.files);
+    handleIncomingFiles(e.target.files);
     fileInput.value = "";
   }
 });
@@ -3200,6 +2849,7 @@ async function _importPreloadedDeckObj(deckObj) {
       await dbSaveDeck(deckObj);
       console.log("Preloaded deck auto-imported:", deckObj.name, "Karet:", deckObj.cards.length);
     } else {
+      // Balíček již existuje: zachováme statistiky učení (interval, reps, ease, due), ale zaktualizujeme obsah
       const statMap = new Map();
       (existing.cards || []).forEach(c => {
         if (c.id) statMap.set(c.id, c);

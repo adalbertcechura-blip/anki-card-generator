@@ -1001,9 +1001,14 @@ main {
       <input type="file" id="fileZipInput" accept=".zip,application/zip,application/x-zip-compressed,application/octet-stream,.md,text/markdown,*/*" multiple style="display:none">
     </div>
 
-    <div style="display:flex; justify-content:space-between; align-items:center;">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
       <h2 style="font-size:1.15rem; font-weight:700;">Moje balíčky</h2>
-      <span id="deckCountInfo" style="font-size:0.85rem; color:var(--text-muted);">0 balíčků</span>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <button class="btn btn-sm" id="btnExportProgress" title="Stáhnout lehký soubor .json s postupem učení pro přenos na jiné zařízení">📤 Export postupu (.json)</button>
+        <button class="btn btn-sm" id="btnImportProgress" title="Načíst a sloučit postup učení ze souboru .json">📥 Import postupu (.json)</button>
+        <input type="file" id="fileProgressInput" accept=".json,application/json" style="display:none">
+        <span id="deckCountInfo" style="font-size:0.85rem; color:var(--text-muted);">0 balíčků</span>
+      </div>
     </div>
 
     <div class="deck-list" id="deckList">
@@ -1365,6 +1370,17 @@ async function getMediaUrl(deckId, filename) {
     mediaUrlCache.set(cacheKey, url);
     return url;
   }
+  if (window.PRELOADED_MEDIA_REF) {
+    const refId = window.PRELOADED_MEDIA_REF[cacheKey] || window.PRELOADED_MEDIA_REF[filename];
+    if (refId) {
+      const el = document.getElementById(refId);
+      if (el && el.textContent) {
+        const dataUrl = el.textContent.trim();
+        mediaUrlCache.set(cacheKey, dataUrl);
+        return dataUrl;
+      }
+    }
+  }
   return null;
 }
 
@@ -1558,7 +1574,8 @@ async function importZipFile(file) {
   try {
     const zip = await JSZip.loadAsync(file);
     let deckName = file.name.replace(/\.zip$/i, "").replace(/_/g, " ");
-    
+    let parsedPreloaded = null;
+
     const files = Object.keys(zip.files);
     const mediaBlobs = {};
     const mdCards = [];
@@ -1570,7 +1587,18 @@ async function importZipFile(file) {
       const lower = filename.toLowerCase();
       const baseFn = filename.split('/').pop().split('\\').pop();
 
-      if (lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png') || lower.endsWith('.webp') || lower.endsWith('.svg') || lower.endsWith('.gif')) {
+      if (lower.endsWith('deck_data.js')) {
+        try {
+          const jsTxt = await entry.async("text");
+          const eqIdx = jsTxt.indexOf("=");
+          if (eqIdx !== -1) {
+            const jsonStr = jsTxt.slice(eqIdx + 1).trim().replace(/;\s*$/, "");
+            parsedPreloaded = JSON.parse(jsonStr);
+          }
+        } catch (err) {
+          console.warn("Nepodařilo se načíst deck_data.js:", err);
+        }
+      } else if (lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png') || lower.endsWith('.webp') || lower.endsWith('.svg') || lower.endsWith('.gif')) {
         const blob = await entry.async("blob");
         mediaBlobs[baseFn] = blob;
       } else if (lower.endsWith('.md')) {
@@ -1580,57 +1608,114 @@ async function importZipFile(file) {
       }
     }
 
-    if (mdCards.length === 0) {
-      alert("V archivu nebyl nalezen žádný soubor s kartičkami (.md).");
-      return;
+    if (parsedPreloaded && parsedPreloaded.name) {
+      deckName = parsedPreloaded.name;
     }
 
-    const deckId = "deck_" + Date.now();
-    const cards = [];
-
-    for (let i = 0; i < mdCards.length; i++) {
-      const { filename, text } = mdCards[i];
-      let front = "";
-      let back = "";
-      let title = filename.replace(/\.md$/i, "");
-
-      const matchQ = text.match(/\n(\?{1,2})\n/);
-      if (matchQ) {
-        const qIndex = matchQ.index;
-        const qLen = matchQ[0].length;
-        front = text.substring(0, qIndex).trim();
-        back = text.substring(qIndex + qLen).trim();
-      } else {
-        const parts = text.split(/^---$/m);
-        if (parts.length >= 3) {
-          const body = parts.slice(2).join("---").trim();
-          const subQ = body.indexOf("\n?\n");
-          if (subQ !== -1) {
-            front = body.substring(0, subQ).trim();
-            back = body.substring(subQ + 3).trim();
-          } else {
-            front = title;
-            back = body;
-          }
-        } else {
-          front = title;
-          back = text;
-        }
+    let rawCards = [];
+    if (parsedPreloaded && Array.isArray(parsedPreloaded.cards) && parsedPreloaded.cards.length > 0) {
+      rawCards = parsedPreloaded.cards.map((c, i) => ({
+        id: c.id || ("c_" + i + "_" + Date.now()),
+        title: c.title || ("Karta " + (i + 1)),
+        front: c.front || "",
+        back: c.back || "",
+        answer: c.answer || "",
+        answerReverse: c.answerReverse || "",
+        subdeck: c.subdeck || "",
+        interval: c.interval || 0,
+        reps: c.reps || 0,
+        ease: c.ease || 2.5,
+        due: c.due || 0,
+        state: c.state || 0,
+        lastReview: c.lastReview || 0
+      }));
+    } else {
+      if (mdCards.length === 0) {
+        alert("V archivu nebyl nalezen žádný soubor s kartičkami (.md ani deck_data.js).");
+        return;
       }
 
-      front = front.replace(/^---[\s\S]*?---\s*/, "");
-      front = front.replace(/#flashcards[^\s]*/gi, "").trim();
+      for (let i = 0; i < mdCards.length; i++) {
+        const { filename, text } = mdCards[i];
+        let front = "";
+        let back = "";
+        let title = filename.replace(/\.md$/i, "");
 
-      cards.push({
-        id: "c_" + i + "_" + Date.now(),
-        title: title,
-        front: front,
-        back: back,
-        interval: 0,
-        reps: 0,
-        ease: 2.5,
-        due: 0,
-        state: 0
+        const matchQ = text.match(/\n(\?{1,2})\n/);
+        if (matchQ) {
+          const qIndex = matchQ.index;
+          const qLen = matchQ[0].length;
+          front = text.substring(0, qIndex).trim();
+          back = text.substring(qIndex + qLen).trim();
+        } else {
+          const parts = text.split(/^---$/m);
+          if (parts.length >= 3) {
+            const body = parts.slice(2).join("---").trim();
+            const subQ = body.indexOf("\n?\n");
+            if (subQ !== -1) {
+              front = body.substring(0, subQ).trim();
+              back = body.substring(subQ + 3).trim();
+            } else {
+              front = title;
+              back = body;
+            }
+          } else {
+            front = title;
+            back = text;
+          }
+        }
+
+        front = front.replace(/^---[\s\S]*?---\s*/, "");
+        front = front.replace(/#flashcards[^\s]*/gi, "").trim();
+
+        rawCards.push({
+          id: "c_" + i + "_" + Date.now(),
+          title: title,
+          front: front,
+          back: back,
+          interval: 0,
+          reps: 0,
+          ease: 2.5,
+          due: 0,
+          state: 0
+        });
+      }
+    }
+
+    const allExisting = await dbGetAllDecks();
+    const normName = (s) => (s || "").toLowerCase().replace(/[_\s]+/g, " ").trim();
+    const targetId = parsedPreloaded && parsedPreloaded.id ? parsedPreloaded.id : null;
+    const existingDeck = allExisting.find(d =>
+      (targetId && d.id === targetId) ||
+      normName(d.name) === normName(deckName)
+    );
+
+    const deckId = existingDeck ? existingDeck.id : (targetId || ("deck_" + Date.now()));
+    let preservedCount = 0;
+
+    if (existingDeck && Array.isArray(existingDeck.cards)) {
+      const oldById = new Map();
+      const oldByTitle = new Map();
+      for (const oc of existingDeck.cards) {
+        if (oc.id) oldById.set(oc.id, oc);
+        if (oc.title) oldByTitle.set(oc.title.trim().toLowerCase(), oc);
+      }
+      rawCards = rawCards.map(nc => {
+        const old = (nc.id && oldById.get(nc.id)) || (nc.title && oldByTitle.get(nc.title.trim().toLowerCase()));
+        if (old) {
+          preservedCount++;
+          return {
+            ...nc,
+            id: old.id || nc.id,
+            interval: old.interval ?? nc.interval ?? 0,
+            reps: old.reps ?? nc.reps ?? 0,
+            ease: old.ease ?? nc.ease ?? 2.5,
+            due: old.due ?? nc.due ?? 0,
+            state: old.state ?? nc.state ?? 0,
+            lastReview: old.lastReview ?? nc.lastReview ?? 0
+          };
+        }
+        return nc;
       });
     }
 
@@ -1638,19 +1723,21 @@ async function importZipFile(file) {
       await dbSaveMedia(deckId, fn, blob);
     }
 
-    const newDeck = {
+    const updatedDeck = {
       id: deckId,
       name: deckName,
-      createdAt: Date.now(),
-      cards: cards,
-      settings: {
-        newCardsPerDay: 20
-      },
-      history: []
+      createdAt: existingDeck ? (existingDeck.createdAt || Date.now()) : Date.now(),
+      cards: rawCards,
+      settings: existingDeck && existingDeck.settings ? existingDeck.settings : { newCardsPerDay: 20 },
+      history: existingDeck && Array.isArray(existingDeck.history) ? existingDeck.history : []
     };
 
-    await dbSaveDeck(newDeck);
-    alert(`Úspěšně importován balíček "${deckName}" (${cards.length} kartiček, ${Object.keys(mediaBlobs).length} fotografií)!`);
+    await dbSaveDeck(updatedDeck);
+    if (existingDeck) {
+      alert(`Aktualizován balíček "${deckName}" (${rawCards.length} kartiček, ${Object.keys(mediaBlobs).length} fotografií). Postup učení zachován u ${preservedCount} kartiček!`);
+    } else {
+      alert(`Úspěšně importován balíček "${deckName}" (${rawCards.length} kartiček, ${Object.keys(mediaBlobs).length} fotografií)!`);
+    }
     await loadDeckList();
   } catch (err) {
     console.error(err);
@@ -2510,6 +2597,12 @@ async function handleIncomingFiles(fileList) {
   if (!fileList || fileList.length === 0) return;
   const files = Array.from(fileList);
 
+  // 0. Soubor s postupem učení (.json)
+  const jsonFile = files.find(f => f.name.toLowerCase().endsWith('.json'));
+  if (jsonFile) {
+    return await importProgressJson(jsonFile);
+  }
+
   // 1. Zda je mezi vybranými soubory archiv .zip
   const zipFile = files.find(f => f.name.toLowerCase().endsWith('.zip') || f.type.includes('zip') || f.type === 'application/x-zip-compressed');
   if (zipFile) {
@@ -2522,7 +2615,160 @@ async function handleIncomingFiles(fileList) {
     return await importLooseFiles(files);
   }
 
-  alert("Vyberte prosím archiv .zip s kartičkami, nebo soubory kartiček (.md) a případné obrázky.");
+  alert("Vyberte prosím archiv .zip s kartičkami, soubor postupu .json, nebo soubory kartiček (.md) a případné obrázky.");
+}
+
+// --- SYNCHRONIZACE POSTUPU UČENÍ (.json) ---
+async function exportProgressJson() {
+  try {
+    const decks = await dbGetAllDecks();
+    const payload = {
+      version: 1,
+      exportedAt: Date.now(),
+      decks: decks.map(d => ({
+        id: d.id,
+        name: d.name,
+        settings: d.settings || {},
+        history: Array.isArray(d.history) ? d.history : [],
+        cards: (d.cards || []).map(c => ({
+          id: c.id,
+          title: c.title,
+          interval: c.interval || 0,
+          reps: c.reps || 0,
+          ease: c.ease || 2.5,
+          due: c.due || 0,
+          state: c.state || 0,
+          lastReview: c.lastReview || 0
+        }))
+      }))
+    };
+    const jsonStr = JSON.stringify(payload, null, 2);
+    const blob = new Blob([jsonStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const today = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `karty_postup_${today}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (err) {
+    console.error(err);
+    alert("Chyba při exportu postupu: " + err.message);
+  }
+}
+
+async function importProgressJson(file) {
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if (!data || !Array.isArray(data.decks)) {
+      alert("Neplatný formát souboru s postupem učení.");
+      return;
+    }
+
+    const localDecks = await dbGetAllDecks();
+    const normName = (s) => (s || "").toLowerCase().replace(/[_\s]+/g, " ").trim();
+    let updatedDecks = 0;
+    let updatedCards = 0;
+
+    for (const impDeck of data.decks) {
+      const target = localDecks.find(d =>
+        (impDeck.id && d.id === impDeck.id) ||
+        normName(d.name) === normName(impDeck.name)
+      );
+      if (!target) continue;
+
+      const impById = new Map();
+      const impByTitle = new Map();
+      for (const ic of (impDeck.cards || [])) {
+        if (ic.id) impById.set(ic.id, ic);
+        if (ic.title) impByTitle.set(ic.title.trim().toLowerCase(), ic);
+      }
+
+      let deckChanged = false;
+      target.cards = (target.cards || []).map(lc => {
+        const ic = (lc.id && impById.get(lc.id)) || (lc.title && impByTitle.get(lc.title.trim().toLowerCase()));
+        if (!ic) return lc;
+
+        const lLast = lc.lastReview || 0;
+        const iLast = ic.lastReview || 0;
+        const lReps = lc.reps || 0;
+        const iReps = ic.reps || 0;
+
+        // Sloučit: přednost má novější opakování (lastReview) nebo vyšší počet opakování (reps) / due
+        const useImported = (iLast > lLast) || (iLast === lLast && (iReps > lReps || (iReps === lReps && (ic.due || 0) > (lc.due || 0))));
+        if (useImported) {
+          deckChanged = true;
+          updatedCards++;
+          return {
+            ...lc,
+            interval: ic.interval ?? lc.interval ?? 0,
+            reps: ic.reps ?? lc.reps ?? 0,
+            ease: ic.ease ?? lc.ease ?? 2.5,
+            due: ic.due ?? lc.due ?? 0,
+            state: ic.state ?? lc.state ?? 0,
+            lastReview: ic.lastReview ?? lc.lastReview ?? 0
+          };
+        }
+        return lc;
+      });
+
+      if (Array.isArray(impDeck.history) && impDeck.history.length > 0) {
+        const histMap = new Map();
+        for (const h of (target.history || [])) {
+          if (h && h.date) histMap.set(h.date, { ...h });
+        }
+        for (const h of impDeck.history) {
+          if (!h || !h.date) continue;
+          const prev = histMap.get(h.date);
+          if (!prev) {
+            histMap.set(h.date, { ...h });
+            deckChanged = true;
+          } else {
+            const maxRev = Math.max(prev.reviews || 0, h.reviews || 0);
+            const maxNew = Math.max(prev.newLearned || 0, h.newLearned || 0);
+            if (maxRev !== (prev.reviews || 0) || maxNew !== (prev.newLearned || 0)) {
+              histMap.set(h.date, { date: h.date, reviews: maxRev, newLearned: maxNew });
+              deckChanged = true;
+            }
+          }
+        }
+        target.history = Array.from(histMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+      }
+
+      if (impDeck.settings && Object.keys(impDeck.settings).length > 0) {
+        target.settings = { ...(target.settings || {}), ...impDeck.settings };
+        deckChanged = true;
+      }
+
+      if (deckChanged) {
+        await dbSaveDeck(target);
+        updatedDecks++;
+      }
+    }
+
+    await loadDeckList();
+    alert(`Synchronizace dokončena! Aktualizováno ${updatedDecks} balíčků (${updatedCards} kartiček s novějším postupem).`);
+  } catch (err) {
+    console.error(err);
+    alert("Chyba při importu postupu (.json): " + err.message);
+  }
+}
+
+const btnExportProgress = document.getElementById("btnExportProgress");
+const btnImportProgress = document.getElementById("btnImportProgress");
+const fileProgressInput = document.getElementById("fileProgressInput");
+if (btnExportProgress) btnExportProgress.addEventListener("click", exportProgressJson);
+if (btnImportProgress && fileProgressInput) {
+  btnImportProgress.addEventListener("click", () => fileProgressInput.click());
+  fileProgressInput.addEventListener("change", (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      importProgressJson(e.target.files[0]);
+      fileProgressInput.value = "";
+    }
+  });
 }
 
 fileInput.addEventListener("change", (e) => {
@@ -2597,40 +2843,50 @@ window.addEventListener("keydown", (e) => {
 });
 
 // Auto-check for preloaded deck data if provided via script tag
-async function checkPreloadedDeck() {
-  if (window.PRELOADED_DECK && window.PRELOADED_DECK.name && Array.isArray(window.PRELOADED_DECK.cards) && window.PRELOADED_DECK.cards.length > 0) {
-    try {
-      const existing = await dbGetDeck(window.PRELOADED_DECK.id);
-      if (!existing) {
-        await dbSaveDeck(window.PRELOADED_DECK);
-        console.log("Preloaded deck auto-imported:", window.PRELOADED_DECK.name, "Karet:", window.PRELOADED_DECK.cards.length);
-      } else {
-        // Balíček již existuje: zachováme statistiky učení (interval, reps, ease, due), ale zaktualizujeme obsah
-        const statMap = new Map();
-        (existing.cards || []).forEach(c => {
-          if (c.id) statMap.set(c.id, c);
-          if (c.title) statMap.set(c.title, c);
-        });
-        window.PRELOADED_DECK.cards.forEach(c => {
-          const s = statMap.get(c.id) || statMap.get(c.title);
-          if (s) {
-            if (s.interval !== undefined) c.interval = s.interval;
-            if (s.reps !== undefined) c.reps = s.reps;
-            if (s.ease !== undefined) c.ease = s.ease;
-            if (s.due !== undefined) c.due = s.due;
-            if (s.state !== undefined) c.state = s.state;
-            if (s.lastReview !== undefined) c.lastReview = s.lastReview;
-          }
-        });
-        if (existing.settings) {
-          window.PRELOADED_DECK.settings = existing.settings;
+async function _importPreloadedDeckObj(deckObj) {
+  if (!deckObj || !deckObj.name || !Array.isArray(deckObj.cards) || deckObj.cards.length === 0) return;
+  try {
+    const existing = await dbGetDeck(deckObj.id);
+    if (!existing) {
+      await dbSaveDeck(deckObj);
+      console.log("Preloaded deck auto-imported:", deckObj.name, "Karet:", deckObj.cards.length);
+    } else {
+      // Balíček již existuje: zachováme statistiky učení (interval, reps, ease, due), ale zaktualizujeme obsah
+      const statMap = new Map();
+      (existing.cards || []).forEach(c => {
+        if (c.id) statMap.set(c.id, c);
+        if (c.title) statMap.set(c.title, c);
+      });
+      deckObj.cards.forEach(c => {
+        const s = statMap.get(c.id) || statMap.get(c.title);
+        if (s) {
+          if (s.interval !== undefined) c.interval = s.interval;
+          if (s.reps !== undefined) c.reps = s.reps;
+          if (s.ease !== undefined) c.ease = s.ease;
+          if (s.due !== undefined) c.due = s.due;
+          if (s.state !== undefined) c.state = s.state;
+          if (s.lastReview !== undefined) c.lastReview = s.lastReview;
         }
-        await dbSaveDeck(window.PRELOADED_DECK);
-        console.log("Preloaded deck updated, stats preserved:", window.PRELOADED_DECK.name);
+      });
+      if (existing.settings) {
+        deckObj.settings = existing.settings;
       }
-    } catch(err) {
-      console.warn("Could not auto-import preloaded deck:", err);
+      await dbSaveDeck(deckObj);
+      console.log("Preloaded deck updated, stats preserved:", deckObj.name);
     }
+  } catch(err) {
+    console.warn("Could not auto-import preloaded deck:", err);
+  }
+}
+
+async function checkPreloadedDeck() {
+  if (Array.isArray(window.PRELOADED_DECKS)) {
+    for (const d of window.PRELOADED_DECKS) {
+      await _importPreloadedDeckObj(d);
+    }
+  }
+  if (window.PRELOADED_DECK) {
+    await _importPreloadedDeckObj(window.PRELOADED_DECK);
   }
 }
 
