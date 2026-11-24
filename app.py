@@ -2717,20 +2717,31 @@ def fetch_first_nature_fungi(species_name, max_photos=4):
     out['photo_urls'] = out.get('photo_urls', [])[:int(max_photos)]
     return out
 
-@functools.lru_cache(maxsize=2048)
+_MO_LAST_ERROR = ""
+_MO_SUCCESS_CACHE = {}
+
 def _cached_mushroom_observer_photos(species_name: str, max_photos: int = 5):
+    global _MO_LAST_ERROR
+    _MO_LAST_ERROR = ""
     binomial = _resolve_fungi_binomial(species_name)
     if not binomial:
         return tuple()
+    cache_key = (binomial.lower(), int(max_photos))
+    if cache_key in _MO_SUCCESS_CACHE:
+        return _MO_SUCCESS_CACHE[cache_key]
     photos = []
     try:
         r = _scrape_session.get(
             "https://mushroomobserver.org/api2/images",
             params={"name": binomial, "detail": "high", "format": "json"},
-            headers={"User-Agent": "AnkiCardGenerator/1.0 (educational use)"},
-            timeout=(4, 12)
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                "Accept": "application/json"
+            },
+            timeout=(5, 15)
         )
         if r.status_code != 200:
+            _MO_LAST_ERROR = f"HTTP {r.status_code}"
             return tuple()
         results = r.json().get("results", [])
         candidates = []
@@ -2755,8 +2766,10 @@ def _cached_mushroom_observer_photos(species_name: str, max_photos: int = 5):
                 photos.append(f"{u}|{a}")
                 if len(photos) >= max_photos:
                     break
-    except Exception:
-        pass
+        if photos:
+            _MO_SUCCESS_CACHE[cache_key] = tuple(photos)
+    except Exception as e:
+        _MO_LAST_ERROR = f"{type(e).__name__}: {str(e)[:120]}"
     return tuple(photos)
 
 def fetch_mushroom_observer_photos(species_name, max_photos=4):
@@ -9147,7 +9160,8 @@ if st.session_state.df is not None:
                                 st.rerun()
                         elif cur_src_choice != "Aktuální fotky v buňce":
                             if st.session_state.get("curator_loaded_key") == cur_cache_key:
-                                st.warning(f"Zdroj **{cur_src_choice}** pro **{cur_sp_name}** nenašel žádné fotografie.")
+                                extra_err = f" ({_MO_LAST_ERROR})" if (cur_src_choice == "Mushroom Observer (Houby)" and _MO_LAST_ERROR) else ""
+                                st.warning(f"Zdroj **{cur_src_choice}** pro **{cur_sp_name}** nenašel žádné fotografie.{extra_err}")
                             else:
                                 st.info("Klikněte na **Načíst náhledy kandidátů** pro zobrazení dostupných fotografií ze zvoleného zdroje.")
 
