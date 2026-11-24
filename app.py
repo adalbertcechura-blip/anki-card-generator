@@ -98,7 +98,7 @@ def _record_generated_export(kind: str, src_path: str, filename: str, info_str: 
         "info": info_str,
     }
     hist.insert(0, entry)
-    while len(hist) > 12:
+    while len(hist) > 5:
         old_item = hist.pop()
         try:
             if old_item.get("path") and os.path.exists(old_item["path"]):
@@ -14448,6 +14448,9 @@ if st.session_state.df is not None:
 
     if _has_apkg or _has_obs or _has_pdf or _has_docx or _hist_all:
         with st.expander("5. Stažení výsledků", expanded=False):
+            gc.collect()
+            _newest_id = _hist_all[0]["id"] if _hist_all else None
+            _active_dl_id = st.session_state.get("active_hist_dl_id")
 
             col_res1, col_res2 = st.columns(2)
             with col_res1:
@@ -14568,14 +14571,19 @@ if st.session_state.df is not None:
                         _extra_inf = f" • {_hitem['info']}" if _hitem.get("info") else ""
                         st.markdown(f"**{_hi + 1}. {_hitem['filename']}** (`{_hitem['created_at']}` • {_hitem['size_mb']} MB{_extra_inf})")
                     with hc2:
-                        with open(_hitem["path"], "rb") as _f_hist:
-                            _safe_download_button(
-                                label="Stáhnout",
-                                data=_f_hist,
-                                file_name=_hitem["filename"],
-                                mime=_mime_map.get(_hitem["kind"], "application/octet-stream"),
-                                key=f"dl_hist_{_hitem['id']}",
-                            )
+                        if _active_dl_id == _hitem["id"]:
+                            with open(_hitem["path"], "rb") as _f_hist:
+                                _safe_download_button(
+                                    label="Stáhnout",
+                                    data=_f_hist,
+                                    file_name=_hitem["filename"],
+                                    mime=_mime_map.get(_hitem["kind"], "application/octet-stream"),
+                                    key=f"dl_hist_{_hitem['id']}",
+                                )
+                        else:
+                            if st.button("Připravit", key=f"prep_hist_{_hitem['id']}"):
+                                st.session_state["active_hist_dl_id"] = _hitem["id"]
+                                st.rerun()
                 if st.button("Vymazat historii vygenerovaných souborů", key="btn_clear_export_history"):
                     for _hitem in _hist_all:
                         try:
@@ -14584,6 +14592,7 @@ if st.session_state.df is not None:
                         except Exception:
                             pass
                     st.session_state.generated_history = []
+                    st.session_state["active_hist_dl_id"] = None
                     st.session_state.generated_apkg_path = None
                     st.session_state.generated_obsidian_path = None
                     st.session_state.generated_pdf_path = None
