@@ -2725,29 +2725,30 @@ def _cached_mushroom_observer_photos(species_name: str, max_photos: int = 5):
     photos = []
     try:
         r = _scrape_session.get(
-            "https://mushroomobserver.org/api2/observations",
-            params={"name": binomial, "has_images": "true", "detail": "high", "format": "json"},
+            "https://mushroomobserver.org/api2/images",
+            params={"name": binomial, "detail": "high", "format": "json"},
             headers={"User-Agent": "AnkiCardGenerator/1.0 (educational use)"},
-            timeout=(3, 6)
+            timeout=(4, 12)
         )
         if r.status_code != 200:
             return tuple()
         results = r.json().get("results", [])
         candidates = []
-        for obs in results[:20]:
-            for img in obs.get("images", []) or []:
-                img_id = img.get("id")
-                orig_url = img.get("original_url") or (f"https://mushroomobserver.org/images/640/{img_id}.jpg" if img_id else "")
-                if not orig_url:
-                    continue
-                # Pro rychlé stahování a menší objem dat preferujeme 640px verzi, je-li dostupné id
-                disp_url = f"https://mushroomobserver.org/images/640/{img_id}.jpg" if img_id else orig_url
-                qual = float(img.get("quality") or 0.0)
-                owner_obj = img.get("owner") or {}
-                author = str(img.get("copyright_holder") or owner_obj.get("legal_name") or owner_obj.get("login_name") or "Mushroom Observer").strip()
-                lic = str(img.get("license") or "").strip()
-                attr = f"© {author} ({lic}), Mushroom Observer" if lic else f"© {author}, Mushroom Observer"
-                candidates.append((qual, disp_url, attr))
+        for img in results[:60]:
+            img_id = img.get("id")
+            files_list = img.get("files") or []
+            url_640 = next((f for f in files_list if "/640/" in f), None)
+            url_960 = next((f for f in files_list if "/960/" in f), None)
+            orig_url = img.get("original_url") or (f"https://mushroomobserver.org/images/640/{img_id}.jpg" if img_id else "")
+            disp_url = url_640 or url_960 or (f"https://mushroomobserver.org/images/640/{img_id}.jpg" if img_id else orig_url)
+            if not disp_url:
+                continue
+            qual = float(img.get("quality") or 0.0)
+            owner_obj = img.get("owner") or {}
+            author = str(img.get("copyright_holder") or owner_obj.get("legal_name") or owner_obj.get("login_name") or "Mushroom Observer").strip()
+            lic = str(img.get("license") or "").strip()
+            attr = f"© {author} ({lic}), Mushroom Observer" if lic else f"© {author}, Mushroom Observer"
+            candidates.append((qual, disp_url, attr))
         candidates.sort(key=lambda x: x[0], reverse=True)
         for _, u, a in candidates:
             if not any(p.split('|')[0] == u for p in photos):
