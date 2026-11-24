@@ -9146,7 +9146,10 @@ if st.session_state.df is not None:
                                 st.success(f"Uloženo {len(chosen_entries)} fotografií pro **{cur_sp_name}** do sloupce **{cur_target_col}**.")
                                 st.rerun()
                         elif cur_src_choice != "Aktuální fotky v buňce":
-                            st.info("Klikněte na **Načíst náhledy kandidátů** pro zobrazení dostupných fotografií ze zvoleného zdroje.")
+                            if st.session_state.get("curator_loaded_key") == cur_cache_key:
+                                st.warning(f"Zdroj **{cur_src_choice}** pro **{cur_sp_name}** nenašel žádné fotografie.")
+                            else:
+                                st.info("Klikněte na **Načíst náhledy kandidátů** pro zobrazení dostupných fotografií ze zvoleného zdroje.")
 
         st.markdown("---")
 
