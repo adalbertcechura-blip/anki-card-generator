@@ -20,6 +20,9 @@ html_template = r"""<!DOCTYPE html>
 <meta name="theme-color" content="#0c120e">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="ikona.png">
+<link rel="apple-touch-icon" href="ikona.png">
 <title>Karty – Chytrý přehrávač kartiček</title>
 <style>
 :root {
@@ -515,6 +518,27 @@ main {
   margin-top: 18px;
   animation: fadeIn 0.2s ease-in-out;
 }
+.flashcard.side-mode-separate .card-answer {
+  border-top: none;
+  margin-top: 0;
+  padding-top: 0;
+}
+.btn-side-peek {
+  align-self: center;
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-side-peek:hover {
+  color: var(--text-main);
+  border-color: var(--accent);
+}
 
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(4px); }
@@ -522,6 +546,25 @@ main {
 }
 
 /* Card images */
+.card-img-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 6px 0;
+}
+.flashcard.img-layout-2col .card-img-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+.flashcard.img-layout-2col .card-img-grid .card-img-thumb {
+  width: 100%;
+  max-height: 320px;
+  min-height: 140px;
+  margin: 0;
+  object-fit: contain;
+}
 .card-img-thumb {
   display: block;
   margin: 8px auto;
@@ -1038,6 +1081,14 @@ main {
           <button class="btn-mode-tgl active" id="btnModeFlip" title="Režim otáčení karty">🔄 Otáčecí</button>
           <button class="btn-mode-tgl" id="btnModeType" title="Režim vepisování z klávesnice">⌨️ Vepisovací</button>
         </div>
+        <div class="mode-toggle-group" title="Zobrazení rubu karty">
+          <button class="btn-mode-tgl active" id="btnBackStacked" title="Zobrazit líc i rub pod sebou">📄 Pod sebe</button>
+          <button class="btn-mode-tgl" id="btnBackSeparate" title="Zobrazit rub na druhé straně karty">🃏 Na druhou stranu</button>
+        </div>
+        <div class="mode-toggle-group" title="Rozložení obrázků">
+          <button class="btn-mode-tgl active" id="btnImg1Col" title="Obrázky pod sebou (1 sloupec)">↕️ 1 sloupec</button>
+          <button class="btn-mode-tgl" id="btnImg2Col" title="Obrázky vedle sebe (2 sloupce)">◫ 2 sloupce</button>
+        </div>
         <label class="switch-label">
           <input type="checkbox" id="chkReverseStudy">
           <span>Otočit směr</span>
@@ -1076,6 +1127,7 @@ main {
 
       <div class="study-controls">
         <button class="btn-flip" id="btnFlip">Zobrazit odpověď (Mezerník / Klepnutí)</button>
+        <button class="btn-side-peek" id="btnSidePeek" style="display:none;">↻ Zobrazit líc</button>
         <div class="rating-grid" id="ratingGrid">
           <button class="btn-rate btn-rate-again" id="btnAgain" title="Klávesa 1">
             <span>Znovu (1)</span>
@@ -1525,9 +1577,12 @@ let currentDeck = null;
 let studyQueue = [];
 let currentIndex = 0;
 let isCardFlipped = false;
+let showingFrontOnFlipped = false;
 let sessionStats = { newCount: 0, dueCount: 0, doneCount: 0 };
 let currentCard = null;
 let cardStudyMode = "flip"; // "flip" or "type"
+let backLayoutMode = localStorage.getItem("karty_back_layout") || "stacked"; // "stacked" or "separate"
+let imgLayoutMode = localStorage.getItem("karty_img_layout") || (window.innerWidth > 768 ? "2col" : "1col"); // "1col" or "2col"
 let heatmapYear = new Date().getFullYear();
 let statsModalDeck = null;
 let extraNewCardsGranted = 0;
@@ -1671,13 +1726,28 @@ async function renderContentToHtml(content, deckId) {
   const lines = text.split('\n');
   let html = "";
   let inList = false;
+  let imgGroup = [];
+
+  const flushImgGroup = () => {
+    if (imgGroup.length > 0) {
+      html += `<div class="card-img-grid">${imgGroup.join("")}</div>`;
+      imgGroup = [];
+    }
+  };
 
   for (let l of lines) {
     l = l.trim();
     if (!l) {
+      flushImgGroup();
       if (inList) { html += "</ul>"; inList = false; }
       continue;
     }
+    if (/^(?:<img\b[^>]*>\s*)+$/i.test(l)) {
+      if (inList) { html += "</ul>"; inList = false; }
+      imgGroup.push(l);
+      continue;
+    }
+    flushImgGroup();
     if (l.startsWith('# ')) {
       if (inList) { html += "</ul>"; inList = false; }
       html += `<h2 style="font-size:1.4rem; color:#fff; margin-bottom:8px;">${l.substring(2)}</h2>`;
@@ -1692,6 +1762,7 @@ async function renderContentToHtml(content, deckId) {
       html += `<p style="margin-bottom:8px;">${l}</p>`;
     }
   }
+  flushImgGroup();
   if (inList) html += "</ul>";
 
   return html;
@@ -2687,6 +2758,7 @@ async function loadCard(idx) {
 
   currentCard = studyQueue[idx];
   isCardFlipped = false;
+  showingFrontOnFlipped = false;
 
   const isReverse = document.getElementById("chkReverseStudy").checked;
   const isQuick = document.getElementById("chkQuickReview").checked;
@@ -2703,7 +2775,7 @@ async function loadCard(idx) {
   await resolvePendingImages(qBox, currentDeck.id);
   await resolvePendingImages(aBox, currentDeck.id);
 
-  aBox.style.display = "none";
+  applyBackLayoutVisibility();
   document.getElementById("ratingGrid").style.display = "none";
   document.getElementById("quickNavGrid").style.display = isQuick ? "flex" : "none";
 
@@ -2761,10 +2833,44 @@ function flipCard() {
   revealAnswer();
 }
 
+function applyBackLayoutVisibility() {
+  const qBox = document.getElementById("cardQuestion");
+  const aBox = document.getElementById("cardAnswer");
+  const flashcardBox = document.getElementById("flashcardBox");
+  const btnSidePeek = document.getElementById("btnSidePeek");
+  if (!isCardFlipped) {
+    qBox.style.display = "flex";
+    aBox.style.display = "none";
+    flashcardBox.classList.remove("side-mode-separate");
+    if (btnSidePeek) btnSidePeek.style.display = "none";
+    return;
+  }
+  if (backLayoutMode === "separate") {
+    flashcardBox.classList.add("side-mode-separate");
+    if (showingFrontOnFlipped) {
+      qBox.style.display = "flex";
+      aBox.style.display = "none";
+      if (btnSidePeek) btnSidePeek.innerText = "↻ Zobrazit rub";
+    } else {
+      qBox.style.display = "none";
+      aBox.style.display = "flex";
+      if (btnSidePeek) btnSidePeek.innerText = "↻ Zobrazit líc";
+    }
+    if (btnSidePeek) btnSidePeek.style.display = "inline-flex";
+  } else {
+    flashcardBox.classList.remove("side-mode-separate");
+    qBox.style.display = "flex";
+    aBox.style.display = "flex";
+    if (btnSidePeek) btnSidePeek.style.display = "none";
+  }
+}
+
 function revealAnswer() {
   isCardFlipped = true;
-  document.getElementById("cardAnswer").style.display = "flex";
+  showingFrontOnFlipped = false;
+  applyBackLayoutVisibility();
   document.getElementById("btnFlip").style.display = "none";
+  document.getElementById("flashcardBox").scrollTop = 0;
 
   const isQuick = document.getElementById("chkQuickReview").checked;
   if (isQuick) {
@@ -2872,6 +2978,80 @@ btnModeType.onclick = () => {
   btnModeFlip.classList.remove("active");
   loadCard(currentIndex);
 };
+
+// --- BACK LAYOUT TOGGLES (POD SEBE VS NA DRUHOU STRANU) ---
+const btnBackStacked = document.getElementById("btnBackStacked");
+const btnBackSeparate = document.getElementById("btnBackSeparate");
+const btnSidePeek = document.getElementById("btnSidePeek");
+
+function syncBackLayoutButtons() {
+  if (backLayoutMode === "separate") {
+    btnBackSeparate.classList.add("active");
+    btnBackStacked.classList.remove("active");
+  } else {
+    btnBackStacked.classList.add("active");
+    btnBackSeparate.classList.remove("active");
+  }
+}
+syncBackLayoutButtons();
+
+btnBackStacked.onclick = () => {
+  backLayoutMode = "stacked";
+  localStorage.setItem("karty_back_layout", backLayoutMode);
+  showingFrontOnFlipped = false;
+  syncBackLayoutButtons();
+  applyBackLayoutVisibility();
+};
+
+btnBackSeparate.onclick = () => {
+  backLayoutMode = "separate";
+  localStorage.setItem("karty_back_layout", backLayoutMode);
+  showingFrontOnFlipped = false;
+  syncBackLayoutButtons();
+  applyBackLayoutVisibility();
+  document.getElementById("flashcardBox").scrollTop = 0;
+};
+
+if (btnSidePeek) {
+  btnSidePeek.onclick = () => {
+    showingFrontOnFlipped = !showingFrontOnFlipped;
+    applyBackLayoutVisibility();
+    document.getElementById("flashcardBox").scrollTop = 0;
+  };
+}
+
+// --- IMAGE LAYOUT TOGGLES (1 SLOUPEC VS 2 SLOUPCE) ---
+const btnImg1Col = document.getElementById("btnImg1Col");
+const btnImg2Col = document.getElementById("btnImg2Col");
+
+function applyImgLayoutMode() {
+  const flashcardBox = document.getElementById("flashcardBox");
+  if (imgLayoutMode === "2col") {
+    flashcardBox.classList.add("img-layout-2col");
+    if (btnImg2Col) btnImg2Col.classList.add("active");
+    if (btnImg1Col) btnImg1Col.classList.remove("active");
+  } else {
+    flashcardBox.classList.remove("img-layout-2col");
+    if (btnImg1Col) btnImg1Col.classList.add("active");
+    if (btnImg2Col) btnImg2Col.classList.remove("active");
+  }
+}
+applyImgLayoutMode();
+
+if (btnImg1Col) {
+  btnImg1Col.onclick = () => {
+    imgLayoutMode = "1col";
+    localStorage.setItem("karty_img_layout", imgLayoutMode);
+    applyImgLayoutMode();
+  };
+}
+if (btnImg2Col) {
+  btnImg2Col.onclick = () => {
+    imgLayoutMode = "2col";
+    localStorage.setItem("karty_img_layout", imgLayoutMode);
+    applyImgLayoutMode();
+  };
+}
 
 // Vepisovací tlačítko a Enter
 document.getElementById("btnCheckType").onclick = submitTypeAnswer;
@@ -3291,6 +3471,9 @@ window.addEventListener("DOMContentLoaded", async () => {
   await initDB();
   await checkPreloadedDeck();
   await loadDeckList();
+  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  }
 });
 </script>
 
@@ -3304,4 +3487,8 @@ output_html_path = os.path.join(BASE_DIR, "Karty.html")
 with open(output_html_path, "w", encoding="utf-8") as f:
     f.write(final_html)
 
-print(f"Successfully generated Karty.html at: {output_html_path} ({len(final_html.encode('utf-8'))} bytes)")
+output_index_path = os.path.join(BASE_DIR, "index.html")
+with open(output_index_path, "w", encoding="utf-8") as f:
+    f.write(final_html)
+
+print(f"Successfully generated Karty.html and index.html ({len(final_html.encode('utf-8'))} bytes)")

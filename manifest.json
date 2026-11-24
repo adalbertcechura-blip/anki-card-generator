@@ -1,0 +1,17 @@
+{
+  "name": "Karty – Chytrý přehrávač kartiček",
+  "short_name": "Karty",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0c120e",
+  "theme_color": "#0c120e",
+  "icons": [
+    {
+      "src": "ikona.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
