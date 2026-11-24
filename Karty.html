@@ -1020,11 +1020,11 @@ main {
       </div>
     </div>
 
-    <div class="drop-zone" id="dropZone">
+    <div class="drop-zone" id="dropZone" style="position: relative;">
       <div class="drop-icon">📦</div>
       <div class="drop-title">Přetáhněte sem balíček .zip nebo klikněte</div>
       <div class="drop-subtitle">Otevřete balíček s kartičkami vygenerovaný generátorem (nebo vyberte soubory kartiček)</div>
-      <input type="file" id="fileZipInput" accept=".zip,application/zip,application/x-zip-compressed,application/octet-stream,.md,text/markdown,*/*" multiple style="display:none">
+      <input type="file" id="fileZipInput" accept=".zip,application/zip,application/x-zip-compressed,application/octet-stream,.md,text/markdown,*/*" multiple style="position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:2;">
     </div>
 
     <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -1249,60 +1249,105 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 const DB_NAME = "KartyFlashcardsDB";
 const DB_VERSION = 2;
 let db = null;
+const _memDecks = new Map();
+const _memMedia = new Map();
+const _memReviews = [];
 
 function initDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = (e) => {
-      const d = e.target.result;
-      if (!d.objectStoreNames.contains("decks")) {
-        d.createObjectStore("decks", { keyPath: "id" });
+  return new Promise((resolve) => {
+    try {
+      if (typeof indexedDB === "undefined") {
+        resolve(null);
+        return;
       }
-      if (!d.objectStoreNames.contains("media")) {
-        d.createObjectStore("media");
-      }
-      if (!d.objectStoreNames.contains("reviews")) {
-        const revStore = d.createObjectStore("reviews", { keyPath: "id", autoIncrement: true });
-        revStore.createIndex("deckId", "deckId", { unique: false });
-        revStore.createIndex("dateStr", "dateStr", { unique: false });
-      }
-    };
-    req.onsuccess = (e) => {
-      db = e.target.result;
-      resolve(db);
-    };
-    req.onerror = (e) => reject(e);
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = (e) => {
+        const d = e.target.result;
+        if (!d.objectStoreNames.contains("decks")) {
+          d.createObjectStore("decks", { keyPath: "id" });
+        }
+        if (!d.objectStoreNames.contains("media")) {
+          d.createObjectStore("media");
+        }
+        if (!d.objectStoreNames.contains("reviews")) {
+          const revStore = d.createObjectStore("reviews", { keyPath: "id", autoIncrement: true });
+          revStore.createIndex("deckId", "deckId", { unique: false });
+          revStore.createIndex("dateStr", "dateStr", { unique: false });
+        }
+      };
+      req.onsuccess = (e) => {
+        db = e.target.result;
+        resolve(db);
+      };
+      req.onerror = () => {
+        db = null;
+        resolve(null);
+      };
+    } catch (err) {
+      db = null;
+      resolve(null);
+    }
   });
 }
 
 function dbSaveDeck(deck) {
+  if (!db) {
+    _memDecks.set(deck.id, deck);
+    return Promise.resolve();
+  }
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(["decks"], "readwrite");
-    tx.objectStore("decks").put(deck);
-    tx.oncomplete = () => resolve();
-    tx.onerror = (e) => reject(e);
+    try {
+      const tx = db.transaction(["decks"], "readwrite");
+      tx.objectStore("decks").put(deck);
+      tx.oncomplete = () => resolve();
+      tx.onerror = (e) => reject(e);
+    } catch (err) {
+      _memDecks.set(deck.id, deck);
+      resolve();
+    }
   });
 }
 
 function dbGetAllDecks() {
+  if (!db) {
+    return Promise.resolve(Array.from(_memDecks.values()));
+  }
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(["decks"], "readonly");
-    const req = tx.objectStore("decks").getAll();
-    req.onsuccess = () => resolve(req.result || []);
-    req.onerror = (e) => reject(e);
+    try {
+      const tx = db.transaction(["decks"], "readonly");
+      const req = tx.objectStore("decks").getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = (e) => reject(e);
+    } catch (err) {
+      resolve(Array.from(_memDecks.values()));
+    }
   });
 }
 
 function dbGetDeck(id) {
+  if (!db) {
+    return Promise.resolve(_memDecks.get(id));
+  }
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(["decks"], "readonly");
-    const req = tx.objectStore("decks").get(id);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = (e) => reject(e);
+    try {
+      const tx = db.transaction(["decks"], "readonly");
+      const req = tx.objectStore("decks").get(id);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = (e) => reject(e);
+    } catch (err) {
+      resolve(_memDecks.get(id));
+    }
   });
 }
 
 function dbDeleteDeck(id) {
+  if (!db) {
+    _memDecks.delete(id);
+    for (const k of Array.from(_memMedia.keys())) {
+      if (String(k).startsWith(id + ":")) _memMedia.delete(k);
+    }
+    return Promise.resolve();
+  }
   return new Promise(async (resolve, reject) => {
     try {
       const stores = ["decks", "media"];
@@ -1343,24 +1388,44 @@ function dbDeleteDeck(id) {
 }
 
 function dbSaveMedia(deckId, filename, blob) {
+  if (!db) {
+    _memMedia.set(deckId + ":" + filename, blob);
+    return Promise.resolve();
+  }
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(["media"], "readwrite");
-    tx.objectStore("media").put(blob, deckId + ":" + filename);
-    tx.oncomplete = () => resolve();
-    tx.onerror = (e) => reject(e);
+    try {
+      const tx = db.transaction(["media"], "readwrite");
+      tx.objectStore("media").put(blob, deckId + ":" + filename);
+      tx.oncomplete = () => resolve();
+      tx.onerror = (e) => reject(e);
+    } catch (err) {
+      _memMedia.set(deckId + ":" + filename, blob);
+      resolve();
+    }
   });
 }
 
 function dbGetMedia(deckId, filename) {
+  if (!db) {
+    return Promise.resolve(_memMedia.get(deckId + ":" + filename));
+  }
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(["media"], "readonly");
-    const req = tx.objectStore("media").get(deckId + ":" + filename);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = (e) => reject(e);
+    try {
+      const tx = db.transaction(["media"], "readonly");
+      const req = tx.objectStore("media").get(deckId + ":" + filename);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(undefined);
+    } catch (err) {
+      resolve(_memMedia.get(deckId + ":" + filename));
+    }
   });
 }
 
 function dbAddReview(entry) {
+  if (!db) {
+    _memReviews.push(entry);
+    return Promise.resolve();
+  }
   return new Promise((resolve) => {
     try {
       if (!db.objectStoreNames.contains("reviews")) {
@@ -1378,6 +1443,9 @@ function dbAddReview(entry) {
 }
 
 function dbGetAllReviews() {
+  if (!db) {
+    return Promise.resolve(_memReviews.slice());
+  }
   return new Promise((resolve) => {
     try {
       if (!db.objectStoreNames.contains("reviews")) {
@@ -1411,6 +1479,17 @@ async function getMediaUrl(deckId, filename) {
     const url = URL.createObjectURL(blob);
     mediaUrlCache.set(cacheKey, url);
     return url;
+  }
+  if (window.PRELOADED_MEDIA_REF) {
+    const refId = window.PRELOADED_MEDIA_REF[cacheKey] || window.PRELOADED_MEDIA_REF[filename];
+    if (refId) {
+      const el = document.getElementById(refId);
+      if (el && el.textContent) {
+        const dataUrl = el.textContent.trim();
+        mediaUrlCache.set(cacheKey, dataUrl);
+        return dataUrl;
+      }
+    }
   }
   return null;
 }
@@ -1623,7 +1702,8 @@ document.getElementById("lightbox").onclick = () => document.getElementById("lig
 // --- ZIP PARSER ---
 async function importZipFile(file) {
   try {
-    const zip = await JSZip.loadAsync(file);
+    const buf = file.arrayBuffer ? await file.arrayBuffer() : file;
+    const zip = await JSZip.loadAsync(buf);
     let deckName = file.name.replace(/\.zip$/i, "").replace(/_/g, " ");
     
     const files = Object.keys(zip.files);
@@ -2678,10 +2758,6 @@ document.getElementById("helpModal").onclick = (e) => {
 const dropZone = document.getElementById("dropZone");
 const fileInput = document.getElementById("fileZipInput");
 
-dropZone.addEventListener("click", () => {
-  fileInput.click();
-});
-
 async function handleIncomingFiles(fileList) {
   if (!fileList || fileList.length === 0) return;
   const files = Array.from(fileList);
@@ -2701,9 +2777,9 @@ async function handleIncomingFiles(fileList) {
   alert("Vyberte prosím archiv .zip s kartičkami, nebo soubory kartiček (.md) a případné obrázky.");
 }
 
-fileInput.addEventListener("change", (e) => {
+fileInput.addEventListener("change", async (e) => {
   if (e.target.files && e.target.files.length > 0) {
-    handleIncomingFiles(e.target.files);
+    await handleIncomingFiles(e.target.files);
     fileInput.value = "";
   }
 });
@@ -2773,40 +2849,49 @@ window.addEventListener("keydown", (e) => {
 });
 
 // Auto-check for preloaded deck data if provided via script tag
-async function checkPreloadedDeck() {
-  if (window.PRELOADED_DECK && window.PRELOADED_DECK.name && Array.isArray(window.PRELOADED_DECK.cards) && window.PRELOADED_DECK.cards.length > 0) {
-    try {
-      const existing = await dbGetDeck(window.PRELOADED_DECK.id);
-      if (!existing) {
-        await dbSaveDeck(window.PRELOADED_DECK);
-        console.log("Preloaded deck auto-imported:", window.PRELOADED_DECK.name, "Karet:", window.PRELOADED_DECK.cards.length);
-      } else {
-        // Balíček již existuje: zachováme statistiky učení (interval, reps, ease, due), ale zaktualizujeme obsah
-        const statMap = new Map();
-        (existing.cards || []).forEach(c => {
-          if (c.id) statMap.set(c.id, c);
-          if (c.title) statMap.set(c.title, c);
-        });
-        window.PRELOADED_DECK.cards.forEach(c => {
-          const s = statMap.get(c.id) || statMap.get(c.title);
-          if (s) {
-            if (s.interval !== undefined) c.interval = s.interval;
-            if (s.reps !== undefined) c.reps = s.reps;
-            if (s.ease !== undefined) c.ease = s.ease;
-            if (s.due !== undefined) c.due = s.due;
-            if (s.state !== undefined) c.state = s.state;
-            if (s.lastReview !== undefined) c.lastReview = s.lastReview;
-          }
-        });
-        if (existing.settings) {
-          window.PRELOADED_DECK.settings = existing.settings;
+async function _importPreloadedDeckObj(deckObj) {
+  if (!deckObj || !deckObj.name || !Array.isArray(deckObj.cards) || deckObj.cards.length === 0) return;
+  try {
+    const existing = await dbGetDeck(deckObj.id);
+    if (!existing) {
+      await dbSaveDeck(deckObj);
+      console.log("Preloaded deck auto-imported:", deckObj.name, "Karet:", deckObj.cards.length);
+    } else {
+      const statMap = new Map();
+      (existing.cards || []).forEach(c => {
+        if (c.id) statMap.set(c.id, c);
+        if (c.title) statMap.set(c.title, c);
+      });
+      deckObj.cards.forEach(c => {
+        const s = statMap.get(c.id) || statMap.get(c.title);
+        if (s) {
+          if (s.interval !== undefined) c.interval = s.interval;
+          if (s.reps !== undefined) c.reps = s.reps;
+          if (s.ease !== undefined) c.ease = s.ease;
+          if (s.due !== undefined) c.due = s.due;
+          if (s.state !== undefined) c.state = s.state;
+          if (s.lastReview !== undefined) c.lastReview = s.lastReview;
         }
-        await dbSaveDeck(window.PRELOADED_DECK);
-        console.log("Preloaded deck updated, stats preserved:", window.PRELOADED_DECK.name);
+      });
+      if (existing.settings) {
+        deckObj.settings = existing.settings;
       }
-    } catch(err) {
-      console.warn("Could not auto-import preloaded deck:", err);
+      await dbSaveDeck(deckObj);
+      console.log("Preloaded deck updated, stats preserved:", deckObj.name);
     }
+  } catch(err) {
+    console.warn("Could not auto-import preloaded deck:", err);
+  }
+}
+
+async function checkPreloadedDeck() {
+  if (Array.isArray(window.PRELOADED_DECKS)) {
+    for (const d of window.PRELOADED_DECKS) {
+      await _importPreloadedDeckObj(d);
+    }
+  }
+  if (window.PRELOADED_DECK) {
+    await _importPreloadedDeckObj(window.PRELOADED_DECK);
   }
 }
 
