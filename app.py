@@ -2717,96 +2717,6 @@ def fetch_first_nature_fungi(species_name, max_photos=4):
     out['photo_urls'] = out.get('photo_urls', [])[:int(max_photos)]
     return out
 
-import threading
-_MO_LAST_ERROR = ""
-_MO_SUCCESS_CACHE = {}
-_MO_RATE_LOCK = threading.Lock()
-_MO_LAST_REQ_TS = 0.0
-
-def _cached_mushroom_observer_photos(species_name: str, max_photos: int = 5):
-    global _MO_LAST_ERROR, _MO_LAST_REQ_TS
-    _MO_LAST_ERROR = ""
-    binomial = _resolve_fungi_binomial(species_name)
-    if not binomial:
-        return tuple()
-    cache_key = (binomial.lower(), int(max_photos))
-    if cache_key in _MO_SUCCESS_CACHE:
-        return _MO_SUCCESS_CACHE[cache_key]
-    photos = []
-    mo_headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Accept": "application/json"
-    }
-    mo_params = {"name": binomial, "detail": "high", "format": "json"}
-    try:
-        with _MO_RATE_LOCK:
-            now = time.time()
-            wait_s = 0.35 - (now - _MO_LAST_REQ_TS)
-            if wait_s > 0:
-                time.sleep(wait_s)
-            _MO_LAST_REQ_TS = time.time()
-            r = _scrape_session.get(
-                "https://mushroomobserver.org/api2/images",
-                params=mo_params,
-                headers=mo_headers,
-                timeout=(5, 15)
-            )
-            if r.status_code == 429:
-                try:
-                    retry_after = min(float(r.headers.get("Retry-After", 1.5)), 3.0)
-                except Exception:
-                    retry_after = 1.5
-                time.sleep(max(0.5, retry_after))
-                _MO_LAST_REQ_TS = time.time()
-                r = _scrape_session.get(
-                    "https://mushroomobserver.org/api2/images",
-                    params=mo_params,
-                    headers=mo_headers,
-                    timeout=(5, 15)
-                )
-        if r.status_code != 200:
-            if r.status_code == 429:
-                _MO_LAST_ERROR = "HTTP 429 – Mushroom Observer dočasně omezil počet požadavků ze sdílené IP adresy Streamlit Cloudu"
-            else:
-                _MO_LAST_ERROR = f"HTTP {r.status_code}"
-            return tuple()
-        results = r.json().get("results", [])
-        candidates = []
-        for img in results[:60]:
-            img_id = img.get("id")
-            files_list = img.get("files") or []
-            url_640 = next((f for f in files_list if "/640/" in f), None)
-            url_960 = next((f for f in files_list if "/960/" in f), None)
-            orig_url = img.get("original_url") or (f"https://mushroomobserver.org/images/640/{img_id}.jpg" if img_id else "")
-            disp_url = url_640 or url_960 or (f"https://mushroomobserver.org/images/640/{img_id}.jpg" if img_id else orig_url)
-            if not disp_url:
-                continue
-            qual = float(img.get("quality") or 0.0)
-            owner_obj = img.get("owner") or {}
-            author = str(img.get("copyright_holder") or owner_obj.get("legal_name") or owner_obj.get("login_name") or "Mushroom Observer").strip()
-            lic = str(img.get("license") or "").strip()
-            attr = f"© {author} ({lic}), Mushroom Observer" if lic else f"© {author}, Mushroom Observer"
-            candidates.append((qual, disp_url, attr))
-        candidates.sort(key=lambda x: x[0], reverse=True)
-        for _, u, a in candidates:
-            if not any(p.split('|')[0] == u for p in photos):
-                photos.append(f"{u}|{a}")
-                if len(photos) >= max_photos:
-                    break
-        if photos:
-            _MO_SUCCESS_CACHE[cache_key] = tuple(photos)
-    except Exception as e:
-        _MO_LAST_ERROR = f"{type(e).__name__}: {str(e)[:120]}"
-    return tuple(photos)
-
-def fetch_mushroom_observer_photos(species_name, max_photos=4):
-    if not species_name or pd.isna(species_name):
-        return []
-    q = str(species_name).strip()
-    if not q:
-        return []
-    return list(_cached_mushroom_observer_photos(q, max(int(max_photos), 5)))[:int(max_photos)]
-
 def fetch_bird_sounds_xenocanto(species_name, sound_types=None, max_sounds=1, api_key=""):
 \
 \
@@ -4169,11 +4079,6 @@ def build_deck_attribution(active_cols=None, selected_sources=None):
             "<p>Fotografie a popisy evropských druhů hub pocházejí z přírodovědného atlasu <strong>First Nature</strong> (<a href=\"https://www.first-nature.com/fungi/\">www.first-nature.com</a>).</p>"
         )
 
-    if any("[Mushroom Observer]" in str(c) for c in active_cols):
-        sections.append(
-            "<p>Fotografie hub z databáze <strong>Mushroom Observer</strong> (<a href=\"https://mushroomobserver.org\">mushroomobserver.org</a>) jsou použity v souladu s uvedenými licencemi Creative Commons a autorskými údaji.</p>"
-        )
-
     has_dalibor_any = any("[DaLiBor]" in str(c) for c in active_cols)
     if has_dalibor_any:
         d_parts = []
@@ -5173,7 +5078,6 @@ ALL_AVAILABLE_CITATIONS = {
     "GBIF": "Global Biodiversity Information Facility (GBIF.org) Backbone Taxonomy, Occurrences & Multimedia.",
     "Mykologie.net": "Mykologická databáze mykologie.net – popisy, fotografie a určování hub v ČR. (mykologie.net)",
     "First Nature": "First Nature – Wildlife & Fungi of Britain and Europe (fotografie a mykologické popisy). (first-nature.com/fungi)",
-    "Mushroom Observer": "Mushroom Observer Community – mezinárodní mykologická databáze fotografií pod licencemi Creative Commons. (mushroomobserver.org)",
     "DaLiBor": "Botanický ústav AV ČR: DaLiBor – Atlas českých lišejníků. (dalib.cz)",
     "Mushroom Color Atlas": "Beeler J. (2024): The Mushroom Color Atlas – A Guide to Dyes and Pigments Made from Fungi. (mushroomcoloratlas.com)",
     "Wikimedia Commons": "Multimediální repozitář Wikimedia Foundation pod volnými licencemi Creative Commons.",
@@ -5225,9 +5129,6 @@ def get_active_citations(cols=None, df=None, selected_sources=None) -> list:
 
     if "[First Nature]" in combined_check or "first-nature.com" in combined_check:
         citations.append(("First Nature", ALL_AVAILABLE_CITATIONS["First Nature"]))
-
-    if "[Mushroom Observer]" in combined_check or "mushroomobserver.org" in combined_check:
-        citations.append(("Mushroom Observer", ALL_AVAILABLE_CITATIONS["Mushroom Observer"]))
 
     if "[DaLiBor]" in combined_check or "dalib.cz" in combined_check:
         citations.append(("DaLiBor", ALL_AVAILABLE_CITATIONS["DaLiBor"]))
@@ -5463,8 +5364,6 @@ def _infer_photo_source_label(col_name: str, url_str: str = "") -> str:
         return "DaLiBor (dalib.cz)"
     if "first nature" in c_low or "first-nature.com" in u_low:
         return "First Nature (first-nature.com)"
-    if "mushroom observer" in c_low or "mushroomobserver.org" in u_low:
-        return "Mushroom Observer"
     if "inat" in c_low or "inaturalist" in u_low:
         return "iNaturalist"
     if "gbif" in c_low:
@@ -9096,7 +8995,7 @@ if st.session_state.df is not None:
                         cur_sp_name = str(df.iloc[cur_idx][columns[0]]).strip() if pd.notna(df.iloc[cur_idx][columns[0]]) else ""
 
                         img_col_cands = [c for c in columns if check_col_is_image(c, df) or is_image_col(c)]
-                        for def_ic in ["[Pladias] Fotky", "[Pladias] Celá rostlina", "[Pladias] Květ", "[Pladias] List", "[iNat] Obrázky (URL)", "[Wikimedia] Obrázky (URL)", "[First Nature] Fotky", "[Mushroom Observer] Fotky", "[Mykologie.net] Fotky", "[GBIF] Houby", "[Vlastní] Fotografie"]:
+                        for def_ic in ["[Pladias] Fotky", "[Pladias] Celá rostlina", "[Pladias] Květ", "[Pladias] List", "[iNat] Obrázky (URL)", "[Wikimedia] Obrázky (URL)", "[First Nature] Fotky", "[Mykologie.net] Fotky", "[GBIF] Houby", "[Vlastní] Fotografie"]:
                             if def_ic not in img_col_cands:
                                 img_col_cands.append(def_ic)
                         img_col_cands.append("— Vytvořit nový sloupec —")
@@ -9118,7 +9017,6 @@ if st.session_state.df is not None:
                                 "iNaturalist",
                                 "Wikimedia Commons",
                                 "First Nature (Houby)",
-                                "Mushroom Observer (Houby)",
                                 "Mykologie.net (Houby)",
                                 "GBIF (Houby)",
                                 "Aktuální fotky v buňce"
@@ -9152,8 +9050,6 @@ if st.session_state.df is not None:
                                     loaded_cands = fetch_wikimedia_images(sp_q, max_photos=cur_limit)
                                 elif cur_src_choice == "First Nature (Houby)":
                                     loaded_cands = fetch_first_nature_fungi(sp_q, max_photos=cur_limit).get("photo_urls", [])
-                                elif cur_src_choice == "Mushroom Observer (Houby)":
-                                    loaded_cands = fetch_mushroom_observer_photos(sp_q, max_photos=cur_limit)
                                 elif cur_src_choice == "Mykologie.net (Houby)":
                                     loaded_cands = fetch_mykologie_data(sp_q, max_photos=cur_limit).get("photo_urls", [])
                                 elif cur_src_choice == "GBIF (Houby)":
@@ -9187,8 +9083,7 @@ if st.session_state.df is not None:
                                 st.rerun()
                         elif cur_src_choice != "Aktuální fotky v buňce":
                             if st.session_state.get("curator_loaded_key") == cur_cache_key:
-                                extra_err = f" ({_MO_LAST_ERROR})" if (cur_src_choice == "Mushroom Observer (Houby)" and _MO_LAST_ERROR) else ""
-                                st.warning(f"Zdroj **{cur_src_choice}** pro **{cur_sp_name}** nenašel žádné fotografie.{extra_err}")
+                                st.warning(f"Zdroj **{cur_src_choice}** pro **{cur_sp_name}** nenašel žádné fotografie.")
                             else:
                                 st.info("Klikněte na **Načíst náhledy kandidátů** pro zobrazení dostupných fotografií ze zvoleného zdroje.")
 
@@ -9200,7 +9095,7 @@ if st.session_state.df is not None:
             "enable_gbif_kvet", "enable_gbif_list", "enable_gbif_herbar",
             "enable_bryo_photos", "enable_bryo_desc", "enable_bryo_link",
             "enable_mykologie_img", "enable_mykologie_desc", "enable_mykologie_link", "enable_mykologie_sci_name", "enable_gbif_fungi",
-            "enable_first_nature_img", "enable_first_nature_desc", "enable_first_nature_link", "enable_mushroom_observer",
+            "enable_first_nature_img", "enable_first_nature_desc", "enable_first_nature_link",
             "enable_dalibor_photos", "enable_dalibor_desc", "enable_dalibor_link",
             "enable_diatombase_taxon", "enable_diatombase_link", "enable_algaebase_link",
             "enable_gbif_zoo", "enable_bird_sounds",
@@ -9299,9 +9194,6 @@ if st.session_state.df is not None:
                 "enable_first_nature_desc": False,
                 "enable_first_nature_link": False,
                 "first_nature_col": columns[0] if columns else "",
-                "enable_mushroom_observer": False,
-                "mushroom_observer_col": columns[0] if columns else "",
-                "mushroom_observer_max": 3,
                 "enable_gbif_zoo": False,
                 "gbif_zoo_col": columns[0] if columns else "",
                 "gbif_zoo_max": 3,
@@ -9398,7 +9290,6 @@ if st.session_state.df is not None:
                         else:
                             for k_adv in ["enable_mykologie_img", "enable_mykologie_desc", "enable_mykologie_link",
                                           "enable_first_nature_img", "enable_first_nature_desc", "enable_first_nature_link",
-                                          "enable_mushroom_observer",
                                           "enable_mushroom_color_atlas", "enable_cerveny_seznam", "enable_gbif", "enable_desc", "enable_inat_map"]:
                                 cfg[k_adv] = True
                                 st.session_state[f"w_{k_adv}"] = True
@@ -9472,7 +9363,7 @@ if st.session_state.df is not None:
 
                 _photo_cfg_keys = [
                     "pladias_photos_max", "inat_max", "wiki_max", "mykologie_img_max",
-                    "gbif_fungi_max", "first_nature_img_max", "mushroom_observer_max", "dalibor_photos_max", "bryo_photos_max", "gbif_zoo_max"
+                    "gbif_fungi_max", "first_nature_img_max", "dalibor_photos_max", "bryo_photos_max", "gbif_zoo_max"
                 ]
                 if bulk_photo_count != st.session_state["_prev_bulk_slider"] or st.session_state.get("_sync_bulk_photo_pending", False):
                     st.session_state["_prev_bulk_slider"] = bulk_photo_count
@@ -9985,7 +9876,7 @@ if st.session_state.df is not None:
                     keys_houby = [
                         "enable_mykologie_img", "enable_mykologie_desc", "enable_mykologie_link", "enable_mykologie_sci_name",
                         "enable_gbif_fungi", "enable_first_nature_img", "enable_first_nature_desc", "enable_first_nature_link",
-                        "enable_mushroom_observer", "enable_mushroom_color_atlas"
+                        "enable_mushroom_color_atlas"
                     ]
                     render_category_select_all_checkbox("tab_houby", keys_houby)
 
@@ -10130,31 +10021,6 @@ if st.session_state.df is not None:
                             value=cfg.get("first_nature_img_max", 3),
                             key="w_first_nature_img_max"
                         )
-
-                cfg["enable_mushroom_observer"] = st.checkbox(
-                    "Mushroom Observer – Fotky (mushroomobserver.org)",
-                    value=cfg.get("enable_mushroom_observer", False),
-                    key="w_enable_mushroom_observer",
-                    help="Vyhledá nejlépe hodnocené fotografie z mezinárodní mykologické databáze Mushroom Observer včetně licencí a autorů."
-                )
-                if cfg.get("enable_mushroom_observer", False):
-                    mo_col_val = cfg.get("mushroom_observer_col", columns[0])
-                    try:
-                        mo_col_idx = columns.index(mo_col_val)
-                    except ValueError:
-                        mo_col_idx = 0
-                    cfg["mushroom_observer_col"] = st.selectbox(
-                        "Sloupec se jménem houby pro Mushroom Observer:",
-                        options=columns,
-                        index=mo_col_idx,
-                        key="w_mushroom_observer_col"
-                    )
-                    cfg["mushroom_observer_max"] = st.slider(
-                        "Max fotek z Mushroom Observer na řádek",
-                        1, 5,
-                        value=cfg.get("mushroom_observer_max", 3),
-                        key="w_mushroom_observer_max"
-                    )
 
                 st.markdown("---")
                 cfg["enable_mushroom_color_atlas"] = st.checkbox(
@@ -10642,7 +10508,6 @@ if st.session_state.df is not None:
             "enable_first_nature_img": "First Nature fotky",
             "enable_first_nature_desc": "First Nature popis",
             "enable_first_nature_link": "First Nature odkaz",
-            "enable_mushroom_observer": "Mushroom Observer fotky",
             "enable_mushroom_color_atlas": "Mushroom Color Atlas",
             "enable_dalibor_photos": "DaLiBor fotky",
             "enable_dalibor_desc": "DaLiBor popis",
@@ -10749,9 +10614,6 @@ if st.session_state.df is not None:
             enable_first_nature_link = cfg.get("enable_first_nature_link", False)
             first_nature_col = cfg.get("first_nature_col", columns[0])
             first_nature_img_max = cfg.get("first_nature_img_max", 3)
-            enable_mushroom_observer = cfg.get("enable_mushroom_observer", False)
-            mushroom_observer_col = cfg.get("mushroom_observer_col", columns[0])
-            mushroom_observer_max = cfg.get("mushroom_observer_max", 3)
             enable_gbif_zoo = cfg.get("enable_gbif_zoo", False)
             enable_bird_sounds = cfg.get("enable_bird_sounds", False)
             enable_wiki_link = cfg.get("enable_wiki_link", False)
@@ -10956,8 +10818,6 @@ if st.session_state.df is not None:
                 _ensure_new_col("[First Nature] Popis")
             if enable_first_nature_link:
                 _ensure_new_col("[First Nature] Odkaz")
-            if enable_mushroom_observer:
-                _ensure_new_col("[Mushroom Observer] Fotky")
             if enable_gbif_zoo:
                 _ensure_new_col("[GBIF] Zoologie")
             if enable_wiki_link:
@@ -11621,20 +11481,6 @@ if st.session_state.df is not None:
                         except Exception:
                             row_unfounds.append({'Řádek': idx + 1, 'Položka': str(raw_sp), 'Modul': 'First Nature (Chyba)'})
 
-                if enable_mushroom_observer:
-                    if skip_existing and _is_target_filled("[Mushroom Observer] Fotky"):
-                        pass
-                    else:
-                        raw_sp = ""
-                        try:
-                            raw_sp = str(row[mushroom_observer_col]).strip()
-                            mo_photos = fetch_mushroom_observer_photos(raw_sp, max_photos=mushroom_observer_max)
-                            if not mo_photos:
-                                row_unfounds.append({'Řádek': idx + 1, 'Položka': raw_sp, 'Modul': 'Mushroom Observer'})
-                            row_updates["[Mushroom Observer] Fotky"] = ";".join(mo_photos[:mushroom_observer_max])
-                        except Exception:
-                            row_unfounds.append({'Řádek': idx + 1, 'Položka': str(raw_sp), 'Modul': 'Mushroom Observer (Chyba)'})
-
                 if enable_gbif_zoo:
                     try:
                         raw_sp = str(row[gbif_zoo_col]).strip()
@@ -11922,11 +11768,10 @@ if st.session_state.df is not None:
         has_pladias = any(("[Pladias]" in str(c) or "[Pladias.cz]" in str(c)) for c in active_cols_for_desc)
         has_myko = any("[Mykologie.net]" in str(c) for c in active_cols_for_desc)
         has_first_nature = any("[First Nature]" in str(c) for c in active_cols_for_desc)
-        has_mushroom_obs = any("[Mushroom Observer]" in str(c) for c in active_cols_for_desc)
         has_dalibor = any("[DaLiBor]" in str(c) for c in active_cols_for_desc)
         has_diatom = any("[DiatomBase]" in str(c) for c in active_cols_for_desc)
         has_algae = any("[AlgaeBase]" in str(c) for c in active_cols_for_desc)
-        has_attribution = has_pladias or has_myko or has_first_nature or has_mushroom_obs or has_dalibor or has_diatom or has_algae
+        has_attribution = has_pladias or has_myko or has_first_nature or has_dalibor or has_diatom or has_algae
         default_attribution_desc = build_deck_attribution(active_cols_for_desc) if has_attribution else ""
 
         tab_anki, tab_obsidian, tab_pdf, tab_docx = st.tabs([
