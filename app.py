@@ -7091,13 +7091,48 @@ st.markdown(f"""
     /* Vstupy a formuláře */
     .stTextInput input,
     .stTextArea textarea,
+    .stNumberInput input,
     input[type="text"],
-    textarea {{
+    input[type="number"],
+    textarea,
+    div[data-baseweb="input"],
+    div[data-baseweb="base-input"] {{
         background-color: {css_input_bg} !important;
         border: 1px solid {css_input_border} !important;
         color: {css_input_fg} !important;
         border-radius: 6px !important;
         font-size: 0.95rem !important;
+    }}
+    div[data-baseweb="input"] input,
+    div[data-baseweb="base-input"] input,
+    [data-testid="stNumberInput"] input {{
+        background-color: transparent !important;
+        border: none !important;
+        color: {css_input_fg} !important;
+    }}
+    [data-testid="stNumberInput"] button,
+    [data-testid="stFileUploader"] button {{
+        background-color: {css_card_bg} !important;
+        color: {css_fg} !important;
+        border: 1px solid {css_input_border} !important;
+    }}
+    [data-baseweb="tag"] {{
+        background-color: {"#dff0e5" if is_light_ui else "#1c3b28"} !important;
+        color: {css_fg} !important;
+        border: 1px solid {css_border} !important;
+    }}
+    [data-baseweb="tag"] span {{
+        color: {css_fg} !important;
+    }}
+    code, pre {{
+        background-color: {"#eef3ef" if is_light_ui else "#102016"} !important;
+        color: {"#14502d" if is_light_ui else "#8ee6b2"} !important;
+        border: 1px solid {css_border} !important;
+        border-radius: 4px !important;
+    }}
+    table, thead, tbody, tr {{
+        background-color: {css_card_bg} !important;
+        color: {css_fg} !important;
     }}
     .stTextInput input:focus,
     .stTextArea textarea:focus {{
@@ -11724,7 +11759,7 @@ if st.session_state.df is not None:
             unfound_list = []
 
             if total > 0:
-                workers = min(4, total)
+                workers = min(8, total)
                 completed_count = 0
                 status.text(f"Obohacování dat: 0/{total} (0%) — spouštím...")
                 with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as enrich_exec:
