@@ -2717,11 +2717,14 @@ def fetch_first_nature_fungi(species_name, max_photos=4):
     out['photo_urls'] = out.get('photo_urls', [])[:int(max_photos)]
     return out
 
+import threading
 _MO_LAST_ERROR = ""
 _MO_SUCCESS_CACHE = {}
+_MO_RATE_LOCK = threading.Lock()
+_MO_LAST_REQ_TS = 0.0
 
 def _cached_mushroom_observer_photos(species_name: str, max_photos: int = 5):
-    global _MO_LAST_ERROR
+    global _MO_LAST_ERROR, _MO_LAST_REQ_TS
     _MO_LAST_ERROR = ""
     binomial = _resolve_fungi_binomial(species_name)
     if not binomial:
@@ -2730,18 +2733,42 @@ def _cached_mushroom_observer_photos(species_name: str, max_photos: int = 5):
     if cache_key in _MO_SUCCESS_CACHE:
         return _MO_SUCCESS_CACHE[cache_key]
     photos = []
+    mo_headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "application/json"
+    }
+    mo_params = {"name": binomial, "detail": "high", "format": "json"}
     try:
-        r = _scrape_session.get(
-            "https://mushroomobserver.org/api2/images",
-            params={"name": binomial, "detail": "high", "format": "json"},
-            headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                "Accept": "application/json"
-            },
-            timeout=(5, 15)
-        )
+        with _MO_RATE_LOCK:
+            now = time.time()
+            wait_s = 0.35 - (now - _MO_LAST_REQ_TS)
+            if wait_s > 0:
+                time.sleep(wait_s)
+            _MO_LAST_REQ_TS = time.time()
+            r = _scrape_session.get(
+                "https://mushroomobserver.org/api2/images",
+                params=mo_params,
+                headers=mo_headers,
+                timeout=(5, 15)
+            )
+            if r.status_code == 429:
+                try:
+                    retry_after = min(float(r.headers.get("Retry-After", 1.5)), 3.0)
+                except Exception:
+                    retry_after = 1.5
+                time.sleep(max(0.5, retry_after))
+                _MO_LAST_REQ_TS = time.time()
+                r = _scrape_session.get(
+                    "https://mushroomobserver.org/api2/images",
+                    params=mo_params,
+                    headers=mo_headers,
+                    timeout=(5, 15)
+                )
         if r.status_code != 200:
-            _MO_LAST_ERROR = f"HTTP {r.status_code}"
+            if r.status_code == 429:
+                _MO_LAST_ERROR = "HTTP 429 – Mushroom Observer dočasně omezil počet požadavků ze sdílené IP adresy Streamlit Cloudu"
+            else:
+                _MO_LAST_ERROR = f"HTTP {r.status_code}"
             return tuple()
         results = r.json().get("results", [])
         candidates = []
