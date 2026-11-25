@@ -1,4 +1,4 @@
-const CACHE_NAME = "karty-pwa-v4";
+const CACHE_NAME = "karty-pwa-v5";
 const ASSETS = ["./", "./index.html", "./manifest.json", "./ikona.png"];
 
 self.addEventListener("install", (event) => {

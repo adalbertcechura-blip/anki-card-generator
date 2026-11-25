@@ -362,7 +362,8 @@ main {
 }
 .anki-table-header {
   display: grid;
-  grid-template-columns: 1fr 56px 56px 68px 36px;
+  grid-template-columns: 1fr 56px 56px 76px 36px;
+  column-gap: 10px;
   align-items: center;
   padding: 10px 14px;
   border-bottom: 1px solid var(--border-color);
@@ -375,10 +376,12 @@ main {
 .anki-col-num {
   text-align: right;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .anki-deck-row {
   display: grid;
-  grid-template-columns: 1fr 56px 56px 68px 36px;
+  grid-template-columns: 1fr 56px 56px 76px 36px;
+  column-gap: 10px;
   align-items: center;
   padding: 11px 14px;
   border-bottom: 1px solid rgba(36, 57, 43, 0.55);
@@ -805,13 +808,19 @@ main {
   .flashcard {
     padding: 12px 8px;
   }
+  .anki-table-header {
+    font-size: 0.68rem;
+    letter-spacing: 0.01em;
+  }
   .anki-table-header,
   .anki-deck-row {
-    grid-template-columns: 1fr 44px 44px 54px 32px;
+    grid-template-columns: 1fr 40px 44px 66px 28px;
+    column-gap: 10px;
     padding: 10px 10px;
   }
   .anki-subdeck-row {
-    grid-template-columns: 1fr 44px 44px 54px 32px;
+    grid-template-columns: 1fr 40px 44px 66px 28px;
+    column-gap: 10px;
     padding: 8px 10px 8px 32px;
   }
   .card-img-thumb {
