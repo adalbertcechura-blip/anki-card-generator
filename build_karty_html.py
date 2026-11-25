@@ -1418,6 +1418,15 @@ main {
         </div>
       </div>
       <div class="daily-limit-control" style="margin:0;">
+        <span style="color:#d4d4d8; font-weight:600;">Pořadí nových karet:</span>
+        <select id="selSrsNewOrder" style="background:#09090b; border:1px solid #3f3f46; color:#fff; padding:5px 8px; border-radius:6px; font-weight:600; font-size:0.85rem;">
+          <option value="sequential">Podle pořadí v balíčku</option>
+          <option value="random">Náhodně</option>
+          <option value="alpha_asc">Abecedně (A - Z)</option>
+          <option value="alpha_desc">Abecedně (Z - A)</option>
+        </select>
+      </div>
+      <div class="daily-limit-control" style="margin:0;">
         <span style="color:#d4d4d8;">Znovu (Again) – krok <small style="color:#95ab9e;">(min. 1 min)</small>:</span>
         <div style="display:flex; align-items:center; gap:6px;">
           <input type="number" id="inpSrsAgainMin" min="1" max="1440" step="1" value="10" style="width:78px; background:#09090b; border:1px solid #3f3f46; color:#fff; padding:5px 8px; border-radius:6px; text-align:center; font-weight:700;">
@@ -2839,7 +2848,26 @@ async function startStudy(deckId, quickMode = false, subdeckFilter = null) {
     studyQueue = [...activePool].sort(() => Math.random() - 0.5);
   } else {
     const due = activePool.filter(c => c.due && c.due > 0 && (c.due <= now || (c.interval > 0 && c.interval < 1 && c.due <= endOfTodayMs)));
-    const newCardsAll = activePool.filter(c => !c.due || c.due === 0);
+    const redCards = due
+      .filter(c => (c.interval || 0) < 1 || c.state === 1 || c.state === 3)
+      .sort((a, b) => (a.due || 0) - (b.due || 0));
+    const greenCards = due
+      .filter(c => !((c.interval || 0) < 1 || c.state === 1 || c.state === 3))
+      .sort((a, b) => (a.due || 0) - (b.due || 0));
+
+    let newCardsAll = activePool.filter(c => !c.due || c.due === 0);
+    const newCardOrder = (currentDeck.settings && currentDeck.settings.newCardOrder) || "sequential";
+    if (newCardOrder === "random") {
+      newCardsAll = [...newCardsAll];
+      for (let i = newCardsAll.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [newCardsAll[i], newCardsAll[j]] = [newCardsAll[j], newCardsAll[i]];
+      }
+    } else if (newCardOrder === "alpha_asc") {
+      newCardsAll = [...newCardsAll].sort((a, b) => (a.title || "").localeCompare(b.title || "", "cs"));
+    } else if (newCardOrder === "alpha_desc") {
+      newCardsAll = [...newCardsAll].sort((a, b) => (b.title || "").localeCompare(a.title || "", "cs"));
+    }
 
     // Vymáhání denního limitu nových karet
     const dailyLimit = (currentDeck.settings && typeof currentDeck.settings.newCardsPerDay === "number") ? currentDeck.settings.newCardsPerDay : 20;
@@ -2848,7 +2876,8 @@ async function startStudy(deckId, quickMode = false, subdeckFilter = null) {
     let allowedNew = dailyLimit > 0 ? Math.max(0, dailyLimit + extraNewCardsGranted - studiedNewToday) : newCardsAll.length;
     const selectedNew = newCardsAll.slice(0, allowedNew);
 
-    studyQueue = [...due, ...selectedNew];
+    // Prvně červené (učení), potom zelené (opakování), nakonec modré (nové)
+    studyQueue = [...redCards, ...greenCards, ...selectedNew];
   }
 
   if (studyQueue.length === 0) {
@@ -3324,6 +3353,7 @@ function openSrsSettingsModal(deck) {
   const cfg = getDeckSrsSettings(deck);
   document.getElementById("srsModalTitle").innerText = `Nastavení: ${deck.name}`;
   document.getElementById("inpSrsDailyLimit").value = cfg.newCardsPerDay;
+  document.getElementById("selSrsNewOrder").value = (deck.settings && deck.settings.newCardOrder) || "sequential";
   document.getElementById("inpSrsAgainMin").value = cfg.againMinutes;
   document.getElementById("inpSrsHardMin").value = cfg.hardMinutes;
   document.getElementById("inpSrsGoodMin").value = cfg.goodMinutes;
@@ -3337,6 +3367,7 @@ document.getElementById("srsSettingsModal").addEventListener("click", (e) => {
 });
 document.getElementById("btnSrsResetDef").onclick = () => {
   document.getElementById("inpSrsDailyLimit").value = 20;
+  document.getElementById("selSrsNewOrder").value = "sequential";
   document.getElementById("inpSrsAgainMin").value = 10;
   document.getElementById("inpSrsHardMin").value = 1440;
   document.getElementById("inpSrsGoodMin").value = 1440;
@@ -3348,6 +3379,7 @@ document.getElementById("btnSrsSave").onclick = async () => {
   _srsModalTargetDeck.settings = _srsModalTargetDeck.settings || {};
   const parsedDaily = parseInt(document.getElementById("inpSrsDailyLimit").value, 10);
   _srsModalTargetDeck.settings.newCardsPerDay = isNaN(parsedDaily) ? 20 : Math.max(0, Math.min(500, parsedDaily));
+  _srsModalTargetDeck.settings.newCardOrder = document.getElementById("selSrsNewOrder").value || "sequential";
   _srsModalTargetDeck.settings.againMinutes = Math.max(1, parseInt(document.getElementById("inpSrsAgainMin").value, 10) || 1);
   _srsModalTargetDeck.settings.hardMinutes = Math.max(1, parseInt(document.getElementById("inpSrsHardMin").value, 10) || 1);
   _srsModalTargetDeck.settings.goodMinutes = Math.max(1, parseInt(document.getElementById("inpSrsGoodMin").value, 10) || 1);
