@@ -1704,6 +1704,37 @@ function dbGetAllReviews() {
   });
 }
 
+function dbDeleteDeckReviews(deckId) {
+  for (let i = _memReviews.length - 1; i >= 0; i--) {
+    if (_memReviews[i].deckId === deckId) _memReviews.splice(i, 1);
+  }
+  if (!db) return Promise.resolve();
+  return new Promise((resolve) => {
+    try {
+      if (!db.objectStoreNames.contains("reviews")) {
+        resolve();
+        return;
+      }
+      const tx = db.transaction(["reviews"], "readwrite");
+      const store = tx.objectStore("reviews");
+      const req = store.openCursor();
+      req.onsuccess = (e) => {
+        const cursor = e.target.result;
+        if (cursor) {
+          if (cursor.value && cursor.value.deckId === deckId) {
+            cursor.delete();
+          }
+          cursor.continue();
+        }
+      };
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+    } catch (err) {
+      resolve();
+    }
+  });
+}
+
 // Media Blob URL Cache
 const mediaUrlCache = new Map();
 
@@ -2796,7 +2827,11 @@ async function loadDeckList() {
           c.reps = 0;
           c.ease = 2.5;
           c.state = 0;
+          c.lastReview = 0;
         });
+        deck.history = [];
+        extraNewCardsGranted = 0;
+        await dbDeleteDeckReviews(deck.id);
         await dbSaveDeck(deck);
         await loadDeckList();
       }
@@ -3395,9 +3430,9 @@ document.getElementById("typeTextInput").addEventListener("keydown", (e) => {
 });
 
 // --- EVENT HANDLERS ---
-document.getElementById("btnHome").onclick = () => { showView("decks"); loadDeckList(); };
-document.getElementById("btnBackToDecks").onclick = () => { showView("decks"); loadDeckList(); };
-document.getElementById("btnFinishBackDecks").onclick = () => { showView("decks"); loadDeckList(); };
+document.getElementById("btnHome").onclick = () => { extraNewCardsGranted = 0; showView("decks"); loadDeckList(); };
+document.getElementById("btnBackToDecks").onclick = () => { extraNewCardsGranted = 0; showView("decks"); loadDeckList(); };
+document.getElementById("btnFinishBackDecks").onclick = () => { extraNewCardsGranted = 0; showView("decks"); loadDeckList(); };
 
 document.getElementById("btnFlip").onclick = flipCard;
 document.getElementById("flashcardBox").onclick = (e) => {
