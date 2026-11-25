@@ -1143,110 +1143,128 @@ main {
   transform: translateY(-1px);
 }
 
-/* --- KARTY PRO GAMIFICATION --- */
+/* --- KARTY PRO MINIMALIST THEME & GAMIFICATION --- */
+:root {
+  --bg-main: #0d1015;
+  --bg-card: #151a22;
+  --bg-card-hover: #1b222c;
+  --bg-surface: #1e2530;
+  --border-color: #28313e;
+  --border-highlight: #3b4758;
+  --accent: #10b981;
+  --accent-hover: #059669;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+}
 body.theme-midnight {
-  --bg-main: #0b1120;
-  --bg-card: #111a2e;
-  --bg-card-hover: #17233d;
-  --bg-surface: #1b2947;
-  --border-color: #263a63;
-  --border-highlight: #3b5998;
+  --bg-main: #090e1a;
+  --bg-card: #10182b;
+  --bg-card-hover: #16213a;
+  --bg-surface: #1a2642;
+  --border-color: #243459;
+  --border-highlight: #3b538a;
   --accent: #38bdf8;
-  --accent-hover: #0ea5e9;
+  --accent-hover: #0284c7;
 }
 body.theme-amber {
-  --bg-main: #14100a;
-  --bg-card: #1f1810;
-  --bg-card-hover: #292016;
-  --bg-surface: #33271a;
-  --border-color: #473623;
-  --border-highlight: #785936;
+  --bg-main: #120f0c;
+  --bg-card: #1b1611;
+  --bg-card-hover: #241d16;
+  --bg-surface: #2a2219;
+  --border-color: #3d3124;
+  --border-highlight: #614d37;
   --accent: #f59e0b;
   --accent-hover: #d97706;
 }
 body.theme-mono {
   --bg-main: #09090b;
-  --bg-card: #18181b;
-  --bg-card-hover: #27272a;
-  --bg-surface: #27272a;
-  --border-color: #3f3f46;
-  --border-highlight: #71717a;
+  --bg-card: #141417;
+  --bg-card-hover: #1e1e22;
+  --bg-surface: #222227;
+  --border-color: #323238;
+  --border-highlight: #52525b;
   --accent: #e4e4e7;
   --accent-hover: #ffffff;
+}
+header {
+  background: rgba(13, 16, 21, 0.92);
+  padding: 10px 14px;
+}
+.heatmap-container {
+  background: var(--bg-card);
 }
 .pro-hud {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 .pro-pill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 0.78rem;
+  padding: 3px 9px;
+  font-size: 0.75rem;
   font-weight: 700;
   color: var(--text-main);
   white-space: nowrap;
 }
-.pro-pill.streak { border-color: rgba(245, 158, 11, 0.55); color: #fbbf24; background: rgba(245, 158, 11, 0.12); }
-.pro-pill.points { border-color: rgba(34, 197, 94, 0.55); color: #4ade80; background: rgba(34, 197, 94, 0.12); }
-.pro-pill.freeze { border-color: rgba(56, 189, 248, 0.55); color: #38bdf8; background: rgba(56, 189, 248, 0.12); }
-.pro-pill.boost { border-color: rgba(168, 85, 247, 0.65); color: #c084fc; background: rgba(168, 85, 247, 0.14); }
-.pro-pill.level { border-color: rgba(250, 204, 21, 0.55); color: #fde047; background: rgba(250, 204, 21, 0.12); }
+.pro-pill.streak { border-color: rgba(245, 158, 11, 0.45); color: #fbbf24; background: rgba(245, 158, 11, 0.1); }
+.pro-pill.points { border-color: rgba(16, 185, 129, 0.45); color: #34d399; background: rgba(16, 185, 129, 0.1); }
+.pro-pill.freeze { border-color: rgba(56, 189, 248, 0.45); color: #38bdf8; background: rgba(56, 189, 248, 0.1); }
+.pro-pill.boost { border-color: rgba(168, 85, 247, 0.55); color: #c084fc; background: rgba(168, 85, 247, 0.12); }
+.pro-pill.level { border-color: rgba(250, 204, 21, 0.45); color: #fde047; background: rgba(250, 204, 21, 0.1); }
 
-/* Duolingo-style tactile 3D buttons */
+/* Minimalist tactile 3D buttons */
 .btn-primary, .btn-flip {
-  border-bottom: 4px solid #15803d !important;
+  border-bottom: 3px solid rgba(0, 0, 0, 0.35) !important;
   transition: transform 0.08s ease, filter 0.12s ease !important;
 }
 .btn-primary:active, .btn-flip:active {
   transform: translateY(2px);
-  border-bottom-width: 2px !important;
+  border-bottom-width: 1px !important;
 }
 .btn-rate {
-  border-bottom-width: 4px !important;
+  border-bottom-width: 3px !important;
   transition: transform 0.08s ease, background 0.12s ease !important;
 }
 .btn-rate:active {
   transform: translateY(2px);
-  border-bottom-width: 2px !important;
+  border-bottom-width: 1px !important;
 }
 
 /* Pro Dashboard Card */
 .pro-dashboard {
-  background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-surface) 100%);
-  border: 2px solid var(--border-highlight);
-  border-radius: 16px;
-  padding: 14px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 12px 14px;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
+  gap: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
 }
 .pro-dash-block {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 .pro-dash-top {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   font-weight: 700;
 }
 .pro-bar-track {
   width: 100%;
-  height: 12px;
+  height: 9px;
   background: rgba(0, 0, 0, 0.35);
   border-radius: 999px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 .pro-bar-fill {
   height: 100%;
@@ -1254,18 +1272,37 @@ body.theme-mono {
   transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .pro-bar-xp { background: linear-gradient(90deg, #eab308, #fde047); }
-.pro-bar-goal { background: linear-gradient(90deg, #16a34a, #4ade80); }
+.pro-bar-goal { background: linear-gradient(90deg, #059669, #34d399); }
+
+.pro-quests-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.pro-quest-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.78rem;
+}
+.pro-quest-card.done {
+  border-color: rgba(16, 185, 129, 0.55);
+  background: rgba(16, 185, 129, 0.08);
+}
 
 .pro-combo-badge {
   display: none;
   align-items: center;
   padding: 3px 9px;
   border-radius: 999px;
-  font-size: 0.76rem;
+  font-size: 0.74rem;
   font-weight: 800;
   color: #fff;
   background: linear-gradient(90deg, #f97316, #eab308);
-  box-shadow: 0 2px 10px rgba(249, 115, 22, 0.45);
   animation: popIn 0.2s ease;
 }
 @keyframes popIn {
@@ -1274,46 +1311,39 @@ body.theme-mono {
 }
 .pro-confetti-piece {
   position: fixed;
-  width: 9px;
-  height: 9px;
+  width: 8px;
+  height: 8px;
   top: -12px;
   z-index: 500;
   pointer-events: none;
   border-radius: 2px;
-  animation: confettiFall 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  animation: confettiFall 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
 @keyframes confettiFall {
   0% { transform: translateY(0) rotate(0deg); opacity: 1; }
   100% { transform: translateY(100vh) rotate(540deg); opacity: 0; }
 }
-@media (max-width: 640px) {
-  .pro-dashboard {
-    grid-template-columns: 1fr;
-    gap: 10px;
-    padding: 12px;
-  }
-}
 .hm-cell.frozen {
   background: #38bdf8 !important;
-  box-shadow: 0 0 4px rgba(56, 189, 248, 0.6);
+  box-shadow: 0 0 4px rgba(56, 189, 248, 0.55);
 }
 .pro-toast {
   position: fixed;
   bottom: 84px;
   left: 50%;
   transform: translateX(-50%) translateY(16px);
-  background: #18251d;
+  background: var(--bg-surface);
   border: 1px solid var(--accent);
-  color: #edf5f0;
-  padding: 9px 16px;
+  color: var(--text-main);
+  padding: 8px 15px;
   border-radius: 999px;
-  font-size: 0.86rem;
+  font-size: 0.84rem;
   font-weight: 700;
   z-index: 300;
   opacity: 0;
   pointer-events: none;
   transition: all 0.25s ease;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.55);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
   white-space: nowrap;
 }
 .pro-toast.show {
@@ -1323,17 +1353,17 @@ body.theme-mono {
 .shop-grid {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 .shop-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 10px;
-  background: rgba(12, 18, 14, 0.55);
+  background: rgba(0, 0, 0, 0.25);
   border: 1px solid var(--border-color);
   border-radius: 10px;
-  padding: 10px 12px;
+  padding: 9px 12px;
 }
 .shop-item-info {
   display: flex;
@@ -1342,11 +1372,11 @@ body.theme-mono {
 }
 .shop-item-title {
   font-weight: 700;
-  font-size: 0.92rem;
+  font-size: 0.9rem;
   color: var(--text-main);
 }
 .shop-item-desc {
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   color: var(--text-muted);
 }
 .milestone-row {
@@ -1356,22 +1386,32 @@ body.theme-mono {
   gap: 8px;
   padding: 7px 10px;
   border-radius: 8px;
-  background: rgba(12, 18, 14, 0.45);
+  background: rgba(0, 0, 0, 0.22);
   border: 1px solid var(--border-color);
-  font-size: 0.84rem;
+  font-size: 0.82rem;
 }
 .milestone-row.claimed {
-  border-color: rgba(34, 197, 94, 0.5);
-  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(16, 185, 129, 0.5);
+  background: rgba(16, 185, 129, 0.08);
 }
 @media (max-width: 768px) {
   header {
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 6px;
+    padding: 8px 10px;
   }
   .pro-pill {
-    padding: 3px 8px;
-    font-size: 0.74rem;
+    padding: 2px 7px;
+    font-size: 0.71rem;
+  }
+  .pro-dashboard {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+  .pro-quests-strip {
+    grid-template-columns: 1fr;
+    gap: 6px;
   }
 }
 
@@ -1407,18 +1447,19 @@ body.theme-mono {
       <div class="pro-dash-block">
         <div class="pro-dash-top">
           <span id="proDashRank" style="color:#fde047;">Úroveň 1 – Začátečník</span>
-          <span id="proDashXpText" style="color:var(--text-muted); font-size:0.78rem;">0 / 100 XP</span>
+          <span id="proDashXpText" style="color:var(--text-muted); font-size:0.78rem;">0 / 45 XP</span>
         </div>
         <div class="pro-bar-track"><div class="pro-bar-fill pro-bar-xp" id="proDashXpBar" style="width:0%;"></div></div>
       </div>
       <div class="pro-dash-block">
         <div class="pro-dash-top">
-          <span style="color:#4ade80;">Dnešní cíl</span>
+          <span style="color:#34d399;">Dnešní cíl (min. 1 den)</span>
           <span id="proDashGoalText" style="color:var(--text-muted); font-size:0.78rem;">0 / 20 karet</span>
         </div>
         <div class="pro-bar-track"><div class="pro-bar-fill pro-bar-goal" id="proDashGoalBar" style="width:0%;"></div></div>
       </div>
     </div>
+    <div class="pro-quests-strip" id="proQuestsStrip"></div>
 
 
 
@@ -1662,6 +1703,20 @@ body.theme-mono {
           <div class="shop-item-desc">Zpětně doplní včerejší vynechaný den jako zmrazený, pokud jste neměli Freeze.</div>
         </div>
         <button class="btn btn-sm btn-primary" id="btnBuyRepair">Koupit (400 b.)</button>
+      </div>
+      <div class="shop-item">
+        <div class="shop-item-info">
+          <div class="shop-item-title">Tajemná truhla</div>
+          <div class="shop-item-desc">Náhodná odměna: +50 až +250 bodů, Streak Freeze zdarma nebo 2x Boost.</div>
+        </div>
+        <button class="btn btn-sm btn-primary" id="btnBuyMystery">Otevřít (120 b.)</button>
+      </div>
+      <div class="shop-item">
+        <div class="shop-item-info">
+          <div class="shop-item-title">Balíček 3x Streak Freeze</div>
+          <div class="shop-item-desc">Doplní zásobu Freeze na maximum (3/3) se slevou.</div>
+        </div>
+        <button class="btn btn-sm btn-primary" id="btnBuyShieldPack">Koupit (380 b.)</button>
       </div>
     </div>
 
@@ -4276,9 +4331,9 @@ async function checkPreloadedDeck() {
 // --- KARTY PRO GAMIFICATION ENGINE ---
 const PRO_STORAGE_KEY = "karty_pro_profile_v1";
 const PRO_THEMES = [
-  { id: "default", name: "Hluboký les (výchozí)", cost: 0 },
+  { id: "default", name: "Nordická břidlice (výchozí)", cost: 0 },
   { id: "midnight", name: "Půlnoční modř", cost: 200 },
-  { id: "amber", name: "Jantarová pracovna", cost: 250 },
+  { id: "amber", name: "Teplý jantar", cost: 250 },
   { id: "mono", name: "Čistý monochrom", cost: 300 }
 ];
 
@@ -4356,9 +4411,13 @@ async function computeProStreakAndFreeze() {
   });
 
   const activeSet = new Set();
-  for (const [dStr, cnt] of countsByDate.entries()) {
-    if (cnt >= 1) activeSet.add(dStr);
-  }
+  const graduatedByDate = new Map();
+  reviews.forEach(r => {
+    if (r && r.dateStr && (r.interval || 0) >= 1) {
+      graduatedByDate.set(r.dateStr, (graduatedByDate.get(r.dateStr) || 0) + 1);
+      activeSet.add(r.dateStr);
+    }
+  });
   const frozenSet = new Set(prof.frozenDates);
 
   // Auto-consume Streak Freeze for missed days between last active/frozen day and yesterday
@@ -4407,7 +4466,7 @@ async function computeProStreakAndFreeze() {
   }
   if (msAwarded) saveProProfile(prof);
 
-  const todayCount = countsByDate.get(todayStr) || 0;
+  const todayCount = graduatedByDate.get(todayStr) || 0;
   return { prof, streak, todayCount, frozenSet };
 }
 
@@ -4500,6 +4559,45 @@ async function updateProHud() {
   const goalPct = Math.min(100, Math.round((todayCount / Math.max(1, prof.dailyGoal || 20)) * 100));
   if (elGoalTxt) elGoalTxt.innerText = todayCount >= prof.dailyGoal ? `Splněno (${todayCount}/${prof.dailyGoal})` : `${todayCount} / ${prof.dailyGoal} karet`;
   if (elGoalBar) elGoalBar.style.width = `${goalPct}%`;
+  renderDailyQuests(prof, todayCount);
+}
+
+function getDailyQuestsState(prof, todayCount) {
+  const todayStr = getLocalDateString();
+  if (!prof.dailyQuests || prof.dailyQuests.date !== todayStr) {
+    prof.dailyQuests = { date: todayStr, maxCombo: 0, cleanCount: 0, claimedIds: [] };
+    saveProProfile(prof);
+  }
+  const dq = prof.dailyQuests;
+  const defs = [
+    { id: "q_grad15", title: "Dokonči 15 karet (min. 1 den)", cur: todayCount, target: 15, reward: 40 },
+    { id: "q_combo5", title: "Dosáhni Combo 5x", cur: dq.maxCombo || 0, target: 5, reward: 35 },
+    { id: "q_clean10", title: "10 karet bez tlačítka Znovu", cur: dq.cleanCount || 0, target: 10, reward: 50 }
+  ];
+  return { dq, defs };
+}
+
+function renderDailyQuests(prof, todayCount) {
+  const strip = document.getElementById("proQuestsStrip");
+  if (!strip) return;
+  const { dq, defs } = getDailyQuestsState(prof, todayCount);
+  strip.innerHTML = "";
+  defs.forEach(q => {
+    const done = dq.claimedIds.includes(q.id) || q.cur >= q.target;
+    const pct = Math.min(100, Math.round((q.cur / q.target) * 100));
+    const card = document.createElement("div");
+    card.className = `pro-quest-card ${done ? "done" : ""}`;
+    card.innerHTML = `
+      <div style="display:flex; justify-content:space-between; gap:6px; font-weight:700;">
+        <span>${q.title}</span>
+        <span style="color:${done ? "#34d399" : "#fbbf24"};">${done ? "Splněno" : `+${q.reward} b.`}</span>
+      </div>
+      <div class="pro-bar-track" style="height:6px;">
+        <div class="pro-bar-fill pro-bar-goal" style="width:${pct}%;"></div>
+      </div>
+    `;
+    strip.appendChild(card);
+  });
 }
 
 async function renderShopModal() {
@@ -4568,22 +4666,40 @@ async function renderShopModal() {
   }
 }
 
-// Wrap rateCard for XP/points, combo, sound, confetti and daily goal bonus
+// Wrap rateCard: award points and daily goal ONLY when card is scheduled for >= 1 full day
 const _origRateCardPro = rateCard;
 rateCard = async function(ratingKey) {
+  const intervals = calcNextIntervals(currentCard);
+  const chosen = intervals[ratingKey];
+  const isGraduatedForDay = chosen && chosen.ms >= 86400000;
+
   await _origRateCardPro(ratingKey);
+
   const prof = loadProProfile();
   const prevLv = getLevelInfo(prof.xp ?? prof.points).level;
   const isBoost = prof.boostUntil > Date.now();
+  const todayStr = getLocalDateString();
+  if (!prof.dailyQuests || prof.dailyQuests.date !== todayStr) {
+    prof.dailyQuests = { date: todayStr, maxCombo: 0, cleanCount: 0, claimedIds: [] };
+  }
+
+  if (ratingKey === "again") {
+    sessionCombo = 0;
+    prof.dailyQuests.cleanCount = 0;
+    playProTone("again");
+    const comboEl = document.getElementById("proComboBadge");
+    if (comboEl) comboEl.style.display = "none";
+    saveProProfile(prof);
+    showProToast("Opakování za chvíli (body až po odložení o 1+ den)");
+    await updateProHud();
+    return;
+  }
+
   if (ratingKey === "good" || ratingKey === "easy") {
     sessionCombo++;
-    playProTone("good");
-  } else if (ratingKey === "hard") {
-    playProTone("good");
-  } else {
-    sessionCombo = 0;
-    playProTone("again");
+    prof.dailyQuests.maxCombo = Math.max(prof.dailyQuests.maxCombo || 0, sessionCombo);
   }
+  prof.dailyQuests.cleanCount = (prof.dailyQuests.cleanCount || 0) + 1;
 
   const comboEl = document.getElementById("proComboBadge");
   if (comboEl) {
@@ -4595,29 +4711,54 @@ rateCard = async function(ratingKey) {
     }
   }
 
+  if (!isGraduatedForDay) {
+    playProTone("good");
+    saveProProfile(prof);
+    showProToast("Krok učení (body až po odložení o 1+ den)");
+    await updateProHud();
+    return;
+  }
+
+  playProTone("good");
   const comboBonus = (sessionCombo > 0 && sessionCombo % 5 === 0) ? 5 : 0;
-  const basePts = (ratingKey === "good" || ratingKey === "easy") ? 10 : 5;
+  const basePts = (ratingKey === "good" || ratingKey === "easy") ? 10 : 6;
   const gained = (basePts + comboBonus) * (isBoost ? 2 : 1);
   prof.points += gained;
   prof.xp = (prof.xp ?? prof.points) + gained;
 
-  const newLv = getLevelInfo(prof.xp).level;
-  const todayStr = getLocalDateString();
   const reviews = await dbGetAllReviews();
-  const todayCount = reviews.filter(r => r && r.dateStr === todayStr).length;
+  const todayCount = reviews.filter(r => r && r.dateStr === todayStr && (r.interval || 0) >= 1).length;
+
+  // Check daily quests
+  const { dq, defs } = getDailyQuestsState(prof, todayCount);
+  let questReward = 0;
+  defs.forEach(q => {
+    if (!dq.claimedIds.includes(q.id) && q.cur >= q.target) {
+      dq.claimedIds.push(q.id);
+      questReward += q.reward;
+    }
+  });
+  if (questReward > 0) {
+    prof.points += questReward;
+    prof.xp += questReward;
+    launchConfetti();
+    playProTone("level");
+  }
+
+  const newLv = getLevelInfo(prof.xp).level;
   if (todayCount >= prof.dailyGoal && !prof.dailyBonusDates.includes(todayStr)) {
     prof.dailyBonusDates.push(todayStr);
     prof.points += 30;
     prof.xp += 30;
     launchConfetti();
     playProTone("level");
-    showProToast(`Denní cíl splněn! +${gained + 30} b.`);
+    showProToast(`Denní cíl splněn! +${gained + 30 + questReward} b.`);
+  } else if (questReward > 0) {
+    showProToast(`Denní výzva splněna! +${gained + questReward} b.`);
   } else if (newLv > prevLv) {
     launchConfetti();
     playProTone("level");
     showProToast(`Nová úroveň ${newLv}! (+${gained} b.)`);
-  } else if (ratingKey === "again") {
-    showProToast(`Nevadí, příště to vyjde (+${gained} b.)`);
   } else if (comboBonus > 0) {
     showProToast(`Skvělé combo ${sessionCombo}x! +${gained} b.`);
   } else {
@@ -4703,6 +4844,41 @@ document.getElementById("btnBuyRepair").onclick = async () => {
   saveProProfile(p);
   showProToast("Včerejší série byla opravena!");
   await renderHeatmap();
+  await renderShopModal();
+};
+document.getElementById("btnBuyMystery").onclick = async () => {
+  const p = loadProProfile();
+  if (p.points < 120) { alert("Potřebujete alespoň 120 bodů."); return; }
+  p.points -= 120;
+  const roll = Math.random();
+  let msg = "";
+  if (roll < 0.25 && p.freezes < 3) {
+    p.freezes++;
+    msg = "Tajemná truhla: Získali jste 1x Streak Freeze!";
+  } else if (roll < 0.5) {
+    p.boostUntil = Date.now() + 15 * 60 * 1000;
+    msg = "Tajemná truhla: 2x Body Boost na 15 min!";
+  } else {
+    const winPts = [60, 100, 150, 220][Math.floor(Math.random() * 4)];
+    p.points += winPts;
+    msg = `Tajemná truhla: +${winPts} bodů!`;
+  }
+  saveProProfile(p);
+  launchConfetti();
+  playProTone("level");
+  showProToast(msg);
+  await updateProHud();
+  await renderShopModal();
+};
+document.getElementById("btnBuyShieldPack").onclick = async () => {
+  const p = loadProProfile();
+  if (p.freezes >= 3) { alert("Zásobu Freeze už máte plnou (3/3)."); return; }
+  if (p.points < 380) { alert("Potřebujete alespoň 380 bodů."); return; }
+  p.points -= 380;
+  p.freezes = 3;
+  saveProProfile(p);
+  showProToast("Zásoba Streak Freeze doplněna na 3/3!");
+  await updateProHud();
   await renderShopModal();
 };
 document.getElementById("btnAddMilestone").onclick = async () => {
