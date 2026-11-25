@@ -1781,59 +1781,118 @@ function calcNextIntervals(card, deckArg) {
   const reps = card.reps || 0;
   const ease = card.ease || 2.5;
   const interval = card.interval || 0;
+  const state = (typeof card.state === "number") ? card.state : ((!card.due || card.due === 0) ? 0 : (interval < 1 ? 1 : 2));
   const cfg = getDeckSrsSettings(deckArg || currentDeck);
   const mult = cfg.intervalMultiplier;
 
-  // 1. Znovu (Again) - min. 1 minuta
-  const againMinutes = cfg.againMinutes;
+  const againMinutes = Math.max(1, Math.round(cfg.againMinutes));
+  const gradDays = Math.max(1, Math.round(1 * mult));
 
-  // 2. Těžké (Hard)
-  let hardMs, hardText, hardIntervalDays;
-  if (reps === 0) {
-    const m = Math.max(1, Math.round(cfg.hardMinutes));
-    hardMs = m * 60 * 1000;
-    hardIntervalDays = m / 1440;
-    hardText = formatMinutesLabel(m);
-  } else {
-    const baseMins = Math.max(cfg.hardMinutes, interval * 1440);
-    const nextMins = Math.max(1, Math.round(baseMins * 1.2 * mult));
-    hardMs = nextMins * 60 * 1000;
-    hardIntervalDays = nextMins / 1440;
-    hardText = formatMinutesLabel(nextMins);
+  // New (0), Learning (1), Relearning (3)
+  if (state === 0 || state === 1 || state === 3) {
+    const hardMins = Math.max(1, Math.round(cfg.hardMinutes));
+    const hardMs = hardMins * 60 * 1000;
+    const hardIsDay = hardMins >= 1440;
+    const hardText = formatMinutesLabel(hardMins);
+    const hardIntervalDays = hardMins / 1440;
+
+    // Good: if in Learning/New and goodMinutes < 1440 and reps === 0, do learning step; otherwise graduate to 1 day
+    let goodMs, goodText, goodIntervalDays, goodNextState, goodNextReps;
+    if (state !== 3 && reps === 0 && cfg.goodMinutes < 1440) {
+      const gm = Math.max(1, Math.round(cfg.goodMinutes));
+      goodMs = gm * 60 * 1000;
+      goodIntervalDays = gm / 1440;
+      goodText = formatMinutesLabel(gm);
+      goodNextState = 1;
+      goodNextReps = 1;
+    } else {
+      const gd = (cfg.goodMinutes >= 1440 && reps === 0 && state !== 3)
+        ? Math.max(1, Math.round((cfg.goodMinutes / 1440) * mult))
+        : gradDays;
+      goodMs = gd * 86400000;
+      goodIntervalDays = gd;
+      goodText = formatDays(gd);
+      goodNextState = 2;
+      goodNextReps = Math.max(1, reps + 1);
+    }
+
+    const easyDays = Math.max(1, Math.round(cfg.easyDays));
+
+    return {
+      again: {
+        text: `< ${againMinutes} min`,
+        ms: againMinutes * 60 * 1000,
+        newInterval: againMinutes / 1440,
+        newEase: ease, // Anki SM-2 nesnižuje Ease při učení nové karty
+        newReps: 0,
+        newState: state === 3 ? 3 : 1
+      },
+      hard: {
+        text: hardText,
+        ms: hardMs,
+        newInterval: hardIntervalDays,
+        newEase: ease,
+        newReps: reps,
+        newState: hardIsDay ? 2 : (state === 3 ? 3 : 1)
+      },
+      good: {
+        text: goodText,
+        ms: goodMs,
+        newInterval: goodIntervalDays,
+        newEase: ease,
+        newReps: goodNextReps,
+        newState: goodNextState
+      },
+      easy: {
+        text: formatDays(easyDays),
+        ms: easyDays * 86400000,
+        newInterval: easyDays,
+        newEase: ease,
+        newReps: Math.max(1, reps + 1),
+        newState: 2
+      }
+    };
   }
 
-  // 3. Dobré (Good)
-  let goodMs, goodText, goodIntervalDays;
-  if (reps === 0) {
-    const m = Math.max(1, Math.round(cfg.goodMinutes));
-    goodMs = m * 60 * 1000;
-    goodIntervalDays = m / 1440;
-    goodText = formatMinutesLabel(m);
-  } else if (reps === 1) {
-    const d = Math.max(1, Math.round(4 * mult));
-    goodMs = d * 86400000;
-    goodIntervalDays = d;
-    goodText = formatDays(d);
-  } else {
-    const d = Math.max(2, Math.round(interval * ease * mult));
-    goodMs = d * 86400000;
-    goodIntervalDays = d;
-    goodText = formatDays(d);
-  }
-
-  // 4. Snadné (Easy)
-  let easyDays;
-  if (reps === 0) {
-    easyDays = cfg.easyDays;
-  } else {
-    easyDays = Math.max(Math.round(goodIntervalDays) + 1, Math.round(interval * ease * 1.3 * mult));
-  }
+  // Review (state === 2) - klasický SM-2
+  const baseDays = Math.max(1, interval);
+  const hardDays = Math.max(baseDays + 1, Math.round(baseDays * 1.2 * mult));
+  const goodDays = Math.max(baseDays + 1, Math.round(baseDays * ease * mult));
+  const easyDays = Math.max(goodDays + 1, Math.round(baseDays * ease * 1.3 * mult));
 
   return {
-    again: { text: `< ${againMinutes} min`, ms: againMinutes * 60 * 1000, newInterval: againMinutes / 1440, newEase: Math.max(1.3, ease - 0.2), newReps: 0 },
-    hard: { text: hardText, ms: hardMs, newInterval: hardIntervalDays, newEase: Math.max(1.3, ease - 0.15), newReps: reps + 1 },
-    good: { text: goodText, ms: goodMs, newInterval: goodIntervalDays, newEase: ease, newReps: reps + 1 },
-    easy: { text: formatDays(easyDays), ms: easyDays * 86400000, newInterval: easyDays, newEase: ease + 0.15, newReps: reps + 1 }
+    again: {
+      text: `< ${againMinutes} min`,
+      ms: againMinutes * 60 * 1000,
+      newInterval: againMinutes / 1440,
+      newEase: Math.max(1.3, ease - 0.2),
+      newReps: 0,
+      newState: 3
+    },
+    hard: {
+      text: formatDays(hardDays),
+      ms: hardDays * 86400000,
+      newInterval: hardDays,
+      newEase: Math.max(1.3, ease - 0.15),
+      newReps: reps + 1,
+      newState: 2
+    },
+    good: {
+      text: formatDays(goodDays),
+      ms: goodDays * 86400000,
+      newInterval: goodDays,
+      newEase: ease,
+      newReps: reps + 1,
+      newState: 2
+    },
+    easy: {
+      text: formatDays(easyDays),
+      ms: easyDays * 86400000,
+      newInterval: easyDays,
+      newEase: ease + 0.15,
+      newReps: reps + 1,
+      newState: 2
+    }
   };
 }
 
@@ -3106,6 +3165,7 @@ async function rateCard(ratingKey) {
   const intervals = calcNextIntervals(currentCard);
   const choice = intervals[ratingKey];
 
+  const isSameDayStep = (ratingKey === "again") || (choice.ms < 12 * 3600 * 1000);
   const cardInDeck = currentDeck.cards.find(c => c.id === currentCard.id);
   if (cardInDeck) {
     const wasNew = !cardInDeck.due || cardInDeck.due === 0;
@@ -3113,11 +3173,18 @@ async function rateCard(ratingKey) {
     cardInDeck.ease = choice.newEase;
     cardInDeck.reps = choice.newReps;
     cardInDeck.due = Date.now() + choice.ms;
-    cardInDeck.state = ratingKey === "again" ? 1 : 2;
+    cardInDeck.lastReview = Date.now();
+    cardInDeck.state = (typeof choice.newState === "number") ? choice.newState : (ratingKey === "again" ? 1 : 2);
 
     if (wasNew && sessionStats.newCount > 0) sessionStats.newCount--;
     else if (!wasNew && sessionStats.dueCount > 0) sessionStats.dueCount--;
-    sessionStats.doneCount++;
+
+    if (isSameDayStep) {
+      studyQueue.push(cardInDeck);
+      sessionStats.dueCount++;
+    } else {
+      sessionStats.doneCount++;
+    }
 
     const reviewEntry = {
       deckId: currentDeck.id,
@@ -3134,11 +3201,8 @@ async function rateCard(ratingKey) {
 
     await dbAddReview(reviewEntry);
     await dbSaveDeck(currentDeck);
-  }
-
-  const isSameDayStep = (ratingKey === "again") || (choice.ms < 12 * 3600 * 1000);
-  if (isSameDayStep) {
-    studyQueue.push(cardInDeck || currentCard);
+  } else if (isSameDayStep) {
+    studyQueue.push(currentCard);
     sessionStats.dueCount++;
   }
 
