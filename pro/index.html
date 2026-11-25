@@ -1143,55 +1143,65 @@ main {
   transform: translateY(-1px);
 }
 
-/* --- KARTY PRO MINIMALIST THEME & GAMIFICATION --- */
+/* --- KARTY PRO ULTRA-MINIMALIST DESIGN SYSTEM --- */
 :root {
-  --bg-main: #0d1015;
-  --bg-card: #151a22;
-  --bg-card-hover: #1b222c;
-  --bg-surface: #1e2530;
-  --border-color: #28313e;
-  --border-highlight: #3b4758;
+  --bg-main: #0b0e12;
+  --bg-card: #12161c;
+  --bg-card-hover: #171c24;
+  --bg-surface: #1a2029;
+  --border-color: rgba(255, 255, 255, 0.07);
+  --border-highlight: rgba(255, 255, 255, 0.14);
   --accent: #10b981;
   --accent-hover: #059669;
-  --text-main: #f1f5f9;
-  --text-muted: #94a3b8;
+  --text-main: #e2e8f0;
+  --text-muted: #7e8a9a;
+  --radius: 12px;
+  --shadow: 0 2px 12px rgba(0, 0, 0, 0.18);
 }
 body.theme-midnight {
-  --bg-main: #090e1a;
-  --bg-card: #10182b;
-  --bg-card-hover: #16213a;
-  --bg-surface: #1a2642;
-  --border-color: #243459;
-  --border-highlight: #3b538a;
+  --bg-main: #080c14;
+  --bg-card: #0f1522;
+  --bg-card-hover: #141c2e;
+  --bg-surface: #182236;
+  --border-color: rgba(148, 163, 184, 0.1);
+  --border-highlight: rgba(148, 163, 184, 0.2);
   --accent: #38bdf8;
   --accent-hover: #0284c7;
 }
 body.theme-amber {
-  --bg-main: #120f0c;
-  --bg-card: #1b1611;
-  --bg-card-hover: #241d16;
-  --bg-surface: #2a2219;
-  --border-color: #3d3124;
-  --border-highlight: #614d37;
+  --bg-main: #100d0a;
+  --bg-card: #17130f;
+  --bg-card-hover: #1f1914;
+  --bg-surface: #251e18;
+  --border-color: rgba(245, 158, 11, 0.12);
+  --border-highlight: rgba(245, 158, 11, 0.24);
   --accent: #f59e0b;
   --accent-hover: #d97706;
 }
 body.theme-mono {
   --bg-main: #09090b;
-  --bg-card: #141417;
-  --bg-card-hover: #1e1e22;
-  --bg-surface: #222227;
-  --border-color: #323238;
-  --border-highlight: #52525b;
+  --bg-card: #111113;
+  --bg-card-hover: #18181b;
+  --bg-surface: #1e1e22;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-highlight: rgba(255, 255, 255, 0.18);
   --accent: #e4e4e7;
   --accent-hover: #ffffff;
 }
 header {
-  background: rgba(13, 16, 21, 0.92);
-  padding: 10px 14px;
+  background: rgba(11, 14, 18, 0.88);
+  border-bottom: 1px solid var(--border-color);
+  padding: 10px 16px;
 }
-.heatmap-container {
+.heatmap-container, .deck-list, .drop-zone, .flashcard, .modal-content {
   background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.drop-zone {
+  border-style: dashed;
+  border-color: var(--border-highlight);
 }
 .pro-hud {
   display: flex;
@@ -1202,67 +1212,61 @@ header {
 .pro-pill {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  background: var(--bg-surface);
+  gap: 5px;
+  background: transparent;
   border: 1px solid var(--border-color);
   border-radius: 999px;
   padding: 3px 9px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--text-main);
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-muted);
   white-space: nowrap;
 }
-.pro-pill.streak { border-color: rgba(245, 158, 11, 0.45); color: #fbbf24; background: rgba(245, 158, 11, 0.1); }
-.pro-pill.points { border-color: rgba(16, 185, 129, 0.45); color: #34d399; background: rgba(16, 185, 129, 0.1); }
-.pro-pill.freeze { border-color: rgba(56, 189, 248, 0.45); color: #38bdf8; background: rgba(56, 189, 248, 0.1); }
-.pro-pill.boost { border-color: rgba(168, 85, 247, 0.55); color: #c084fc; background: rgba(168, 85, 247, 0.12); }
-.pro-pill.level { border-color: rgba(250, 204, 21, 0.45); color: #fde047; background: rgba(250, 204, 21, 0.1); }
+.pro-pill.streak { color: #fbbf24; }
+.pro-pill.points { color: var(--accent); }
+.pro-pill.freeze { color: #7dd3fc; }
+.pro-pill.boost { color: #c084fc; border-color: rgba(192, 132, 252, 0.35); }
+.pro-pill.level { color: var(--text-main); }
 
-/* Minimalist tactile 3D buttons */
+/* Subtle minimalist tactile buttons */
+.btn, .btn-flip, .btn-rate {
+  border-radius: 9px;
+  transition: transform 0.08s ease, background 0.15s ease, border-color 0.15s ease !important;
+}
 .btn-primary, .btn-flip {
-  border-bottom: 3px solid rgba(0, 0, 0, 0.35) !important;
-  transition: transform 0.08s ease, filter 0.12s ease !important;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.25);
 }
-.btn-primary:active, .btn-flip:active {
-  transform: translateY(2px);
-  border-bottom-width: 1px !important;
-}
-.btn-rate {
-  border-bottom-width: 3px !important;
-  transition: transform 0.08s ease, background 0.12s ease !important;
-}
-.btn-rate:active {
-  transform: translateY(2px);
-  border-bottom-width: 1px !important;
+.btn:active, .btn-flip:active, .btn-rate:active {
+  transform: translateY(1px);
 }
 
-/* Pro Dashboard Card */
+/* Unified Minimalist Pro Overview */
 .pro-dashboard {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: 14px;
-  padding: 12px 14px;
+  border-radius: var(--radius);
+  padding: 14px 16px;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
+  gap: 14px;
+  box-shadow: var(--shadow);
 }
 .pro-dash-block {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
 }
 .pro-dash-top {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  font-size: 0.82rem;
-  font-weight: 700;
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 .pro-bar-track {
   width: 100%;
-  height: 9px;
-  background: rgba(0, 0, 0, 0.35);
+  height: 5px;
+  background: rgba(255, 255, 255, 0.06);
   border-radius: 999px;
   overflow: hidden;
 }
@@ -1271,8 +1275,8 @@ header {
   border-radius: 999px;
   transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 }
-.pro-bar-xp { background: linear-gradient(90deg, #eab308, #fde047); }
-.pro-bar-goal { background: linear-gradient(90deg, #059669, #34d399); }
+.pro-bar-xp { background: #eab308; opacity: 0.9; }
+.pro-bar-goal { background: var(--accent); }
 
 .pro-quests-strip {
   display: grid;
@@ -1283,67 +1287,69 @@ header {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: 10px;
-  padding: 8px 10px;
+  padding: 9px 11px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 0.78rem;
+  gap: 6px;
+  font-size: 0.76rem;
+  color: var(--text-main);
 }
 .pro-quest-card.done {
-  border-color: rgba(16, 185, 129, 0.55);
-  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.35);
+  background: rgba(16, 185, 129, 0.05);
 }
 
 .pro-combo-badge {
   display: none;
   align-items: center;
-  padding: 3px 9px;
+  padding: 2px 8px;
   border-radius: 999px;
-  font-size: 0.74rem;
-  font-weight: 800;
-  color: #fff;
-  background: linear-gradient(90deg, #f97316, #eab308);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.14);
+  border: 1px solid rgba(245, 158, 11, 0.3);
   animation: popIn 0.2s ease;
 }
 @keyframes popIn {
-  from { transform: scale(0.8); opacity: 0; }
+  from { transform: scale(0.88); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
 }
 .pro-confetti-piece {
   position: fixed;
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   top: -12px;
   z-index: 500;
   pointer-events: none;
   border-radius: 2px;
-  animation: confettiFall 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  animation: confettiFall 1.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
 @keyframes confettiFall {
-  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  0% { transform: translateY(0) rotate(0deg); opacity: 0.95; }
   100% { transform: translateY(100vh) rotate(540deg); opacity: 0; }
 }
 .hm-cell.frozen {
   background: #38bdf8 !important;
-  box-shadow: 0 0 4px rgba(56, 189, 248, 0.55);
+  opacity: 0.85;
 }
 .pro-toast {
   position: fixed;
   bottom: 84px;
   left: 50%;
-  transform: translateX(-50%) translateY(16px);
+  transform: translateX(-50%) translateY(14px);
   background: var(--bg-surface);
-  border: 1px solid var(--accent);
+  border: 1px solid var(--border-highlight);
   color: var(--text-main);
-  padding: 8px 15px;
+  padding: 7px 14px;
   border-radius: 999px;
-  font-size: 0.84rem;
-  font-weight: 700;
+  font-size: 0.8rem;
+  font-weight: 600;
   z-index: 300;
   opacity: 0;
   pointer-events: none;
-  transition: all 0.25s ease;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  transition: all 0.22s ease;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   white-space: nowrap;
 }
 .pro-toast.show {
@@ -1360,10 +1366,10 @@ header {
   justify-content: space-between;
   align-items: center;
   gap: 10px;
-  background: rgba(0, 0, 0, 0.25);
+  background: rgba(255, 255, 255, 0.02);
   border: 1px solid var(--border-color);
   border-radius: 10px;
-  padding: 9px 12px;
+  padding: 10px 12px;
 }
 .shop-item-info {
   display: flex;
@@ -1371,12 +1377,12 @@ header {
   gap: 2px;
 }
 .shop-item-title {
-  font-weight: 700;
-  font-size: 0.9rem;
+  font-weight: 600;
+  font-size: 0.88rem;
   color: var(--text-main);
 }
 .shop-item-desc {
-  font-size: 0.76rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
 }
 .milestone-row {
@@ -1386,13 +1392,13 @@ header {
   gap: 8px;
   padding: 7px 10px;
   border-radius: 8px;
-  background: rgba(0, 0, 0, 0.22);
+  background: rgba(255, 255, 255, 0.02);
   border: 1px solid var(--border-color);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
 }
 .milestone-row.claimed {
-  border-color: rgba(16, 185, 129, 0.5);
-  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.35);
+  background: rgba(16, 185, 129, 0.05);
 }
 @media (max-width: 768px) {
   header {
@@ -1402,12 +1408,12 @@ header {
   }
   .pro-pill {
     padding: 2px 7px;
-    font-size: 0.71rem;
+    font-size: 0.7rem;
   }
   .pro-dashboard {
     grid-template-columns: 1fr;
-    gap: 8px;
-    padding: 10px 12px;
+    gap: 10px;
+    padding: 12px;
   }
   .pro-quests-strip {
     grid-template-columns: 1fr;
@@ -4562,19 +4568,53 @@ async function updateProHud() {
   renderDailyQuests(prof, todayCount);
 }
 
+function _hashDateSeed(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
 function getDailyQuestsState(prof, todayCount) {
   const todayStr = getLocalDateString();
   if (!prof.dailyQuests || prof.dailyQuests.date !== todayStr) {
-    prof.dailyQuests = { date: todayStr, maxCombo: 0, cleanCount: 0, claimedIds: [] };
+    prof.dailyQuests = {
+      date: todayStr,
+      maxCombo: 0,
+      cleanCount: 0,
+      easyCount: 0,
+      goodCount: 0,
+      typeCount: 0,
+      xpToday: 0,
+      claimedIds: []
+    };
     saveProProfile(prof);
   }
   const dq = prof.dailyQuests;
-  const defs = [
-    { id: "q_grad15", title: "Dokonči 15 karet (min. 1 den)", cur: todayCount, target: 15, reward: 40 },
-    { id: "q_combo5", title: "Dosáhni Combo 5x", cur: dq.maxCombo || 0, target: 5, reward: 35 },
-    { id: "q_clean10", title: "10 karet bez tlačítka Znovu", cur: dq.cleanCount || 0, target: 10, reward: 50 }
+  const allDefs = [
+    { id: "q_grad10", title: "Dokonči 10 karet (min. 1 den)", cur: todayCount, target: 10, reward: 30 },
+    { id: "q_grad25", title: "Dokonči 25 karet (min. 1 den)", cur: todayCount, target: 25, reward: 60 },
+    { id: "q_combo4", title: "Dosáhni Combo 4x", cur: dq.maxCombo || 0, target: 4, reward: 30 },
+    { id: "q_combo8", title: "Dosáhni Combo 8x", cur: dq.maxCombo || 0, target: 8, reward: 55 },
+    { id: "q_clean10", title: "10 karet bez tlačítka Znovu", cur: dq.cleanCount || 0, target: 10, reward: 45 },
+    { id: "q_clean20", title: "20 karet bez tlačítka Znovu", cur: dq.cleanCount || 0, target: 20, reward: 75 },
+    { id: "q_easy5", title: "Ohodnoť 5 karet jako Snadné", cur: dq.easyCount || 0, target: 5, reward: 35 },
+    { id: "q_good12", title: "Ohodnoť 12 karet jako Dobré", cur: dq.goodCount || 0, target: 12, reward: 40 },
+    { id: "q_type5", title: "5 karet ve vepisovacím režimu", cur: dq.typeCount || 0, target: 5, reward: 45 },
+    { id: "q_xp120", title: "Nasbírej dnes 120 XP", cur: dq.xpToday || 0, target: 120, reward: 50 }
   ];
-  return { dq, defs };
+
+  // Deterministický náhodný výběr 3 výzev na dnešní den
+  let seed = _hashDateSeed(todayStr);
+  const pool = [...allDefs];
+  for (let i = pool.length - 1; i > 0; i--) {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    const j = seed % (i + 1);
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return { dq, defs: pool.slice(0, 3) };
 }
 
 function renderDailyQuests(prof, todayCount) {
@@ -4680,7 +4720,16 @@ rateCard = async function(ratingKey) {
   const isBoost = prof.boostUntil > Date.now();
   const todayStr = getLocalDateString();
   if (!prof.dailyQuests || prof.dailyQuests.date !== todayStr) {
-    prof.dailyQuests = { date: todayStr, maxCombo: 0, cleanCount: 0, claimedIds: [] };
+    prof.dailyQuests = {
+      date: todayStr,
+      maxCombo: 0,
+      cleanCount: 0,
+      easyCount: 0,
+      goodCount: 0,
+      typeCount: 0,
+      xpToday: 0,
+      claimedIds: []
+    };
   }
 
   if (ratingKey === "again") {
@@ -4698,6 +4747,11 @@ rateCard = async function(ratingKey) {
   if (ratingKey === "good" || ratingKey === "easy") {
     sessionCombo++;
     prof.dailyQuests.maxCombo = Math.max(prof.dailyQuests.maxCombo || 0, sessionCombo);
+  }
+  if (ratingKey === "easy") prof.dailyQuests.easyCount = (prof.dailyQuests.easyCount || 0) + 1;
+  if (ratingKey === "good") prof.dailyQuests.goodCount = (prof.dailyQuests.goodCount || 0) + 1;
+  if (typeof cardStudyMode !== "undefined" && cardStudyMode === "type") {
+    prof.dailyQuests.typeCount = (prof.dailyQuests.typeCount || 0) + 1;
   }
   prof.dailyQuests.cleanCount = (prof.dailyQuests.cleanCount || 0) + 1;
 
@@ -4725,6 +4779,7 @@ rateCard = async function(ratingKey) {
   const gained = (basePts + comboBonus) * (isBoost ? 2 : 1);
   prof.points += gained;
   prof.xp = (prof.xp ?? prof.points) + gained;
+  prof.dailyQuests.xpToday = (prof.dailyQuests.xpToday || 0) + gained;
 
   const reviews = await dbGetAllReviews();
   const todayCount = reviews.filter(r => r && r.dateStr === todayStr && (r.interval || 0) >= 1).length;
