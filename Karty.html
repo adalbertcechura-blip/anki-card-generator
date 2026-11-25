@@ -1641,6 +1641,32 @@ function dbSaveMedia(deckId, filename, blob) {
   });
 }
 
+function dbSaveMediaBatch(deckId, items) {
+  if (!items || items.length === 0) return Promise.resolve();
+  if (!db) {
+    for (const [fn, blob] of items) {
+      _memMedia.set(deckId + ":" + fn, blob);
+    }
+    return Promise.resolve();
+  }
+  return new Promise((resolve, reject) => {
+    try {
+      const tx = db.transaction(["media"], "readwrite");
+      const store = tx.objectStore("media");
+      for (const [fn, blob] of items) {
+        store.put(blob, deckId + ":" + fn);
+      }
+      tx.oncomplete = () => resolve();
+      tx.onerror = (e) => reject(e);
+    } catch (err) {
+      for (const [fn, blob] of items) {
+        _memMedia.set(deckId + ":" + fn, blob);
+      }
+      resolve();
+    }
+  });
+}
+
 function dbGetMedia(deckId, filename) {
   if (!db) {
     return Promise.resolve(_memMedia.get(deckId + ":" + filename));
@@ -2065,41 +2091,53 @@ document.getElementById("lightbox").onclick = () => document.getElementById("lig
 
 // --- ZIP PARSER ---
 async function importZipFile(file) {
+  const dropTitleEl = document.querySelector("#dropZone .drop-title");
+  const dropSubEl = document.querySelector("#dropZone .drop-subtitle");
+  const origTitle = dropTitleEl ? dropTitleEl.innerText : "";
+  const origSub = dropSubEl ? dropSubEl.innerText : "";
+  const setStatus = (t, s) => {
+    if (dropTitleEl) dropTitleEl.innerText = t;
+    if (dropSubEl) dropSubEl.innerText = s;
+  };
+
   try {
-    const buf = file.arrayBuffer ? await file.arrayBuffer() : file;
-    const zip = await JSZip.loadAsync(buf);
+    setStatus("Načítám archiv .zip...", `${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`);
+    await new Promise(r => setTimeout(r, 10));
+
+    const zip = await JSZip.loadAsync(file);
     let deckName = file.name.replace(/\.zip$/i, "").replace(/_/g, " ");
     let parsedPreloaded = null;
 
     const files = Object.keys(zip.files);
-    const mediaBlobs = {};
-    const mdCards = [];
+    const mediaEntries = [];
+    const mdEntries = [];
+    let deckJsEntry = null;
 
     for (const filename of files) {
       const entry = zip.files[filename];
       if (entry.dir) continue;
-
       const lower = filename.toLowerCase();
       const baseFn = filename.split('/').pop().split('\\').pop();
-
       if (lower.endsWith('deck_data.js')) {
-        try {
-          const jsTxt = await entry.async("text");
-          const eqIdx = jsTxt.indexOf("=");
-          if (eqIdx !== -1) {
-            const jsonStr = jsTxt.slice(eqIdx + 1).trim().replace(/;\s*$/, "");
-            parsedPreloaded = JSON.parse(jsonStr);
-          }
-        } catch (err) {
-          console.warn("Nepodařilo se načíst deck_data.js:", err);
-        }
+        deckJsEntry = entry;
       } else if (lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png') || lower.endsWith('.webp') || lower.endsWith('.svg') || lower.endsWith('.gif')) {
-        const blob = await entry.async("blob");
-        mediaBlobs[baseFn] = blob;
-      } else if (lower.endsWith('.md')) {
-        if (baseFn.startsWith("00_")) continue;
-        const text = await entry.async("text");
-        mdCards.push({ filename: baseFn, fullPath: filename, text: text });
+        mediaEntries.push({ baseFn, entry });
+      } else if (lower.endsWith('.md') && !baseFn.startsWith("00_")) {
+        mdEntries.push({ baseFn, filename, entry });
+      }
+    }
+
+    if (deckJsEntry) {
+      setStatus("Čtu metadata balíčku...", "deck_data.js");
+      try {
+        const jsTxt = await deckJsEntry.async("text");
+        const eqIdx = jsTxt.indexOf("=");
+        if (eqIdx !== -1) {
+          const jsonStr = jsTxt.slice(eqIdx + 1).trim().replace(/;\s*$/, "");
+          parsedPreloaded = JSON.parse(jsonStr);
+        }
+      } catch (err) {
+        console.warn("Nepodařilo se načíst deck_data.js:", err);
       }
     }
 
@@ -2125,9 +2163,19 @@ async function importZipFile(file) {
         lastReview: c.lastReview || 0
       }));
     } else {
-      if (mdCards.length === 0) {
+      if (mdEntries.length === 0) {
         alert("V archivu nebyl nalezen žádný soubor s kartičkami (.md ani deck_data.js).");
         return;
+      }
+      setStatus("Zpracovávám kartičky...", `0 / ${mdEntries.length}`);
+      const mdCards = [];
+      for (let i = 0; i < mdEntries.length; i++) {
+        const { baseFn, filename, entry } = mdEntries[i];
+        const text = await entry.async("text");
+        mdCards.push({ filename: baseFn, fullPath: filename, text });
+        if (i % 100 === 0) {
+          setStatus("Zpracovávám kartičky...", `${i} / ${mdEntries.length}`);
+        }
       }
 
       for (let i = 0; i < mdCards.length; i++) {
@@ -2214,10 +2262,20 @@ async function importZipFile(file) {
       });
     }
 
-    for (const [fn, blob] of Object.entries(mediaBlobs)) {
-      await dbSaveMedia(deckId, fn, blob);
+    const BATCH_SIZE = 80;
+    let savedMediaCount = 0;
+    for (let i = 0; i < mediaEntries.length; i += BATCH_SIZE) {
+      const slice = mediaEntries.slice(i, i + BATCH_SIZE);
+      const batch = await Promise.all(
+        slice.map(async ({ baseFn, entry }) => [baseFn, await entry.async("blob")])
+      );
+      await dbSaveMediaBatch(deckId, batch);
+      savedMediaCount += batch.length;
+      setStatus("Ukládám obrázky do zařízení...", `${savedMediaCount} / ${mediaEntries.length}`);
+      await new Promise(r => setTimeout(r, 0));
     }
 
+    setStatus("Dokončuji uložení balíčku...", deckName);
     const updatedDeck = {
       id: deckId,
       name: deckName,
@@ -2229,14 +2287,17 @@ async function importZipFile(file) {
 
     await dbSaveDeck(updatedDeck);
     if (existingDeck) {
-      alert(`Aktualizován balíček "${deckName}" (${rawCards.length} kartiček, ${Object.keys(mediaBlobs).length} fotografií). Postup učení zachován u ${preservedCount} kartiček!`);
+      alert(`Aktualizován balíček "${deckName}" (${rawCards.length} kartiček, ${savedMediaCount} fotografií). Postup učení zachován u ${preservedCount} kartiček!`);
     } else {
-      alert(`Úspěšně importován balíček "${deckName}" (${rawCards.length} kartiček, ${Object.keys(mediaBlobs).length} fotografií)!`);
+      alert(`Úspěšně importován balíček "${deckName}" (${rawCards.length} kartiček, ${savedMediaCount} fotografií)!`);
     }
     await loadDeckList();
   } catch (err) {
     console.error(err);
     alert("Chyba při čtení archivu .zip: " + err.message);
+  } finally {
+    if (dropTitleEl) dropTitleEl.innerText = origTitle;
+    if (dropSubEl) dropSubEl.innerText = origSub;
   }
 }
 
