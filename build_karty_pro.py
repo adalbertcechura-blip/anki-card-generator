@@ -80,10 +80,106 @@ body.theme-mono {
   color: var(--text-main);
   white-space: nowrap;
 }
-.pro-pill.streak { border-color: rgba(245, 158, 11, 0.5); color: #fbbf24; }
-.pro-pill.points { border-color: rgba(34, 197, 94, 0.5); color: #4ade80; }
-.pro-pill.freeze { border-color: rgba(56, 189, 248, 0.5); color: #38bdf8; }
-.pro-pill.boost { border-color: rgba(168, 85, 247, 0.6); color: #c084fc; }
+.pro-pill.streak { border-color: rgba(245, 158, 11, 0.55); color: #fbbf24; background: rgba(245, 158, 11, 0.12); }
+.pro-pill.points { border-color: rgba(34, 197, 94, 0.55); color: #4ade80; background: rgba(34, 197, 94, 0.12); }
+.pro-pill.freeze { border-color: rgba(56, 189, 248, 0.55); color: #38bdf8; background: rgba(56, 189, 248, 0.12); }
+.pro-pill.boost { border-color: rgba(168, 85, 247, 0.65); color: #c084fc; background: rgba(168, 85, 247, 0.14); }
+.pro-pill.level { border-color: rgba(250, 204, 21, 0.55); color: #fde047; background: rgba(250, 204, 21, 0.12); }
+
+/* Duolingo-style tactile 3D buttons */
+.btn-primary, .btn-flip {
+  border-bottom: 4px solid #15803d !important;
+  transition: transform 0.08s ease, filter 0.12s ease !important;
+}
+.btn-primary:active, .btn-flip:active {
+  transform: translateY(2px);
+  border-bottom-width: 2px !important;
+}
+.btn-rate {
+  border-bottom-width: 4px !important;
+  transition: transform 0.08s ease, background 0.12s ease !important;
+}
+.btn-rate:active {
+  transform: translateY(2px);
+  border-bottom-width: 2px !important;
+}
+
+/* Pro Dashboard Card */
+.pro-dashboard {
+  background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-surface) 100%);
+  border: 2px solid var(--border-highlight);
+  border-radius: 16px;
+  padding: 14px 16px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
+}
+.pro-dash-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pro-dash-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.pro-bar-track {
+  width: 100%;
+  height: 12px;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.pro-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.pro-bar-xp { background: linear-gradient(90deg, #eab308, #fde047); }
+.pro-bar-goal { background: linear-gradient(90deg, #16a34a, #4ade80); }
+
+.pro-combo-badge {
+  display: none;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(90deg, #f97316, #eab308);
+  box-shadow: 0 2px 10px rgba(249, 115, 22, 0.45);
+  animation: popIn 0.2s ease;
+}
+@keyframes popIn {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.pro-confetti-piece {
+  position: fixed;
+  width: 9px;
+  height: 9px;
+  top: -12px;
+  z-index: 500;
+  pointer-events: none;
+  border-radius: 2px;
+  animation: confettiFall 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+@keyframes confettiFall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(540deg); opacity: 0; }
+}
+@media (max-width: 640px) {
+  .pro-dashboard {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 12px;
+  }
+}
 .hm-cell.frozen {
   background: #38bdf8 !important;
   box-shadow: 0 0 4px rgba(56, 189, 248, 0.6);
@@ -168,13 +264,33 @@ body.theme-mono {
 """
 
 PRO_HEADER_HUD = r"""  <div class="pro-hud" id="proHud">
+    <span class="pro-pill level" id="proLevelPill" title="Vaše úroveň a hodnost">Lv. 1</span>
     <span class="pro-pill streak" id="proStreakPill" title="Aktuální denní série">Série: 0 d</span>
     <span class="pro-pill points" id="proPointsPill" title="Nasbírané body">Body: 0</span>
     <span class="pro-pill freeze" id="proFreezePill" title="Zásoba Streak Freeze">Freeze: 0/3</span>
-    <span class="pro-pill" id="proGoalPill" title="Dnešní denní cíl">Cíl: 0/20</span>
     <span class="pro-pill boost" id="proBoostPill" style="display:none;">2x Boost</span>
-    <button class="btn btn-sm btn-primary" id="btnOpenShop">Obchod a milníky</button>
+    <button class="btn btn-sm" id="btnProSound" title="Zapnout/vypnout zvukové efekty">Zvuk: Zap</button>
+    <button class="btn btn-sm btn-primary" id="btnOpenShop">Obchod</button>
   </div>"""
+
+PRO_DASHBOARD_HTML = r"""
+    <div class="pro-dashboard" id="proDashboard">
+      <div class="pro-dash-block">
+        <div class="pro-dash-top">
+          <span id="proDashRank" style="color:#fde047;">Úroveň 1 – Začátečník</span>
+          <span id="proDashXpText" style="color:var(--text-muted); font-size:0.78rem;">0 / 100 XP</span>
+        </div>
+        <div class="pro-bar-track"><div class="pro-bar-fill pro-bar-xp" id="proDashXpBar" style="width:0%;"></div></div>
+      </div>
+      <div class="pro-dash-block">
+        <div class="pro-dash-top">
+          <span style="color:#4ade80;">Dnešní cíl</span>
+          <span id="proDashGoalText" style="color:var(--text-muted); font-size:0.78rem;">0 / 20 karet</span>
+        </div>
+        <div class="pro-bar-track"><div class="pro-bar-fill pro-bar-goal" id="proDashGoalBar" style="width:0%;"></div></div>
+      </div>
+    </div>
+"""
 
 PRO_MODAL_HTML = r"""
 <!-- PRO SHOP & MILESTONES MODAL -->
@@ -369,7 +485,10 @@ async function computeProStreakAndFreeze() {
     if (!ms.claimed && streak >= ms.days) {
       ms.claimed = true;
       prof.points += (ms.bonusPoints || 0);
+      prof.xp = (prof.xp || 0) + (ms.bonusPoints || 0);
       msAwarded = true;
+      launchConfetti();
+      playProTone("level");
       showProToast(`Milník ${ms.days} dní splněn: ${ms.title} (+${ms.bonusPoints || 0} b.)`);
     }
   }
@@ -379,19 +498,95 @@ async function computeProStreakAndFreeze() {
   return { prof, streak, todayCount, frozenSet };
 }
 
+function getLevelInfo(xpVal) {
+  const xp = Math.max(0, xpVal || 0);
+  const level = Math.floor(Math.sqrt(xp / 45)) + 1;
+  const curLvXp = Math.pow(level - 1, 2) * 45;
+  const nextLvXp = Math.pow(level, 2) * 45;
+  const ranks = ["Začátečník", "Stopař", "Sběratel", "Průzkumník", "Znalec", "Mistr", "Velmistr", "Legenda"];
+  const rank = ranks[Math.min(ranks.length - 1, Math.floor((level - 1) / 2))];
+  const pct = Math.min(100, Math.round(((xp - curLvXp) / Math.max(1, nextLvXp - curLvXp)) * 100));
+  return { level, rank, xpInLv: xp - curLvXp, lvSpan: nextLvXp - curLvXp, pct };
+}
+
+function launchConfetti() {
+  const colors = ["#22c55e", "#fde047", "#38bdf8", "#f97316", "#c084fc"];
+  for (let i = 0; i < 36; i++) {
+    const p = document.createElement("div");
+    p.className = "pro-confetti-piece";
+    p.style.left = Math.random() * 100 + "vw";
+    p.style.background = colors[i % colors.length];
+    p.style.animationDelay = (Math.random() * 0.35) + "s";
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 2100);
+  }
+}
+
+function playProTone(kind) {
+  const prof = loadProProfile();
+  if (prof.soundEnabled === false) return;
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    if (!window._proAudioCtx) window._proAudioCtx = new AudioCtx();
+    const ctx = window._proAudioCtx;
+    const now = ctx.currentTime;
+    const playNote = (freq, startOffset, dur) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, now + startOffset);
+      gain.gain.setValueAtTime(0.08, now + startOffset);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + startOffset + dur);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + startOffset);
+      osc.stop(now + startOffset + dur);
+    };
+    if (kind === "good") {
+      playNote(523.25, 0, 0.11);
+      playNote(659.25, 0.08, 0.16);
+    } else if (kind === "level") {
+      playNote(523.25, 0, 0.12);
+      playNote(659.25, 0.09, 0.12);
+      playNote(783.99, 0.18, 0.14);
+      playNote(1046.5, 0.28, 0.28);
+    } else if (kind === "again") {
+      playNote(310, 0, 0.14);
+    }
+  } catch (e) {}
+}
+
+let sessionCombo = 0;
+
 async function updateProHud() {
   const { prof, streak, todayCount } = await computeProStreakAndFreeze();
   applyProTheme(prof.activeTheme);
+  const lv = getLevelInfo(prof.xp ?? prof.points);
+  const elLevel = document.getElementById("proLevelPill");
   const elStreak = document.getElementById("proStreakPill");
   const elPoints = document.getElementById("proPointsPill");
   const elFreeze = document.getElementById("proFreezePill");
-  const elGoal = document.getElementById("proGoalPill");
   const elBoost = document.getElementById("proBoostPill");
+  const elSound = document.getElementById("btnProSound");
+  if (elLevel) elLevel.innerText = `Lv. ${lv.level}`;
   if (elStreak) elStreak.innerText = `Série: ${streak} d`;
   if (elPoints) elPoints.innerText = `Body: ${prof.points}`;
   if (elFreeze) elFreeze.innerText = `Freeze: ${prof.freezes}/3`;
-  if (elGoal) elGoal.innerText = `Cíl: ${todayCount}/${prof.dailyGoal}`;
   if (elBoost) elBoost.style.display = (prof.boostUntil > Date.now()) ? "inline-flex" : "none";
+  if (elSound) elSound.innerText = prof.soundEnabled === false ? "Zvuk: Vyp" : "Zvuk: Zap";
+
+  const elRank = document.getElementById("proDashRank");
+  const elXpTxt = document.getElementById("proDashXpText");
+  const elXpBar = document.getElementById("proDashXpBar");
+  const elGoalTxt = document.getElementById("proDashGoalText");
+  const elGoalBar = document.getElementById("proDashGoalBar");
+  if (elRank) elRank.innerText = `Úroveň ${lv.level} – ${lv.rank}`;
+  if (elXpTxt) elXpTxt.innerText = `${lv.xpInLv} / ${lv.lvSpan} XP`;
+  if (elXpBar) elXpBar.style.width = `${lv.pct}%`;
+  const goalPct = Math.min(100, Math.round((todayCount / Math.max(1, prof.dailyGoal || 20)) * 100));
+  if (elGoalTxt) elGoalTxt.innerText = todayCount >= prof.dailyGoal ? `Splněno (${todayCount}/${prof.dailyGoal})` : `${todayCount} / ${prof.dailyGoal} karet`;
+  if (elGoalBar) elGoalBar.style.width = `${goalPct}%`;
 }
 
 async function renderShopModal() {
@@ -460,25 +655,60 @@ async function renderShopModal() {
   }
 }
 
-// Wrap rateCard for XP/points and daily goal bonus
+// Wrap rateCard for XP/points, combo, sound, confetti and daily goal bonus
 const _origRateCardPro = rateCard;
 rateCard = async function(ratingKey) {
   await _origRateCardPro(ratingKey);
   const prof = loadProProfile();
+  const prevLv = getLevelInfo(prof.xp ?? prof.points).level;
   const isBoost = prof.boostUntil > Date.now();
-  const basePts = (ratingKey === "good" || ratingKey === "easy") ? 10 : 5;
-  const gained = basePts * (isBoost ? 2 : 1);
-  prof.points += gained;
+  if (ratingKey === "good" || ratingKey === "easy") {
+    sessionCombo++;
+    playProTone("good");
+  } else if (ratingKey === "hard") {
+    playProTone("good");
+  } else {
+    sessionCombo = 0;
+    playProTone("again");
+  }
 
+  const comboEl = document.getElementById("proComboBadge");
+  if (comboEl) {
+    if (sessionCombo >= 3) {
+      comboEl.style.display = "inline-flex";
+      comboEl.innerText = `Combo ${sessionCombo}x`;
+    } else {
+      comboEl.style.display = "none";
+    }
+  }
+
+  const comboBonus = (sessionCombo > 0 && sessionCombo % 5 === 0) ? 5 : 0;
+  const basePts = (ratingKey === "good" || ratingKey === "easy") ? 10 : 5;
+  const gained = (basePts + comboBonus) * (isBoost ? 2 : 1);
+  prof.points += gained;
+  prof.xp = (prof.xp ?? prof.points) + gained;
+
+  const newLv = getLevelInfo(prof.xp).level;
   const todayStr = getLocalDateString();
   const reviews = await dbGetAllReviews();
   const todayCount = reviews.filter(r => r && r.dateStr === todayStr).length;
   if (todayCount >= prof.dailyGoal && !prof.dailyBonusDates.includes(todayStr)) {
     prof.dailyBonusDates.push(todayStr);
     prof.points += 30;
-    showProToast(`Denní cíl splněn! +${gained + 30} bodů`);
+    prof.xp += 30;
+    launchConfetti();
+    playProTone("level");
+    showProToast(`Denní cíl splněn! +${gained + 30} b.`);
+  } else if (newLv > prevLv) {
+    launchConfetti();
+    playProTone("level");
+    showProToast(`Nová úroveň ${newLv}! (+${gained} b.)`);
+  } else if (ratingKey === "again") {
+    showProToast(`Nevadí, příště to vyjde (+${gained} b.)`);
+  } else if (comboBonus > 0) {
+    showProToast(`Skvělé combo ${sessionCombo}x! +${gained} b.`);
   } else {
-    showProToast(`+${gained} b.${isBoost ? " (2x Boost)" : ""}`);
+    showProToast(`+${gained} b.${isBoost ? " (2x)" : ""}`);
   }
   saveProProfile(prof);
   await updateProHud();
@@ -500,6 +730,14 @@ renderHeatmap = async function() {
     streakEl.innerText = `${streak} dní`;
     if (streak > 0) streakEl.classList.remove("zero");
   }
+  await updateProHud();
+};
+
+document.getElementById("btnProSound").onclick = async () => {
+  const p = loadProProfile();
+  p.soundEnabled = (p.soundEnabled === false);
+  saveProProfile(p);
+  if (p.soundEnabled) playProTone("good");
   await updateProHud();
 };
 
@@ -576,6 +814,12 @@ html = html.replace("</style>", PRO_CSS + "\n</style>", 1)
 
 assert '<div class="nav-actions">' in html
 html = html.replace('<div class="nav-actions">', PRO_HEADER_HUD + '\n  <div class="nav-actions">', 1)
+
+assert '<section id="decksView">' in html
+html = html.replace('<section id="decksView">', '<section id="decksView">\n' + PRO_DASHBOARD_HTML, 1)
+
+assert '<div class="progress-pills">' in html
+html = html.replace('<div class="progress-pills">', '<span class="pro-combo-badge" id="proComboBadge">Combo 3x</span>\n        <div class="progress-pills">', 1)
 
 assert "<!-- HELP MODAL -->" in html
 html = html.replace("<!-- HELP MODAL -->", PRO_MODAL_HTML + "\n<!-- HELP MODAL -->", 1)
