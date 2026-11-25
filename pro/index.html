@@ -1143,53 +1143,63 @@ main {
   transform: translateY(-1px);
 }
 
-/* --- KARTY PRO ULTRA-MINIMALIST DESIGN SYSTEM --- */
+/* --- KARTY PRO TONAL MONOCHROME DESIGN SYSTEM (SAGE-SLATE) --- */
 :root {
-  --bg-main: #0b0e12;
-  --bg-card: #12161c;
-  --bg-card-hover: #171c24;
-  --bg-surface: #1a2029;
-  --border-color: rgba(255, 255, 255, 0.07);
-  --border-highlight: rgba(255, 255, 255, 0.14);
-  --accent: #10b981;
-  --accent-hover: #059669;
-  --text-main: #e2e8f0;
-  --text-muted: #7e8a9a;
+  --bg-main: #0c1211;
+  --bg-card: #121a18;
+  --bg-card-hover: #17211f;
+  --bg-surface: #1b2624;
+  --border-color: rgba(167, 210, 198, 0.1);
+  --border-highlight: rgba(167, 210, 198, 0.22);
+  --accent: #52b79a;
+  --accent-hover: #3ea386;
+  --accent-soft: rgba(82, 183, 154, 0.14);
+  --text-main: #e3ece9;
+  --text-muted: #849993;
   --radius: 12px;
-  --shadow: 0 2px 12px rgba(0, 0, 0, 0.18);
+  --shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
 }
 body.theme-midnight {
-  --bg-main: #080c14;
-  --bg-card: #0f1522;
-  --bg-card-hover: #141c2e;
-  --bg-surface: #182236;
-  --border-color: rgba(148, 163, 184, 0.1);
-  --border-highlight: rgba(148, 163, 184, 0.2);
-  --accent: #38bdf8;
-  --accent-hover: #0284c7;
+  --bg-main: #0b101b;
+  --bg-card: #111827;
+  --bg-card-hover: #162033;
+  --bg-surface: #1b273d;
+  --border-color: rgba(147, 179, 230, 0.11);
+  --border-highlight: rgba(147, 179, 230, 0.22);
+  --accent: #6da3e8;
+  --accent-hover: #538dd8;
+  --accent-soft: rgba(109, 163, 232, 0.14);
+  --text-main: #e2e9f4;
+  --text-muted: #8293ad;
 }
 body.theme-amber {
-  --bg-main: #100d0a;
-  --bg-card: #17130f;
-  --bg-card-hover: #1f1914;
-  --bg-surface: #251e18;
-  --border-color: rgba(245, 158, 11, 0.12);
-  --border-highlight: rgba(245, 158, 11, 0.24);
-  --accent: #f59e0b;
-  --accent-hover: #d97706;
+  --bg-main: #13100d;
+  --bg-card: #1b1612;
+  --bg-card-hover: #221c17;
+  --bg-surface: #29221c;
+  --border-color: rgba(224, 184, 138, 0.11);
+  --border-highlight: rgba(224, 184, 138, 0.22);
+  --accent: #d49b5a;
+  --accent-hover: #be8442;
+  --accent-soft: rgba(212, 155, 90, 0.14);
+  --text-main: #efe7de;
+  --text-muted: #9e8f80;
 }
 body.theme-mono {
-  --bg-main: #09090b;
-  --bg-card: #111113;
-  --bg-card-hover: #18181b;
-  --bg-surface: #1e1e22;
-  --border-color: rgba(255, 255, 255, 0.08);
-  --border-highlight: rgba(255, 255, 255, 0.18);
-  --accent: #e4e4e7;
-  --accent-hover: #ffffff;
+  --bg-main: #0c0d0f;
+  --bg-card: #131518;
+  --bg-card-hover: #191c20;
+  --bg-surface: #1f2328;
+  --border-color: rgba(203, 213, 225, 0.1);
+  --border-highlight: rgba(203, 213, 225, 0.2);
+  --accent: #a8b5c4;
+  --accent-hover: #c4ceda;
+  --accent-soft: rgba(168, 181, 196, 0.14);
+  --text-main: #e6eaef;
+  --text-muted: #87919e;
 }
 header {
-  background: rgba(11, 14, 18, 0.88);
+  background: var(--bg-main);
   border-bottom: 1px solid var(--border-color);
   padding: 10px 16px;
 }
@@ -1213,7 +1223,7 @@ header {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  background: transparent;
+  background: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: 999px;
   padding: 3px 9px;
@@ -1222,10 +1232,10 @@ header {
   color: var(--text-muted);
   white-space: nowrap;
 }
-.pro-pill.streak { color: #fbbf24; }
-.pro-pill.points { color: var(--accent); }
-.pro-pill.freeze { color: #7dd3fc; }
-.pro-pill.boost { color: #c084fc; border-color: rgba(192, 132, 252, 0.35); }
+.pro-pill.streak { color: var(--text-main); }
+.pro-pill.points { color: var(--accent); border-color: var(--border-highlight); }
+.pro-pill.freeze { color: var(--text-muted); }
+.pro-pill.boost { color: var(--accent); background: var(--accent-soft); border-color: var(--border-highlight); }
 .pro-pill.level { color: var(--text-main); }
 
 /* Subtle minimalist tactile buttons */
@@ -1262,11 +1272,15 @@ header {
   align-items: baseline;
   font-size: 0.8rem;
   font-weight: 600;
+  color: var(--text-main);
+}
+.pro-dash-top span:first-child {
+  color: var(--text-main) !important;
 }
 .pro-bar-track {
   width: 100%;
   height: 5px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--bg-surface);
   border-radius: 999px;
   overflow: hidden;
 }
@@ -1275,7 +1289,7 @@ header {
   border-radius: 999px;
   transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 }
-.pro-bar-xp { background: #eab308; opacity: 0.9; }
+.pro-bar-xp { background: var(--accent); opacity: 0.65; }
 .pro-bar-goal { background: var(--accent); }
 
 .pro-quests-strip {
@@ -1295,8 +1309,8 @@ header {
   color: var(--text-main);
 }
 .pro-quest-card.done {
-  border-color: rgba(16, 185, 129, 0.35);
-  background: rgba(16, 185, 129, 0.05);
+  border-color: var(--border-highlight);
+  background: var(--accent-soft);
 }
 
 .pro-combo-badge {
@@ -1306,9 +1320,9 @@ header {
   border-radius: 999px;
   font-size: 0.72rem;
   font-weight: 700;
-  color: #fbbf24;
-  background: rgba(245, 158, 11, 0.14);
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--border-highlight);
   animation: popIn 0.2s ease;
 }
 @keyframes popIn {
@@ -1330,8 +1344,8 @@ header {
   100% { transform: translateY(100vh) rotate(540deg); opacity: 0; }
 }
 .hm-cell.frozen {
-  background: #38bdf8 !important;
-  opacity: 0.85;
+  background: var(--accent) !important;
+  opacity: 0.55;
 }
 .pro-toast {
   position: fixed;
@@ -1366,7 +1380,7 @@ header {
   justify-content: space-between;
   align-items: center;
   gap: 10px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: 10px;
   padding: 10px 12px;
@@ -1392,13 +1406,13 @@ header {
   gap: 8px;
   padding: 7px 10px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--bg-surface);
   border: 1px solid var(--border-color);
   font-size: 0.8rem;
 }
 .milestone-row.claimed {
-  border-color: rgba(16, 185, 129, 0.35);
-  background: rgba(16, 185, 129, 0.05);
+  border-color: var(--border-highlight);
+  background: var(--accent-soft);
 }
 @media (max-width: 768px) {
   header {
