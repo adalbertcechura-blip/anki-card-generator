@@ -374,30 +374,24 @@ main {
   overflow: visible;
   box-shadow: var(--shadow);
 }
-.anki-table-header {
-  display: grid;
-  grid-template-columns: 1fr 56px 56px 76px 36px;
-  column-gap: 10px;
-  align-items: center;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border-color);
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
 .anki-col-num {
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.anki-deck-row {
-  display: grid;
-  grid-template-columns: 1fr 56px 56px 76px 36px;
-  column-gap: 10px;
+.anki-counts-group {
+  display: inline-flex;
   align-items: center;
-  padding: 11px 14px;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.anki-deck-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 12px;
   border-bottom: 1px solid rgba(36, 57, 43, 0.55);
   transition: background 0.12s ease;
   position: relative;
@@ -411,11 +405,12 @@ main {
 .anki-deck-name-cell {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
+  flex: 1;
 }
 .anki-expand-btn {
-  width: 24px;
+  width: 22px;
   height: 24px;
   display: inline-flex;
   align-items: center;
@@ -445,15 +440,16 @@ main {
   text-align: left;
   padding: 2px 0;
   flex: 1;
+  min-width: 0;
 }
 .anki-deck-link:hover {
   color: var(--accent);
 }
 .anki-subdeck-row {
-  display: grid;
-  grid-template-columns: 1fr 56px 56px 68px 36px;
+  display: flex;
   align-items: center;
-  padding: 8px 14px 8px 42px;
+  gap: 8px;
+  padding: 8px 12px 8px 38px;
   border-bottom: 1px solid rgba(36, 57, 43, 0.35);
   background: rgba(12, 18, 14, 0.38);
   transition: background 0.12s ease;
@@ -472,6 +468,8 @@ main {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
 }
 .anki-subdeck-link:hover {
   color: var(--accent);
@@ -822,20 +820,16 @@ main {
   .flashcard {
     padding: 12px 8px;
   }
-  .anki-table-header {
-    font-size: 0.68rem;
-    letter-spacing: 0.01em;
-  }
-  .anki-table-header,
   .anki-deck-row {
-    grid-template-columns: 1fr 40px 44px 66px 28px;
-    column-gap: 10px;
-    padding: 10px 10px;
+    padding: 10px 8px;
+    gap: 6px;
   }
   .anki-subdeck-row {
-    grid-template-columns: 1fr 40px 44px 66px 28px;
-    column-gap: 10px;
-    padding: 8px 10px 8px 32px;
+    padding: 8px 8px 8px 30px;
+    gap: 6px;
+  }
+  .anki-counts-group {
+    gap: 8px;
   }
   .card-img-thumb {
     max-height: 36vh;
@@ -2815,17 +2809,6 @@ async function loadDeckList() {
   const todayStr = getLocalDateString();
   const allReviews = await dbGetAllReviews();
 
-  const headerRow = document.createElement("div");
-  headerRow.className = "anki-table-header";
-  headerRow.innerHTML = `
-    <div>Balíček</div>
-    <div class="anki-col-num">Nové</div>
-    <div class="anki-col-num">Učení</div>
-    <div class="anki-col-num">Zkoušení</div>
-    <div></div>
-  `;
-  listEl.appendChild(headerRow);
-
   if (!window._ankiMenuCloseBound) {
     window._ankiMenuCloseBound = true;
     document.addEventListener("click", (ev) => {
@@ -2865,9 +2848,11 @@ async function loadDeckList() {
         <button class="anki-expand-btn" title="Rozbalit / sbalit podbalíčky">${(hasSubdecks || showSubPanel) ? (showSubPanel ? "▾" : "▸") : ""}</button>
         <button class="anki-deck-link" title="Spustit učení balíčku">${escapeHtml(deck.name)}</button>
       </div>
-      <div class="anki-col-num ${newCardsToStudyToday > 0 ? "anki-count-new" : "anki-count-zero"}">${newCardsToStudyToday}</div>
-      <div class="anki-col-num ${learningDue > 0 ? "anki-count-learn" : "anki-count-zero"}">${learningDue}</div>
-      <div class="anki-col-num ${reviewDue > 0 ? "anki-count-rev" : "anki-count-zero"}">${reviewDue}</div>
+      <div class="anki-counts-group">
+        <span class="${newCardsToStudyToday > 0 ? "anki-count-new" : "anki-count-zero"}" title="Nové">${newCardsToStudyToday}</span>
+        <span class="${learningDue > 0 ? "anki-count-learn" : "anki-count-zero"}" title="Učení">${learningDue}</span>
+        <span class="${reviewDue > 0 ? "anki-count-rev" : "anki-count-zero"}" title="Zkoušení">${reviewDue}</span>
+      </div>
       <button class="btn-deck-kebab" title="Nastavení a možnosti balíčku" aria-label="Možnosti balíčku">⋮</button>
       <div class="anki-deck-menu">
         <button class="anki-menu-item btn-menu-srs">Nastavení (limit: ${dailyLimit > 0 ? dailyLimit : "bez limitu"}/den)</button>
@@ -3008,9 +2993,11 @@ async function loadDeckList() {
           subEl.className = "anki-subdeck-row";
           subEl.innerHTML = `
             <button class="anki-subdeck-link" title="Studovat podbalíček">${escapeHtml(gKey)}</button>
-            <div class="anki-col-num ${gNewToday > 0 ? "anki-count-new" : "anki-count-zero"}">${gNewToday}</div>
-            <div class="anki-col-num ${gLearn > 0 ? "anki-count-learn" : "anki-count-zero"}">${gLearn}</div>
-            <div class="anki-col-num ${gRev > 0 ? "anki-count-rev" : "anki-count-zero"}">${gRev}</div>
+            <div class="anki-counts-group">
+              <span class="${gNewToday > 0 ? "anki-count-new" : "anki-count-zero"}" title="Nové">${gNewToday}</span>
+              <span class="${gLearn > 0 ? "anki-count-learn" : "anki-count-zero"}" title="Učení">${gLearn}</span>
+              <span class="${gRev > 0 ? "anki-count-rev" : "anki-count-zero"}" title="Zkoušení">${gRev}</span>
+            </div>
             <button class="btn-deck-kebab btn-sub-review" title="Procvičit celý podbalíček" style="font-size:0.85rem;">↻</button>
           `;
           subEl.querySelector(".anki-subdeck-link").onclick = () => startStudy(deck.id, false, gKey);
