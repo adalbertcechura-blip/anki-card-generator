@@ -1143,8 +1143,23 @@ main {
   transform: translateY(-1px);
 }
 
-/* --- KARTY PRO TONAL MONOCHROME DESIGN SYSTEM (SAGE-SLATE) --- */
+/* --- KARTY PRO FOREST-MUSHROOM & TONAL MONOCHROME DESIGN SYSTEM --- */
 :root {
+  --bg-main: #12100d;
+  --bg-card: #191611;
+  --bg-card-hover: #211d17;
+  --bg-surface: #25211a;
+  --border-color: rgba(188, 174, 146, 0.12);
+  --border-highlight: rgba(125, 168, 114, 0.28);
+  --accent: #6ea065;
+  --accent-hover: #5b8b53;
+  --accent-soft: rgba(110, 160, 101, 0.14);
+  --text-main: #eae4d7;
+  --text-muted: #989080;
+  --radius: 12px;
+  --shadow: 0 2px 12px rgba(0, 0, 0, 0.22);
+}
+body.theme-moss {
   --bg-main: #0c1211;
   --bg-card: #121a18;
   --bg-card-hover: #17211f;
@@ -1156,8 +1171,6 @@ main {
   --accent-soft: rgba(82, 183, 154, 0.14);
   --text-main: #e3ece9;
   --text-muted: #849993;
-  --radius: 12px;
-  --shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
 }
 body.theme-midnight {
   --bg-main: #0b101b;
@@ -1184,6 +1197,32 @@ body.theme-amber {
   --accent-soft: rgba(212, 155, 90, 0.14);
   --text-main: #efe7de;
   --text-muted: #9e8f80;
+}
+body.theme-heather {
+  --bg-main: #120e14;
+  --bg-card: #19141c;
+  --bg-card-hover: #211a25;
+  --bg-surface: #271f2c;
+  --border-color: rgba(196, 167, 210, 0.11);
+  --border-highlight: rgba(196, 167, 210, 0.24);
+  --accent: #a67db8;
+  --accent-hover: #9167a3;
+  --accent-soft: rgba(166, 125, 184, 0.14);
+  --text-main: #ece5ef;
+  --text-muted: #988b9e;
+}
+body.theme-lichen {
+  --bg-main: #10120c;
+  --bg-card: #171a12;
+  --bg-card-hover: #1e2218;
+  --bg-surface: #252a1d;
+  --border-color: rgba(188, 201, 148, 0.11);
+  --border-highlight: rgba(188, 201, 148, 0.24);
+  --accent: #95a864;
+  --accent-hover: #809350;
+  --accent-soft: rgba(149, 168, 100, 0.14);
+  --text-main: #e9ece2;
+  --text-muted: #8f9682;
 }
 body.theme-mono {
   --bg-main: #0c0d0f;
@@ -1708,35 +1747,35 @@ header {
           <div class="shop-item-title">Streak Freeze (max. 3)</div>
           <div class="shop-item-desc">Automaticky ochrání vaši sérii, pokud některý den vynecháte.</div>
         </div>
-        <button class="btn btn-sm btn-primary" id="btnBuyFreeze">Koupit (150 b.)</button>
+        <button class="btn btn-sm btn-primary" id="btnBuyFreeze">Koupit (500 b.)</button>
       </div>
       <div class="shop-item">
         <div class="shop-item-info">
           <div class="shop-item-title">2x Body Boost (15 min)</div>
           <div class="shop-item-desc">Zdvojnásobí získané body za všechny karty v příštích 15 minutách.</div>
         </div>
-        <button class="btn btn-sm btn-primary" id="btnBuyBoost">Koupit (100 b.)</button>
+        <button class="btn btn-sm btn-primary" id="btnBuyBoost">Koupit (400 b.)</button>
       </div>
       <div class="shop-item">
         <div class="shop-item-info">
-          <div class="shop-item-title">Oprava včerejší série</div>
-          <div class="shop-item-desc">Zpětně doplní včerejší vynechaný den jako zmrazený, pokud jste neměli Freeze.</div>
+          <div class="shop-item-title">Obnovení série (max. 3 dny zpět)</div>
+          <div class="shop-item-desc">Zpětně zachrání nejbližší vynechaný den za poslední 3 dny.</div>
         </div>
-        <button class="btn btn-sm btn-primary" id="btnBuyRepair">Koupit (400 b.)</button>
+        <button class="btn btn-sm btn-primary" id="btnBuyRepair">Koupit (800 b.)</button>
       </div>
       <div class="shop-item">
         <div class="shop-item-info">
           <div class="shop-item-title">Tajemná truhla</div>
-          <div class="shop-item-desc">Náhodná odměna: +50 až +250 bodů, Streak Freeze zdarma nebo 2x Boost.</div>
+          <div class="shop-item-desc">Náhodná odměna: +200 až +700 bodů, Streak Freeze nebo 2x Boost.</div>
         </div>
-        <button class="btn btn-sm btn-primary" id="btnBuyMystery">Otevřít (120 b.)</button>
+        <button class="btn btn-sm btn-primary" id="btnBuyMystery">Otevřít (450 b.)</button>
       </div>
       <div class="shop-item">
         <div class="shop-item-info">
           <div class="shop-item-title">Balíček 3x Streak Freeze</div>
           <div class="shop-item-desc">Doplní zásobu Freeze na maximum (3/3) se slevou.</div>
         </div>
-        <button class="btn btn-sm btn-primary" id="btnBuyShieldPack">Koupit (380 b.)</button>
+        <button class="btn btn-sm btn-primary" id="btnBuyShieldPack">Koupit (1250 b.)</button>
       </div>
     </div>
 
@@ -4351,10 +4390,13 @@ async function checkPreloadedDeck() {
 // --- KARTY PRO GAMIFICATION ENGINE ---
 const PRO_STORAGE_KEY = "karty_pro_profile_v1";
 const PRO_THEMES = [
-  { id: "default", name: "Nordická břidlice (výchozí)", cost: 0 },
-  { id: "midnight", name: "Půlnoční modř", cost: 200 },
-  { id: "amber", name: "Teplý jantar", cost: 250 },
-  { id: "mono", name: "Čistý monochrom", cost: 300 }
+  { id: "default", name: "Lesní houbař (výchozí)", cost: 0 },
+  { id: "moss", name: "Hluboký mech", cost: 1500 },
+  { id: "lichen", name: "Kůra a lišejník", cost: 1500 },
+  { id: "amber", name: "Teplý jantar", cost: 1500 },
+  { id: "midnight", name: "Půlnoční modř", cost: 1500 },
+  { id: "heather", name: "Vřesoviště", cost: 1500 },
+  { id: "mono", name: "Břidlicový monochrom", cost: 1500 }
 ];
 
 function getDefaultProProfile() {
@@ -4409,7 +4451,7 @@ function showProToast(msg) {
 }
 
 function applyProTheme(themeId) {
-  document.body.classList.remove("theme-midnight", "theme-amber", "theme-mono");
+  document.body.classList.remove("theme-moss", "theme-midnight", "theme-amber", "theme-heather", "theme-lichen", "theme-mono");
   if (themeId && themeId !== "default") {
     document.body.classList.add("theme-" + themeId);
   }
@@ -4610,14 +4652,19 @@ function getDailyQuestsState(prof, todayCount) {
   const allDefs = [
     { id: "q_grad10", title: "Dokonči 10 karet (min. 1 den)", cur: todayCount, target: 10, reward: 30 },
     { id: "q_grad25", title: "Dokonči 25 karet (min. 1 den)", cur: todayCount, target: 25, reward: 60 },
+    { id: "q_grad40", title: "Dokonči 40 karet (min. 1 den)", cur: todayCount, target: 40, reward: 90 },
     { id: "q_combo4", title: "Dosáhni Combo 4x", cur: dq.maxCombo || 0, target: 4, reward: 30 },
     { id: "q_combo8", title: "Dosáhni Combo 8x", cur: dq.maxCombo || 0, target: 8, reward: 55 },
+    { id: "q_combo12", title: "Dosáhni Combo 12x", cur: dq.maxCombo || 0, target: 12, reward: 80 },
     { id: "q_clean10", title: "10 karet bez tlačítka Znovu", cur: dq.cleanCount || 0, target: 10, reward: 45 },
     { id: "q_clean20", title: "20 karet bez tlačítka Znovu", cur: dq.cleanCount || 0, target: 20, reward: 75 },
     { id: "q_easy5", title: "Ohodnoť 5 karet jako Snadné", cur: dq.easyCount || 0, target: 5, reward: 35 },
     { id: "q_good12", title: "Ohodnoť 12 karet jako Dobré", cur: dq.goodCount || 0, target: 12, reward: 40 },
+    { id: "q_hard4", title: "Ohodnoť 4 karty jako Těžké", cur: dq.hardCount || 0, target: 4, reward: 35 },
     { id: "q_type5", title: "5 karet ve vepisovacím režimu", cur: dq.typeCount || 0, target: 5, reward: 45 },
-    { id: "q_xp120", title: "Nasbírej dnes 120 XP", cur: dq.xpToday || 0, target: 120, reward: 50 }
+    { id: "q_type10", title: "10 karet ve vepisovacím režimu", cur: dq.typeCount || 0, target: 10, reward: 65 },
+    { id: "q_xp120", title: "Nasbírej dnes 120 XP", cur: dq.xpToday || 0, target: 120, reward: 50 },
+    { id: "q_xp250", title: "Nasbírej dnes 250 XP", cur: dq.xpToday || 0, target: 250, reward: 85 }
   ];
 
   // Deterministický náhodný výběr 3 výzev na dnešní den
@@ -4674,9 +4721,19 @@ async function renderShopModal() {
           <div class="shop-item-title">${th.name}</div>
           <div class="shop-item-desc">${unlocked ? (isActive ? "Aktivní motiv" : "Odemčeno") : `Cena: ${th.cost} bodů`}</div>
         </div>
-        <button class="btn btn-sm ${isActive ? "" : "btn-primary"}">${isActive ? "Aktivní" : (unlocked ? "Použít" : `Koupit (${th.cost} b.)`)}</button>
+        <div style="display:flex; gap:6px; align-items:center;">
+          ${!isActive ? `<button class="btn btn-sm btn-preview-theme">Náhled</button>` : ""}
+          <button class="btn btn-sm ${isActive ? "" : "btn-primary"} btn-buy-theme">${isActive ? "Aktivní" : (unlocked ? "Použít" : `Koupit (${th.cost} b.)`)}</button>
+        </div>
       `;
-      row.querySelector("button").onclick = async () => {
+      const prevBtn = row.querySelector(".btn-preview-theme");
+      if (prevBtn) {
+        prevBtn.onclick = () => {
+          applyProTheme(th.id);
+          showProToast(`Náhled motivu: ${th.name}`);
+        };
+      }
+      row.querySelector(".btn-buy-theme").onclick = async () => {
         const p = loadProProfile();
         if (p.unlockedThemes.includes(th.id)) {
           p.activeTheme = th.id;
@@ -4764,6 +4821,7 @@ rateCard = async function(ratingKey) {
   }
   if (ratingKey === "easy") prof.dailyQuests.easyCount = (prof.dailyQuests.easyCount || 0) + 1;
   if (ratingKey === "good") prof.dailyQuests.goodCount = (prof.dailyQuests.goodCount || 0) + 1;
+  if (ratingKey === "hard") prof.dailyQuests.hardCount = (prof.dailyQuests.hardCount || 0) + 1;
   if (typeof cardStudyMode !== "undefined" && cardStudyMode === "type") {
     prof.dailyQuests.typeCount = (prof.dailyQuests.typeCount || 0) + 1;
   }
@@ -4869,9 +4927,15 @@ document.getElementById("btnOpenShop").onclick = async () => {
   await renderShopModal();
   document.getElementById("shopModal").classList.add("active");
 };
-document.getElementById("shopModalClose").onclick = () => document.getElementById("shopModal").classList.remove("active");
+document.getElementById("shopModalClose").onclick = () => {
+  applyProTheme(loadProProfile().activeTheme);
+  document.getElementById("shopModal").classList.remove("active");
+};
 document.getElementById("shopModal").addEventListener("click", (e) => {
-  if (e.target.id === "shopModal") document.getElementById("shopModal").classList.remove("active");
+  if (e.target.id === "shopModal") {
+    applyProTheme(loadProProfile().activeTheme);
+    document.getElementById("shopModal").classList.remove("active");
+  }
 });
 document.getElementById("selProDailyGoal").onchange = async (e) => {
   const p = loadProProfile();
@@ -4882,8 +4946,8 @@ document.getElementById("selProDailyGoal").onchange = async (e) => {
 document.getElementById("btnBuyFreeze").onclick = async () => {
   const p = loadProProfile();
   if (p.freezes >= 3) { alert("Máte již plnou zásobu (3/3 Streak Freeze)."); return; }
-  if (p.points < 150) { alert("Potřebujete alespoň 150 bodů."); return; }
-  p.points -= 150;
+  if (p.points < 500) { alert("Potřebujete alespoň 500 bodů."); return; }
+  p.points -= 500;
   p.freezes++;
   saveProProfile(p);
   showProToast("Zakoupen Streak Freeze!");
@@ -4892,8 +4956,8 @@ document.getElementById("btnBuyFreeze").onclick = async () => {
 };
 document.getElementById("btnBuyBoost").onclick = async () => {
   const p = loadProProfile();
-  if (p.points < 100) { alert("Potřebujete alespoň 100 bodů."); return; }
-  p.points -= 100;
+  if (p.points < 400) { alert("Potřebujete alespoň 400 bodů."); return; }
+  p.points -= 400;
   p.boostUntil = Date.now() + 15 * 60 * 1000;
   saveProProfile(p);
   showProToast("Aktivován 2x Body Boost na 15 min!");
@@ -4902,23 +4966,33 @@ document.getElementById("btnBuyBoost").onclick = async () => {
 };
 document.getElementById("btnBuyRepair").onclick = async () => {
   const p = loadProProfile();
-  const yesterdayStr = addDaysToDateStr(getLocalDateString(), -1);
-  if (p.frozenDates.includes(yesterdayStr)) {
-    alert("Včerejší den už je chráněný.");
+  const reviews = await dbGetAllReviews();
+  const activeDates = new Set(reviews.filter(r => r && r.dateStr && (r.interval || 0) >= 1).map(r => r.dateStr));
+  const todayStr = getLocalDateString();
+  let targetDay = null;
+  for (let d = 1; d <= 3; d++) {
+    const candidate = addDaysToDateStr(todayStr, -d);
+    if (!activeDates.has(candidate) && !p.frozenDates.includes(candidate)) {
+      targetDay = candidate;
+      break;
+    }
+  }
+  if (!targetDay) {
+    alert("Za poslední 3 dny nemáte žádný nechráněný vynechaný den (obnovení lze použít max. 3 dny dozadu).");
     return;
   }
-  if (p.points < 400) { alert("Potřebujete alespoň 400 bodů."); return; }
-  p.points -= 400;
-  p.frozenDates.push(yesterdayStr);
+  if (p.points < 800) { alert("Potřebujete alespoň 800 bodů."); return; }
+  p.points -= 800;
+  p.frozenDates.push(targetDay);
   saveProProfile(p);
-  showProToast("Včerejší série byla opravena!");
+  showProToast(`Série opravena pro den ${targetDay}!`);
   await renderHeatmap();
   await renderShopModal();
 };
 document.getElementById("btnBuyMystery").onclick = async () => {
   const p = loadProProfile();
-  if (p.points < 120) { alert("Potřebujete alespoň 120 bodů."); return; }
-  p.points -= 120;
+  if (p.points < 450) { alert("Potřebujete alespoň 450 bodů."); return; }
+  p.points -= 450;
   const roll = Math.random();
   let msg = "";
   if (roll < 0.25 && p.freezes < 3) {
@@ -4928,7 +5002,7 @@ document.getElementById("btnBuyMystery").onclick = async () => {
     p.boostUntil = Date.now() + 15 * 60 * 1000;
     msg = "Tajemná truhla: 2x Body Boost na 15 min!";
   } else {
-    const winPts = [60, 100, 150, 220][Math.floor(Math.random() * 4)];
+    const winPts = [200, 350, 500, 700][Math.floor(Math.random() * 4)];
     p.points += winPts;
     msg = `Tajemná truhla: +${winPts} bodů!`;
   }
@@ -4942,8 +5016,8 @@ document.getElementById("btnBuyMystery").onclick = async () => {
 document.getElementById("btnBuyShieldPack").onclick = async () => {
   const p = loadProProfile();
   if (p.freezes >= 3) { alert("Zásobu Freeze už máte plnou (3/3)."); return; }
-  if (p.points < 380) { alert("Potřebujete alespoň 380 bodů."); return; }
-  p.points -= 380;
+  if (p.points < 1250) { alert("Potřebujete alespoň 1250 bodů."); return; }
+  p.points -= 1250;
   p.freezes = 3;
   saveProProfile(p);
   showProToast("Zásoba Streak Freeze doplněna na 3/3!");
