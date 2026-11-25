@@ -1,0 +1,12 @@
+services:
+  anki-generator:
+    build: .
+    container_name: anki-card-generator
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./custom_media:/app/custom_media
+    environment:
+      - STREAMLIT_SERVER_HEADLESS=true
+      - STREAMLIT_BROWSER_GATHER_USAGE_STATS=false

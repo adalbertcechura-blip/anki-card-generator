@@ -1257,6 +1257,7 @@ main {
           <span>Rychlé procvičení</span>
         </label>
         <button class="btn-mode-tgl" id="btnStudySrsSettings" style="width:100%; border:1px solid var(--border-color); padding:7px 10px;" title="Nastavení denního limitu a logiky zapomínání">Limity a SRS</button>
+        <button class="btn-mode-tgl" id="btnStudyRenameDeck" style="width:100%; border:1px solid var(--border-color); padding:7px 10px;" title="Přejmenovat tento balíček">Přejmenovat balíček</button>
       </div>
     </div>
 
@@ -2661,6 +2662,7 @@ async function loadDeckList() {
       <button class="btn-deck-kebab" title="Nastavení a možnosti balíčku" aria-label="Možnosti balíčku">⋮</button>
       <div class="anki-deck-menu">
         <button class="anki-menu-item btn-menu-srs">Nastavení (limit: ${dailyLimit > 0 ? dailyLimit : "bez limitu"}/den)</button>
+        <button class="anki-menu-item btn-menu-rename">Přejmenovat balíček</button>
         <button class="anki-menu-item btn-menu-subdecks">Podbalíčky${groupByField ? " (aktivní)" : ""}</button>
         <button class="anki-menu-item btn-menu-stats">Statistiky</button>
         <button class="anki-menu-item btn-menu-review">Procvičit vše (${deck.cards.length})</button>
@@ -2695,6 +2697,10 @@ async function loadDeckList() {
     rowEl.querySelector(".btn-menu-srs").onclick = () => {
       menuEl.classList.remove("open");
       openSrsSettingsModal(deck);
+    };
+    rowEl.querySelector(".btn-menu-rename").onclick = () => {
+      menuEl.classList.remove("open");
+      renameDeck(deck);
     };
     rowEl.querySelector(".btn-menu-subdecks").onclick = async () => {
       menuEl.classList.remove("open");
@@ -3148,6 +3154,25 @@ function showView(view) {
   document.body.classList.toggle("studying-active", view === "study");
 }
 
+// --- RENAME DECK HELPER ---
+async function renameDeck(deck) {
+  if (!deck) return;
+  const nextName = prompt("Nový název balíčku:", deck.name || "");
+  if (nextName === null) return;
+  const trimmed = nextName.trim();
+  if (!trimmed || trimmed === deck.name) return;
+  deck.name = trimmed;
+  await dbSaveDeck(deck);
+  if (currentDeck && currentDeck.id === deck.id) {
+    currentDeck.name = trimmed;
+    const titleEl = document.getElementById("activeDeckTitle");
+    if (titleEl) {
+      titleEl.innerText = currentSubdeckFilter ? `${trimmed} — ${currentSubdeckFilter}` : trimmed;
+    }
+  }
+  await loadDeckList();
+}
+
 // --- MODE TOGGLES (OTÁČECÍ VS VEPISOVACÍ) ---
 const btnStudyOptionsMenu = document.getElementById("btnStudyOptionsMenu");
 const studyOptionsBar = document.getElementById("studyOptionsBar");
@@ -3164,6 +3189,13 @@ if (btnStudyOptionsMenu && studyOptionsBar) {
   const btnSrsInBar = document.getElementById("btnStudySrsSettings");
   if (btnSrsInBar) {
     btnSrsInBar.addEventListener("click", () => studyOptionsBar.classList.remove("open"));
+  }
+  const btnRenameInBar = document.getElementById("btnStudyRenameDeck");
+  if (btnRenameInBar) {
+    btnRenameInBar.addEventListener("click", () => {
+      studyOptionsBar.classList.remove("open");
+      if (currentDeck) renameDeck(currentDeck);
+    });
   }
 }
 
