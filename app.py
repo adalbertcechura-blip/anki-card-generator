@@ -67,7 +67,38 @@ try:
 except Exception:
     _DL_BTN_SUPPORTS_IGNORE = False
 
+def _inject_download_feedback_js():
+    components.html(
+        """<script>
+        (function() {
+          try {
+            var doc = window.parent.document;
+            if (doc._ankiDlFeedbackBound) return;
+            doc._ankiDlFeedbackBound = true;
+            doc.addEventListener("click", function(ev) {
+              var btn = ev.target && ev.target.closest ? ev.target.closest('[data-testid="stDownloadButton"] button, [data-testid="stDownloadButton"] a') : null;
+              if (!btn || btn.dataset.dlBusy === "1") return;
+              var origHtml = btn.innerHTML;
+              btn.dataset.dlBusy = "1";
+              btn.style.pointerEvents = "none";
+              btn.style.opacity = "0.72";
+              btn.innerHTML = "Stahuji soubor... (čekejte prosím)";
+              setTimeout(function() {
+                btn.dataset.dlBusy = "0";
+                btn.style.pointerEvents = "";
+                btn.style.opacity = "";
+                btn.innerHTML = origHtml;
+              }, 8000);
+            }, true);
+          } catch (e) {}
+        })();
+        </script>""",
+        height=0,
+        width=0,
+    )
+
 def _safe_download_button(*args, **kwargs):
+    _inject_download_feedback_js()
     if _DL_BTN_SUPPORTS_IGNORE and "on_click" not in kwargs:
         kwargs["on_click"] = "ignore"
     return st.download_button(*args, **kwargs)
