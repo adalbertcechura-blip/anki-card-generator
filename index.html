@@ -48,6 +48,17 @@ body {
   overflow-x: hidden;
 }
 
+body.studying-active {
+  height: 100dvh;
+  overflow: hidden;
+}
+body.studying-active main {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+
 header {
   background: rgba(12, 18, 14, 0.95);
   backdrop-filter: blur(8px);
@@ -330,61 +341,174 @@ main {
 .deck-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-}
-.deck-card {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
-  padding: 16px 18px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 14px;
-  transition: all 0.15s ease;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  overflow: visible;
+  box-shadow: var(--shadow);
 }
-.deck-card:hover {
-  border-color: var(--border-highlight);
+.anki-table-header {
+  display: grid;
+  grid-template-columns: 1fr 56px 56px 68px 36px;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.anki-col-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.anki-deck-row {
+  display: grid;
+  grid-template-columns: 1fr 56px 56px 68px 36px;
+  align-items: center;
+  padding: 11px 14px;
+  border-bottom: 1px solid rgba(36, 57, 43, 0.55);
+  transition: background 0.12s ease;
+  position: relative;
+}
+.anki-deck-row:last-child {
+  border-bottom: none;
+}
+.anki-deck-row:hover {
   background: var(--bg-card-hover);
 }
-.deck-info {
-  flex: 1;
-  min-width: 220px;
-}
-.deck-title {
-  font-size: 1.15rem;
-  font-weight: 700;
-  color: var(--text-main);
-  margin-bottom: 4px;
-}
-.deck-meta {
+.anki-deck-name-cell {
   display: flex;
-  gap: 8px;
-  font-size: 0.82rem;
-  color: var(--text-muted);
-  flex-wrap: wrap;
   align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
-.badge-count {
+.anki-expand-btn {
+  width: 24px;
+  height: 24px;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  background: var(--bg-surface);
-  padding: 2px 8px;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
   border-radius: 6px;
-  border: 1px solid var(--border-color);
+  font-size: 0.9rem;
+  flex-shrink: 0;
 }
-.badge-new {
-  color: #60a5fa;
-  border-color: rgba(96, 165, 250, 0.4);
+.anki-expand-btn:hover {
+  background: var(--bg-surface);
+  color: var(--text-main);
 }
-.badge-due {
+.anki-deck-link {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-main);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: transparent;
+  border: none;
+  text-align: left;
+  padding: 2px 0;
+  flex: 1;
+}
+.anki-deck-link:hover {
+  color: var(--accent);
+}
+.anki-subdeck-row {
+  display: grid;
+  grid-template-columns: 1fr 56px 56px 68px 36px;
+  align-items: center;
+  padding: 8px 14px 8px 42px;
+  border-bottom: 1px solid rgba(36, 57, 43, 0.35);
+  background: rgba(12, 18, 14, 0.38);
+  transition: background 0.12s ease;
+}
+.anki-subdeck-row:hover {
+  background: var(--bg-card-hover);
+}
+.anki-subdeck-link {
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: var(--text-main);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.anki-subdeck-link:hover {
+  color: var(--accent);
+}
+.anki-count-new { color: #60a5fa; font-weight: 700; font-size: 0.92rem; }
+.anki-count-learn { color: #f87171; font-weight: 700; font-size: 0.92rem; }
+.anki-count-rev { color: #4ade80; font-weight: 700; font-size: 0.92rem; }
+.anki-count-zero { color: #526358; font-weight: 500; font-size: 0.92rem; }
+.btn-deck-kebab {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  border-radius: 6px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+  justify-self: end;
+}
+.btn-deck-kebab:hover {
+  background: var(--bg-surface);
+  color: var(--text-main);
+}
+.anki-deck-menu {
+  position: absolute;
+  right: 12px;
+  top: 42px;
+  z-index: 90;
+  min-width: 210px;
+  background: #18251d;
+  border: 1px solid var(--border-highlight);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+  padding: 6px;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+}
+.anki-deck-menu.open {
+  display: flex;
+}
+.anki-menu-item {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--text-main);
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.anki-menu-item:hover {
+  background: var(--bg-surface);
+}
+.anki-menu-item.danger {
   color: #f87171;
-  border-color: rgba(248, 113, 113, 0.4);
 }
-.deck-actions {
+.anki-subdeck-config {
+  padding: 8px 14px 10px 42px;
+  background: rgba(12, 18, 14, 0.55);
+  border-bottom: 1px solid rgba(36, 57, 43, 0.45);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -395,10 +519,23 @@ main {
 #studyView {
   display: none;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
-.study-header {
+.study-body.studying-active {
+  height: 100dvh;
+  overflow: hidden;
+}
+body.studying-active main {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+
+header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -468,12 +605,15 @@ main {
 
 .flashcard-wrapper {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .flashcard {
   flex: 1;
+  min-height: 0;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
@@ -482,7 +622,18 @@ main {
   flex-direction: column;
   box-shadow: var(--shadow);
   overflow-y: auto;
-  max-height: calc(100vh - 250px);
+  -webkit-overflow-scrolling: touch;
+}
+
+.study-controls {
+  flex-shrink: 0;
+  margin-top: 8px;
+  padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
+  background: var(--bg-main);
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .card-face {
@@ -575,7 +726,6 @@ main {
     max-width: 1100px;
   }
   .flashcard {
-    max-height: calc(100vh - 210px);
     padding: 28px 36px;
   }
   .card-img-thumb {
@@ -597,12 +747,11 @@ main {
     font-size: 1.1rem;
   }
   #studyView {
-    height: 100%;
-    max-height: calc(100dvh - 54px);
+    flex: 1;
+    min-height: 0;
   }
   .flashcard {
     padding: 14px 10px;
-    max-height: calc(100dvh - 190px);
     border-radius: 10px;
   }
   .card-face {
@@ -637,7 +786,15 @@ main {
 @media (max-width: 480px) {
   .flashcard {
     padding: 12px 8px;
-    max-height: calc(100dvh - 180px);
+  }
+  .anki-table-header,
+  .anki-deck-row {
+    grid-template-columns: 1fr 44px 44px 54px 32px;
+    padding: 10px 10px;
+  }
+  .anki-subdeck-row {
+    grid-template-columns: 1fr 44px 44px 54px 32px;
+    padding: 8px 10px 8px 32px;
   }
   .card-img-thumb {
     max-height: 36vh;
@@ -970,12 +1127,11 @@ main {
 
 <header>
   <div class="logo" id="btnHome">
-    🌱 <span>Karty</span>
-    
+    <span>Karty</span>
   </div>
   <div class="nav-actions">
     <button class="btn btn-sm" id="btnHelp" title="Nápověda k ovládání">
-      ❓ Nápověda
+      Nápověda
     </button>
   </div>
 </header>
@@ -1023,18 +1179,11 @@ main {
       </div>
     </div>
 
-    <div class="drop-zone" id="dropZone" style="position: relative;">
-      <div class="drop-icon">📦</div>
-      <div class="drop-title">Přetáhněte sem balíček .zip nebo klikněte</div>
-      <div class="drop-subtitle">Otevřete balíček s kartičkami vygenerovaný generátorem (nebo vyberte soubory kartiček)</div>
-      <input type="file" id="fileZipInput" accept=".zip,application/zip,application/x-zip-compressed,application/octet-stream,.md,text/markdown,*/*" multiple style="position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:2;">
-    </div>
-
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-      <h2 style="font-size:1.15rem; font-weight:700;">Moje balíčky</h2>
+      <h2 style="font-size:1.15rem; font-weight:700;">Balíčky</h2>
       <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-        <button class="btn btn-sm" id="btnExportProgress" title="Stáhnout lehký soubor .json s postupem učení pro přenos na jiné zařízení">📤 Export postupu (.json)</button>
-        <button class="btn btn-sm" id="btnImportProgress" title="Načíst a sloučit postup učení ze souboru .json">📥 Import postupu (.json)</button>
+        <button class="btn btn-sm" id="btnExportProgress" title="Stáhnout lehký soubor .json s postupem učení pro přenos na jiné zařízení">Export postupu (.json)</button>
+        <button class="btn btn-sm" id="btnImportProgress" title="Načíst a sloučit postup učení ze souboru .json">Import postupu (.json)</button>
         <input type="file" id="fileProgressInput" accept=".json,application/json" style="display:none">
         <span id="deckCountInfo" style="font-size:0.85rem; color:var(--text-muted);">0 balíčků</span>
       </div>
@@ -1042,6 +1191,12 @@ main {
 
     <div class="deck-list" id="deckList">
       <!-- Generováno dynamicky -->
+    </div>
+
+    <div class="drop-zone" id="dropZone" style="position: relative; padding: 14px 16px;">
+      <div class="drop-title" style="font-size:0.95rem;">Importovat balíček (.zip / .md)</div>
+      <div class="drop-subtitle">Přetáhněte sem soubor .zip nebo klikněte pro výběr ze zařízení</div>
+      <input type="file" id="fileZipInput" accept=".zip,application/zip,application/x-zip-compressed,application/octet-stream,.md,text/markdown,*/*" multiple style="position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:2;">
     </div>
   </section>
 
@@ -1064,16 +1219,16 @@ main {
     <div class="study-options-bar">
       <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
         <div class="mode-toggle-group">
-          <button class="btn-mode-tgl active" id="btnModeFlip" title="Režim otáčení karty">🔄 Otáčecí</button>
-          <button class="btn-mode-tgl" id="btnModeType" title="Režim vepisování z klávesnice">⌨️ Vepisovací</button>
+          <button class="btn-mode-tgl active" id="btnModeFlip" title="Režim otáčení karty">Otáčecí</button>
+          <button class="btn-mode-tgl" id="btnModeType" title="Režim vepisování z klávesnice">Vepisovací</button>
         </div>
         <div class="mode-toggle-group" title="Zobrazení rubu karty">
-          <button class="btn-mode-tgl active" id="btnBackStacked" title="Zobrazit líc i rub pod sebou">📄 Pod sebe</button>
-          <button class="btn-mode-tgl" id="btnBackSeparate" title="Zobrazit rub na druhé straně karty">🃏 Na druhou stranu</button>
+          <button class="btn-mode-tgl active" id="btnBackStacked" title="Zobrazit líc i rub pod sebou">Pod sebe</button>
+          <button class="btn-mode-tgl" id="btnBackSeparate" title="Zobrazit rub na druhé straně karty">Na druhou stranu</button>
         </div>
         <div class="mode-toggle-group" title="Rozložení obrázků">
-          <button class="btn-mode-tgl active" id="btnImg1Col" title="Obrázky pod sebou (1 sloupec)">↕️ 1 sloupec</button>
-          <button class="btn-mode-tgl" id="btnImg2Col" title="Obrázky vedle sebe (2 sloupce)">◫ 2 sloupce</button>
+          <button class="btn-mode-tgl active" id="btnImg1Col" title="Obrázky pod sebou (1 sloupec)">1 sloupec</button>
+          <button class="btn-mode-tgl" id="btnImg2Col" title="Obrázky vedle sebe (2 sloupce)">2 sloupce</button>
         </div>
         <label class="switch-label">
           <input type="checkbox" id="chkReverseStudy">
@@ -1083,7 +1238,7 @@ main {
           <input type="checkbox" id="chkQuickReview">
           <span>Rychlé procvičení</span>
         </label>
-        <button class="btn-mode-tgl" id="btnStudySrsSettings" title="Nastavení denního limitu a logiky zapomínání">⚙ Limity &amp; SRS</button>
+        <button class="btn-mode-tgl" id="btnStudySrsSettings" title="Nastavení denního limitu a logiky zapomínání">Limity a SRS</button>
       </div>
     </div>
 
@@ -1143,7 +1298,6 @@ main {
   <!-- 3. OBRAZOVKA: HOTOVO -->
   <section id="finishedView">
     <div class="finished-card">
-      <div class="finished-icon">🎉</div>
       <h2 style="margin-bottom:8px;">Všechny kartičky jsou zopakované!</h2>
       <p style="color:var(--text-muted); margin-bottom:20px;" id="finishedMsg">
         Skvělá práce. Na dnešek máte splněné všechny naplánované kartičky v tomto balíčku.
@@ -1171,11 +1325,11 @@ main {
   <div class="modal-box">
     <h3 style="font-size:1.2rem;">Klávesové zkratky a ovládání</h3>
     <div style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 8px; padding: 8px 12px; font-size: 0.82rem; color: #86efac;">
-      💡 Tento přehrávač funguje plně offline přímo ve vašem webovém prohlížeči (na počítači, telefonu i tabletu).
+      Tento přehrávač funguje plně offline přímo ve vašem webovém prohlížeči (na počítači, telefonu i tabletu).
     </div>
     <ul style="padding-left:20px; line-height:1.8; color:var(--text-muted); font-size:0.92rem;">
       <li><strong style="color:#fff;">Mezerník / Enter / Klepnutí na kartu</strong>: Zobrazit odpověď</li>
-      <li><strong style="color:#fff;">Vepisovací režim (⌨️)</strong>: Napište název a stiskněte Enter pro okamžité porovnání</li>
+      <li><strong style="color:#fff;">Vepisovací režim</strong>: Napište název a stiskněte Enter pro okamžité porovnání</li>
       <li><strong style="color:#fff;">1</strong>: Znovu (nepamatuji si, ukázat za chvíli)</li>
       <li><strong style="color:#fff;">2</strong>: Těžké (správně, ale s obtížemi)</li>
       <li><strong style="color:#fff;">3</strong>: Dobré (správně, standardní interval)</li>
@@ -1192,7 +1346,7 @@ main {
   <div class="modal-box stats-modal-box">
     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #27272a; padding-bottom:12px;">
       <h3 style="font-size:1.15rem; font-weight:700; color:#fff;" id="stDeckTitle">Statistiky balíčku</h3>
-      <button class="btn btn-sm" id="btnStatsClose" style="padding:4px 8px;">✕</button>
+      <button class="btn btn-sm" id="btnStatsClose" style="padding:4px 8px;">Zavřít</button>
     </div>
 
     <div class="stats-table">
@@ -1233,7 +1387,7 @@ main {
 <div class="modal-overlay" id="srsSettingsModal">
   <div class="modal-content" style="max-width:460px;">
     <div class="modal-header">
-      <div class="modal-title" id="srsModalTitle">⚙ Nastavení učení a zapomínání</div>
+      <div class="modal-title" id="srsModalTitle">Nastavení učení a zapomínání</div>
       <button class="modal-close" id="srsModalClose">&times;</button>
     </div>
     <div style="display:flex; flex-direction:column; gap:12px; font-size:0.9rem;">
@@ -2445,151 +2599,116 @@ async function loadDeckList() {
   const todayStr = getLocalDateString();
   const allReviews = await dbGetAllReviews();
 
+  const headerRow = document.createElement("div");
+  headerRow.className = "anki-table-header";
+  headerRow.innerHTML = `
+    <div>Balíček</div>
+    <div class="anki-col-num">Nové</div>
+    <div class="anki-col-num">Učení</div>
+    <div class="anki-col-num">Zkoušení</div>
+    <div></div>
+  `;
+  listEl.appendChild(headerRow);
+
+  if (!window._ankiMenuCloseBound) {
+    window._ankiMenuCloseBound = true;
+    document.addEventListener("click", (ev) => {
+      if (!ev.target.closest(".anki-deck-menu") && !ev.target.closest(".btn-deck-kebab")) {
+        document.querySelectorAll(".anki-deck-menu.open").forEach(m => m.classList.remove("open"));
+      }
+    });
+  }
+
   decks.forEach(deck => {
     let newCardsTotal = 0;
-    let dueCards = 0;
+    let learningDue = 0;
+    let reviewDue = 0;
     deck.cards.forEach(c => {
-      if (!c.due || c.due === 0) newCardsTotal++;
-      else if (c.due <= now || (c.interval > 0 && c.interval < 1 && c.due <= endOfTodayMs)) dueCards++;
+      if (!c.due || c.due === 0) {
+        newCardsTotal++;
+      } else if (c.due <= now || (c.interval > 0 && c.interval < 1 && c.due <= endOfTodayMs)) {
+        if ((c.interval || 0) < 1 || c.state === 1 || c.state === 3) learningDue++;
+        else reviewDue++;
+      }
     });
 
     const dailyLimit = (deck.settings && typeof deck.settings.newCardsPerDay === "number") ? deck.settings.newCardsPerDay : 20;
-
-    // Kolik nových karet uživatel dnes již prošel
     const newStudiedToday = allReviews.filter(r => r.deckId === deck.id && r.dateStr === todayStr && r.isNew).length;
     const newRemainingToday = dailyLimit > 0 ? Math.max(0, dailyLimit - newStudiedToday) : newCardsTotal;
     const newCardsToStudyToday = Math.min(newCardsTotal, newRemainingToday);
 
-    const studyCount = dueCards + newCardsToStudyToday;
-
     const groupByField = (deck.settings && deck.settings.groupByField) ? deck.settings.groupByField : "";
     const { fields: availFields, hasGroup } = extractCardFieldNames(deck);
-    const showSubPanel = _expandedSubdeckPanels.has(deck.id) || !!groupByField;
+    const hasSubdecks = !!groupByField;
+    const showSubPanel = _expandedSubdeckPanels.has(deck.id);
 
-    let subPanelHtml = "";
-    if (showSubPanel) {
-      let optsHtml = `<option value="">— Bez rozdělení (vše pohromadě) —</option>`;
-      if (hasGroup) {
-        optsHtml += `<option value="__group__" ${groupByField === "__group__" ? "selected" : ""}>Podle složky / tagu</option>`;
-      }
-      availFields.forEach(fn => {
-        optsHtml += `<option value="${escapeHtml(fn)}" ${groupByField === fn ? "selected" : ""}>${escapeHtml(fn)}</option>`;
-      });
-
-      let subRowsHtml = "";
-      if (groupByField) {
-        const groups = new Map();
-        deck.cards.forEach(c => {
-          const gVal = extractCardFieldValue(c, groupByField);
-          if (!groups.has(gVal)) groups.set(gVal, []);
-          groups.get(gVal).push(c);
-        });
-        const sortedKeys = Array.from(groups.keys()).sort((a, b) => a.localeCompare(b, "cs"));
-        sortedKeys.forEach(gKey => {
-          const gCards = groups.get(gKey);
-          let gDue = 0, gNew = 0;
-          gCards.forEach(c => {
-            if (!c.due || c.due === 0) gNew++;
-            else if (c.due <= now || (c.interval > 0 && c.interval < 1 && c.due <= endOfTodayMs)) gDue++;
-          });
-          const gStudy = gDue + Math.min(gNew, newRemainingToday);
-          subRowsHtml += `
-            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:7px 10px; border-radius:8px; background:rgba(12,18,14,0.65); border:1px solid #24392b; flex-wrap:wrap;">
-              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                <strong style="font-size:0.88rem; color:#edf5f0;">${escapeHtml(gKey)}</strong>
-                <span style="font-size:0.76rem; color:#95ab9e;">${gCards.length} karet • ${gDue} k opak. • ${gNew} nových</span>
-              </div>
-              <div style="display:flex; gap:6px;">
-                <button class="btn btn-primary btn-sm btn-sub-study" data-group="${escapeHtml(gKey)}">Učit se (${gStudy})</button>
-                <button class="btn btn-sm btn-sub-review" data-group="${escapeHtml(gKey)}">Procvičit vše</button>
-              </div>
-            </div>
-          `;
-        });
-      }
-
-      subPanelHtml = `
-        <div class="subdeck-panel" style="width:100%; margin-top:10px; padding-top:10px; border-top:1px solid #24392b; display:flex; flex-direction:column; gap:8px;">
-          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-            <span style="font-size:0.82rem; color:#95ab9e; font-weight:600;">Rozdělit do podbalíčků podle:</span>
-            <select class="sel-subdeck-field" style="background:#0c120e; color:#edf5f0; border:1px solid #3b6348; border-radius:6px; padding:4px 8px; font-size:0.84rem;">
-              ${optsHtml}
-            </select>
-          </div>
-          ${subRowsHtml ? `<div style="display:flex; flex-direction:column; gap:5px; max-height:280px; overflow-y:auto; padding-right:2px;">${subRowsHtml}</div>` : ""}
-        </div>
-      `;
-    }
-
-    const cardEl = document.createElement("div");
-    cardEl.className = "deck-card";
-    cardEl.style.flexWrap = "wrap";
-    cardEl.innerHTML = `
-      <div class="deck-info">
-        <div class="deck-title">${escapeHtml(deck.name)}</div>
-        <div class="deck-meta">
-          <span class="badge-count">Celkem: ${deck.cards.length}</span>
-          <span class="badge-count badge-due" title="Karty vyžadující zopakování">K opakování: ${dueCards}</span>
-          <span class="badge-count badge-new" title="Zbývá nových na dnešek z limitu ${dailyLimit}/den">Nové dnes: ${newCardsToStudyToday} / ${dailyLimit > 0 ? dailyLimit : '∞'}</span>
-          <label class="badge-count" style="display:inline-flex; align-items:center; gap:5px; cursor:pointer;" title="Denní limit nových karet (0 = bez limitu)">
-            <span>Limit/den:</span>
-            <input type="number" class="inp-deck-daily-limit" min="0" max="500" step="1" value="${dailyLimit}" style="width:54px; background:#0c120e; border:1px solid #3b6348; color:#fff; border-radius:4px; padding:1px 4px; text-align:center; font-weight:700; font-size:0.8rem;">
-          </label>
-        </div>
+    const rowEl = document.createElement("div");
+    rowEl.className = "anki-deck-row";
+    rowEl.innerHTML = `
+      <div class="anki-deck-name-cell">
+        <button class="anki-expand-btn" title="Rozbalit / sbalit podbalíčky">${(hasSubdecks || showSubPanel) ? (showSubPanel ? "▾" : "▸") : ""}</button>
+        <button class="anki-deck-link" title="Spustit učení balíčku">${escapeHtml(deck.name)}</button>
       </div>
-      <div class="deck-actions">
-        <button class="btn btn-primary btn-study" data-id="${deck.id}">Učit se (${studyCount})</button>
-        <button class="btn btn-sm btn-subdecks-tgl" data-id="${deck.id}" title="Rozdělit balíček do podbalíčků podle sloupce">📂 Podbalíčky</button>
-        <button class="btn btn-sm btn-srs-cfg" data-id="${deck.id}" title="Nastavení limitu karet a křivky zapomínání">⚙ Nastavení</button>
-        <button class="btn btn-sm btn-stats" data-id="${deck.id}" title="Podrobné Anki statistiky balíčku">📊 Statistiky</button>
-        <button class="btn btn-sm btn-review" data-id="${deck.id}" title="Procvičit všechny karty z balíčku">Procvičit vše</button>
-        <button class="btn btn-sm btn-reset" data-id="${deck.id}" title="Vrátit všechny karty do stavu Nové">↺ Reset</button>
-        <button class="btn btn-danger btn-sm btn-del" data-id="${deck.id}" title="Smazat balíček">🗑️</button>
+      <div class="anki-col-num ${newCardsToStudyToday > 0 ? "anki-count-new" : "anki-count-zero"}">${newCardsToStudyToday}</div>
+      <div class="anki-col-num ${learningDue > 0 ? "anki-count-learn" : "anki-count-zero"}">${learningDue}</div>
+      <div class="anki-col-num ${reviewDue > 0 ? "anki-count-rev" : "anki-count-zero"}">${reviewDue}</div>
+      <button class="btn-deck-kebab" title="Nastavení a možnosti balíčku" aria-label="Možnosti balíčku">⋮</button>
+      <div class="anki-deck-menu">
+        <button class="anki-menu-item btn-menu-srs">Nastavení (limit: ${dailyLimit > 0 ? dailyLimit : "bez limitu"}/den)</button>
+        <button class="anki-menu-item btn-menu-subdecks">Podbalíčky${groupByField ? " (aktivní)" : ""}</button>
+        <button class="anki-menu-item btn-menu-stats">Statistiky</button>
+        <button class="anki-menu-item btn-menu-review">Procvičit vše (${deck.cards.length})</button>
+        <button class="anki-menu-item btn-menu-reset">Reset postupu</button>
+        <button class="anki-menu-item danger btn-menu-del">Smazat balíček</button>
       </div>
-      ${subPanelHtml}
     `;
 
-    cardEl.querySelector(".btn-study").onclick = () => startStudy(deck.id, false, null);
-    cardEl.querySelector(".btn-subdecks-tgl").onclick = async () => {
+    const menuEl = rowEl.querySelector(".anki-deck-menu");
+    const kebabBtn = rowEl.querySelector(".btn-deck-kebab");
+    kebabBtn.onclick = (ev) => {
+      ev.stopPropagation();
+      const wasOpen = menuEl.classList.contains("open");
+      document.querySelectorAll(".anki-deck-menu.open").forEach(m => m.classList.remove("open"));
+      if (!wasOpen) menuEl.classList.add("open");
+    };
+
+    rowEl.querySelector(".anki-deck-link").onclick = () => startStudy(deck.id, false, null);
+
+    const expandBtn = rowEl.querySelector(".anki-expand-btn");
+    if (hasSubdecks || showSubPanel) {
+      expandBtn.onclick = async (ev) => {
+        ev.stopPropagation();
+        if (_expandedSubdeckPanels.has(deck.id)) _expandedSubdeckPanels.delete(deck.id);
+        else _expandedSubdeckPanels.add(deck.id);
+        await loadDeckList();
+      };
+    } else {
+      expandBtn.style.visibility = "hidden";
+    }
+
+    rowEl.querySelector(".btn-menu-srs").onclick = () => {
+      menuEl.classList.remove("open");
+      openSrsSettingsModal(deck);
+    };
+    rowEl.querySelector(".btn-menu-subdecks").onclick = async () => {
+      menuEl.classList.remove("open");
       if (_expandedSubdeckPanels.has(deck.id)) {
         _expandedSubdeckPanels.delete(deck.id);
-        if (deck.settings && deck.settings.groupByField) {
-          deck.settings.groupByField = "";
-          await dbSaveDeck(deck);
-        }
       } else {
         _expandedSubdeckPanels.add(deck.id);
       }
       await loadDeckList();
     };
-    const selSub = cardEl.querySelector(".sel-subdeck-field");
-    if (selSub) {
-      selSub.onchange = async (ev) => {
-        deck.settings = deck.settings || {};
-        deck.settings.groupByField = ev.target.value;
-        _expandedSubdeckPanels.add(deck.id);
-        await dbSaveDeck(deck);
-        await loadDeckList();
-      };
-    }
-    cardEl.querySelectorAll(".btn-sub-study").forEach(btn => {
-      btn.onclick = () => startStudy(deck.id, false, btn.getAttribute("data-group"));
-    });
-    cardEl.querySelectorAll(".btn-sub-review").forEach(btn => {
-      btn.onclick = () => startStudy(deck.id, true, btn.getAttribute("data-group"));
-    });
-    cardEl.querySelector(".btn-srs-cfg").onclick = () => openSrsSettingsModal(deck);
-    cardEl.querySelector(".inp-deck-daily-limit").onchange = async (ev) => {
-      const parsed = parseInt(ev.target.value, 10);
-      const val = isNaN(parsed) ? 20 : Math.max(0, Math.min(500, parsed));
-      deck.settings = deck.settings || {};
-      deck.settings.newCardsPerDay = val;
-      await dbSaveDeck(deck);
-      await loadDeckList();
+    rowEl.querySelector(".btn-menu-stats").onclick = () => {
+      menuEl.classList.remove("open");
+      openDeckStats(deck);
     };
-    cardEl.querySelector(".btn-stats").onclick = () => openDeckStats(deck);
-    cardEl.querySelector(".btn-review").onclick = () => startStudy(deck.id, true);
-    cardEl.querySelector(".btn-reset").onclick = async () => {
+    rowEl.querySelector(".btn-menu-review").onclick = () => {
+      menuEl.classList.remove("open");
+      startStudy(deck.id, true);
+    };
+    rowEl.querySelector(".btn-menu-reset").onclick = async () => {
+      menuEl.classList.remove("open");
       if (confirm(`Opravdu chcete resetovat postup učení pro balíček "${deck.name}"? Všechny kartičky budou označeny jako nové.`)) {
         deck.cards.forEach(c => {
           c.due = 0;
@@ -2602,14 +2721,77 @@ async function loadDeckList() {
         await loadDeckList();
       }
     };
-    cardEl.querySelector(".btn-del").onclick = async () => {
+    rowEl.querySelector(".btn-menu-del").onclick = async () => {
+      menuEl.classList.remove("open");
       if (confirm(`Opravdu chcete smazat balíček "${deck.name}"? Všechny kartičky a statistiky budou odstraněny.`)) {
         await dbDeleteDeck(deck.id);
         await loadDeckList();
       }
     };
 
-    listEl.appendChild(cardEl);
+    listEl.appendChild(rowEl);
+
+    if (showSubPanel) {
+      let optsHtml = `<option value="">— Bez rozdělení —</option>`;
+      if (hasGroup) {
+        optsHtml += `<option value="__group__" ${groupByField === "__group__" ? "selected" : ""}>Podle složky / tagu</option>`;
+      }
+      availFields.forEach(fn => {
+        optsHtml += `<option value="${escapeHtml(fn)}" ${groupByField === fn ? "selected" : ""}>${escapeHtml(fn)}</option>`;
+      });
+
+      const cfgRow = document.createElement("div");
+      cfgRow.className = "anki-subdeck-config";
+      cfgRow.innerHTML = `
+        <span style="font-size:0.82rem; color:#95ab9e; font-weight:600;">Rozdělit podle:</span>
+        <select class="sel-subdeck-field" style="background:#0c120e; color:#edf5f0; border:1px solid #3b6348; border-radius:6px; padding:4px 8px; font-size:0.84rem;">
+          ${optsHtml}
+        </select>
+      `;
+      cfgRow.querySelector(".sel-subdeck-field").onchange = async (ev) => {
+        deck.settings = deck.settings || {};
+        deck.settings.groupByField = ev.target.value;
+        _expandedSubdeckPanels.add(deck.id);
+        await dbSaveDeck(deck);
+        await loadDeckList();
+      };
+      listEl.appendChild(cfgRow);
+
+      if (groupByField) {
+        const groups = new Map();
+        deck.cards.forEach(c => {
+          const gVal = extractCardFieldValue(c, groupByField);
+          if (!groups.has(gVal)) groups.set(gVal, []);
+          groups.get(gVal).push(c);
+        });
+        const sortedKeys = Array.from(groups.keys()).sort((a, b) => a.localeCompare(b, "cs"));
+        sortedKeys.forEach(gKey => {
+          const gCards = groups.get(gKey);
+          let gLearn = 0, gRev = 0, gNew = 0;
+          gCards.forEach(c => {
+            if (!c.due || c.due === 0) {
+              gNew++;
+            } else if (c.due <= now || (c.interval > 0 && c.interval < 1 && c.due <= endOfTodayMs)) {
+              if ((c.interval || 0) < 1 || c.state === 1 || c.state === 3) gLearn++;
+              else gRev++;
+            }
+          });
+          const gNewToday = Math.min(gNew, newRemainingToday);
+          const subEl = document.createElement("div");
+          subEl.className = "anki-subdeck-row";
+          subEl.innerHTML = `
+            <button class="anki-subdeck-link" title="Studovat podbalíček">${escapeHtml(gKey)}</button>
+            <div class="anki-col-num ${gNewToday > 0 ? "anki-count-new" : "anki-count-zero"}">${gNewToday}</div>
+            <div class="anki-col-num ${gLearn > 0 ? "anki-count-learn" : "anki-count-zero"}">${gLearn}</div>
+            <div class="anki-col-num ${gRev > 0 ? "anki-count-rev" : "anki-count-zero"}">${gRev}</div>
+            <button class="btn-deck-kebab btn-sub-review" title="Procvičit celý podbalíček" style="font-size:0.85rem;">↻</button>
+          `;
+          subEl.querySelector(".anki-subdeck-link").onclick = () => startStudy(deck.id, false, gKey);
+          subEl.querySelector(".btn-sub-review").onclick = () => startStudy(deck.id, true, gKey);
+          listEl.appendChild(subEl);
+        });
+      }
+    }
   });
 
   await renderHeatmap();
@@ -2957,6 +3139,7 @@ function showView(view) {
   document.getElementById("decksView").style.display = view === "decks" ? "flex" : "none";
   document.getElementById("studyView").style.display = view === "study" ? "flex" : "none";
   document.getElementById("finishedView").style.display = view === "finished" ? "flex" : "none";
+  document.body.classList.toggle("studying-active", view === "study");
 }
 
 // --- MODE TOGGLES (OTÁČECÍ VS VEPISOVACÍ) ---
@@ -3083,7 +3266,7 @@ function openSrsSettingsModal(deck) {
   if (!deck) return;
   _srsModalTargetDeck = deck;
   const cfg = getDeckSrsSettings(deck);
-  document.getElementById("srsModalTitle").innerText = `⚙ Nastavení: ${deck.name}`;
+  document.getElementById("srsModalTitle").innerText = `Nastavení: ${deck.name}`;
   document.getElementById("inpSrsDailyLimit").value = cfg.newCardsPerDay;
   document.getElementById("inpSrsAgainMin").value = cfg.againMinutes;
   document.getElementById("inpSrsHardMin").value = cfg.hardMinutes;
