@@ -2739,7 +2739,7 @@ async function loadDeckList() {
     });
 
     const dailyLimit = (deck.settings && typeof deck.settings.newCardsPerDay === "number") ? deck.settings.newCardsPerDay : 20;
-    const newStudiedToday = allReviews.filter(r => r.deckId === deck.id && r.dateStr === todayStr && r.isNew).length;
+    const newStudiedToday = allReviews.filter(r => r.deckId === deck.id && r.dateStr === todayStr && r.isNew && !r.subdeck).length;
     const newRemainingToday = dailyLimit > 0 ? Math.max(0, dailyLimit - newStudiedToday) : newCardsTotal;
     const newCardsToStudyToday = Math.min(newCardsTotal, newRemainingToday);
 
@@ -2891,7 +2891,9 @@ async function loadDeckList() {
               else gRev++;
             }
           });
-          const gNewToday = Math.min(gNew, newRemainingToday);
+          const gStudiedToday = allReviews.filter(r => r.deckId === deck.id && r.dateStr === todayStr && r.isNew && r.subdeck === gKey).length;
+          const gRemainingToday = dailyLimit > 0 ? Math.max(0, dailyLimit - gStudiedToday) : gNew;
+          const gNewToday = Math.min(gNew, gRemainingToday);
           const subEl = document.createElement("div");
           subEl.className = "anki-subdeck-row";
           subEl.innerHTML = `
@@ -2917,7 +2919,8 @@ function escapeHtml(str) {
 }
 
 // --- STUDY ENGINE ---
-async function startStudy(deckId, quickMode = false, subdeckFilter = null) {
+async function startStudy(deckId, quickMode = false, subdeckFilter = null, keepExtra = false) {
+  if (!keepExtra) extraNewCardsGranted = 0;
   currentDeck = await dbGetDeck(deckId);
   if (!currentDeck || currentDeck.cards.length === 0) {
     alert("Balíček je prázdný.");
@@ -2963,9 +2966,14 @@ async function startStudy(deckId, quickMode = false, subdeckFilter = null) {
       newCardsAll = [...newCardsAll].sort((a, b) => (b.title || "").localeCompare(a.title || "", "cs"));
     }
 
-    // Vymáhání denního limitu nových karet
+    // Vymáhání denního limitu nových karet (samostatně pro hlavní balíček i pro každý podbalíček)
     const dailyLimit = (currentDeck.settings && typeof currentDeck.settings.newCardsPerDay === "number") ? currentDeck.settings.newCardsPerDay : 20;
-    const studiedNewToday = allReviews.filter(r => r.deckId === currentDeck.id && r.dateStr === todayStr && r.isNew).length;
+    const studiedNewToday = allReviews.filter(r =>
+      r.deckId === currentDeck.id &&
+      r.dateStr === todayStr &&
+      r.isNew &&
+      (currentSubdeckFilter ? r.subdeck === currentSubdeckFilter : !r.subdeck)
+    ).length;
     
     let allowedNew = dailyLimit > 0 ? Math.max(0, dailyLimit + extraNewCardsGranted - studiedNewToday) : newCardsAll.length;
     const selectedNew = newCardsAll.slice(0, allowedNew);
@@ -3223,6 +3231,7 @@ async function rateCard(ratingKey) {
 
     const reviewEntry = {
       deckId: currentDeck.id,
+      subdeck: currentSubdeckFilter || "",
       cardId: currentCard.id,
       timestamp: Date.now(),
       dateStr: getLocalDateString(),
@@ -3516,7 +3525,7 @@ document.getElementById("btnStudyAllAgain").onclick = () => {
 
 document.getElementById("btnStudyMoreNew").onclick = () => {
   extraNewCardsGranted += 10;
-  if (currentDeck) startStudy(currentDeck.id, false);
+  if (currentDeck) startStudy(currentDeck.id, false, currentSubdeckFilter, true);
 };
 
 document.getElementById("chkReverseStudy").onchange = () => {
