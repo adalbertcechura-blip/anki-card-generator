@@ -80,53 +80,61 @@ body.theme-mono {
   --text-main: #e6eaef; --text-muted: #87919e;
 }
 body.theme-ocean {
-  --bg-main: #07161e; --bg-card: rgba(12, 31, 43, 0.92); --bg-card-hover: #112b3b; --bg-surface: #153547;
-  --border-color: rgba(56, 189, 248, 0.18); --border-highlight: rgba(56, 189, 248, 0.35);
-  --accent: #38bdf8; --accent-hover: #0ea5e9; --accent-soft: rgba(56, 189, 248, 0.15);
+  --bg-main: #061822; --bg-card: rgba(11, 31, 44, 0.84); --bg-card-hover: rgba(17, 43, 59, 0.92); --bg-surface: rgba(21, 53, 71, 0.88);
+  --border-color: rgba(56, 189, 248, 0.24); --border-highlight: rgba(56, 189, 248, 0.45);
+  --accent: #38bdf8; --accent-hover: #0ea5e9; --accent-soft: rgba(56, 189, 248, 0.18);
   --text-main: #e0f2fe; --text-muted: #7dd3fc;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 320' preserveAspectRatio='none'%3E%3Cpath fill='%2338bdf8' fill-opacity='0.08' d='M0,224L80,213.3C160,203,320,181,480,192C640,203,800,245,960,245.3C1120,245,1200,203,1200,203L1200,320L0,320Z'/%3E%3Cpath fill='%230ea5e9' fill-opacity='0.06' d='M0,256L100,245.3C200,235,400,213,600,224C800,235,1000,277,1100,288L1200,298L1200,320L0,320Z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: bottom center; background-size: 100% 240px; background-attachment: fixed;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 500' preserveAspectRatio='none'%3E%3Ccircle cx='960' cy='110' r='54' fill='%237dd3fc' fill-opacity='0.22'/%3E%3Cpath fill='%230284c7' fill-opacity='0.25' d='M0,330Q200,260 400,320T800,310T1200,330L1200,500L0,500Z'/%3E%3Cpath fill='%2338bdf8' fill-opacity='0.22' d='M0,375Q180,320 360,375T720,370T1080,375L1200,385L1200,500L0,500Z'/%3E%3Cpath fill='%230ea5e9' fill-opacity='0.18' d='M0,425Q240,385 480,425T960,420T1200,435L1200,500L0,500Z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: bottom center; background-size: cover; background-attachment: fixed;
 }
 body.theme-desert {
-  --bg-main: #1b110c; --bg-card: rgba(36, 23, 16, 0.93); --bg-card-hover: #2d1d14; --bg-surface: #382419;
-  --border-color: rgba(245, 158, 11, 0.18); --border-highlight: rgba(245, 158, 11, 0.36);
-  --accent: #f59e0b; --accent-hover: #d97706; --accent-soft: rgba(245, 158, 11, 0.16);
+  --bg-main: #1c100a; --bg-card: rgba(36, 22, 14, 0.84); --bg-card-hover: rgba(45, 29, 20, 0.92); --bg-surface: rgba(56, 36, 25, 0.88);
+  --border-color: rgba(245, 158, 11, 0.24); --border-highlight: rgba(245, 158, 11, 0.45);
+  --accent: #f59e0b; --accent-hover: #d97706; --accent-soft: rgba(245, 158, 11, 0.18);
   --text-main: #fef3c7; --text-muted: #d6a87c;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 320' preserveAspectRatio='none'%3E%3Ccircle cx='980' cy='80' r='36' fill='%23f59e0b' fill-opacity='0.12'/%3E%3Cpath fill='%23d97706' fill-opacity='0.09' d='M0,240Q300,150 620,225T1200,210L1200,320L0,320Z'/%3E%3Cpath fill='%23b45309' fill-opacity='0.07' d='M0,275Q400,210 820,270T1200,255L1200,320L0,320Z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: bottom center; background-size: 100% 260px; background-attachment: fixed;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 500' preserveAspectRatio='none'%3E%3Ccircle cx='940' cy='120' r='62' fill='%23fbbf24' fill-opacity='0.28'/%3E%3Cpath fill='%23d97706' fill-opacity='0.24' d='M0,320Q280,210 580,305T1200,280L1200,500L0,500Z'/%3E%3Cpath fill='%23b45309' fill-opacity='0.22' d='M0,380Q380,295 780,375T1200,350L1200,500L0,500Z'/%3E%3Cpath fill='%2392400e' fill-opacity='0.20' d='M0,435Q320,390 660,435T1200,425L1200,500L0,500Z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: bottom center; background-size: cover; background-attachment: fixed;
 }
 body.theme-rainforest {
-  --bg-main: #071710; --bg-card: rgba(12, 33, 23, 0.93); --bg-card-hover: #112e20; --bg-surface: #163b29;
-  --border-color: rgba(52, 211, 153, 0.18); --border-highlight: rgba(52, 211, 153, 0.36);
-  --accent: #10b981; --accent-hover: #059669; --accent-soft: rgba(16, 185, 129, 0.16);
+  --bg-main: #061810; --bg-card: rgba(11, 32, 22, 0.84); --bg-card-hover: rgba(17, 46, 32, 0.92); --bg-surface: rgba(22, 59, 41, 0.88);
+  --border-color: rgba(52, 211, 153, 0.24); --border-highlight: rgba(52, 211, 153, 0.45);
+  --accent: #10b981; --accent-hover: #059669; --accent-soft: rgba(16, 185, 129, 0.18);
   --text-main: #d1fae5; --text-muted: #6ee7b7;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Cpath fill='%2310b981' fill-opacity='0.07' d='M0,300 C40,210 90,170 160,150 C110,200 85,250 80,300 Z M400,300 C350,200 290,160 220,145 C270,195 300,250 310,300 Z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: bottom center; background-size: 100% 280px; background-attachment: fixed;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 500' preserveAspectRatio='none'%3E%3Cpath fill='%2310b981' fill-opacity='0.20' d='M0,500 C35,340 110,250 230,210 C150,290 120,390 115,500 Z M800,500 C750,320 670,240 550,200 C640,285 680,390 695,500 Z'/%3E%3Cpath fill='%23059669' fill-opacity='0.18' d='M120,500 C170,380 250,310 340,290 C260,360 220,430 210,500 Z M680,500 C630,380 550,315 460,295 C540,360 580,430 590,500 Z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: bottom center; background-size: cover; background-attachment: fixed;
 }
 body.theme-space {
-  --bg-main: #070614; --bg-card: rgba(15, 13, 36, 0.92); --bg-card-hover: #17143d; --bg-surface: #1e1a4a;
-  --border-color: rgba(167, 139, 250, 0.2); --border-highlight: rgba(167, 139, 250, 0.4);
-  --accent: #a78bfa; --accent-hover: #8b5cf6; --accent-soft: rgba(167, 139, 250, 0.16);
+  --bg-main: #060514; --bg-card: rgba(14, 12, 34, 0.84); --bg-card-hover: rgba(23, 20, 61, 0.92); --bg-surface: rgba(30, 26, 74, 0.88);
+  --border-color: rgba(167, 139, 250, 0.25); --border-highlight: rgba(167, 139, 250, 0.48);
+  --accent: #a78bfa; --accent-hover: #8b5cf6; --accent-soft: rgba(167, 139, 250, 0.18);
   --text-main: #ede9fe; --text-muted: #a5b4fc;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 400'%3E%3Ccircle cx='80' cy='70' r='2' fill='%23fff' fill-opacity='0.3'/%3E%3Ccircle cx='210' cy='40' r='1.5' fill='%23fff' fill-opacity='0.25'/%3E%3Ccircle cx='490' cy='90' r='28' fill='%23a78bfa' fill-opacity='0.09'/%3E%3Cellipse cx='490' cy='90' rx='48' ry='10' transform='rotate(-18 490 90)' fill='none' stroke='%23c4b5fd' stroke-opacity='0.14' stroke-width='2'/%3E%3Ccircle cx='140' cy='280' r='1.8' fill='%23fff' fill-opacity='0.22'/%3E%3Ccircle cx='390' cy='240' r='1.5' fill='%23fff' fill-opacity='0.25'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 500'%3E%3Ccircle cx='90' cy='90' r='2.5' fill='%23fff' fill-opacity='0.55'/%3E%3Ccircle cx='210' cy='50' r='2' fill='%23fff' fill-opacity='0.45'/%3E%3Ccircle cx='350' cy='110' r='1.8' fill='%23fff' fill-opacity='0.4'/%3E%3Ccircle cx='660' cy='110' r='44' fill='%23a78bfa' fill-opacity='0.24'/%3E%3Cellipse cx='660' cy='110' rx='78' ry='16' transform='rotate(-18 660 110)' fill='none' stroke='%23c4b5fd' stroke-opacity='0.38' stroke-width='3'/%3E%3Ccircle cx='140' cy='350' r='2.4' fill='%23fff' fill-opacity='0.45'/%3E%3Ccircle cx='510' cy='380' r='2' fill='%23fff' fill-opacity='0.45'/%3E%3Ccircle cx='280' cy='250' r='1.5' fill='%23c4b5fd' fill-opacity='0.4'/%3E%3Ccircle cx='730' cy='310' r='2.2' fill='%23fff' fill-opacity='0.45'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: center; background-size: cover; background-attachment: fixed;
 }
 body.theme-lofi {
-  --bg-main: #130e1c; --bg-card: rgba(27, 20, 41, 0.93); --bg-card-hover: #251b38; --bg-surface: #2f2247;
-  --border-color: rgba(244, 114, 182, 0.18); --border-highlight: rgba(244, 114, 182, 0.36);
-  --accent: #f472b6; --accent-hover: #ec4899; --accent-soft: rgba(244, 114, 182, 0.15);
+  --bg-main: #130d1d; --bg-card: rgba(27, 20, 41, 0.84); --bg-card-hover: rgba(37, 27, 56, 0.92); --bg-surface: rgba(47, 34, 71, 0.88);
+  --border-color: rgba(244, 114, 182, 0.24); --border-highlight: rgba(244, 114, 182, 0.45);
+  --accent: #f472b6; --accent-hover: #ec4899; --accent-soft: rgba(244, 114, 182, 0.18);
   --text-main: #fce7f3; --text-muted: #d8b4fe;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 400'%3E%3Ccircle cx='480' cy='85' r='34' fill='%23f472b6' fill-opacity='0.09'/%3E%3Ccircle cx='120' cy='320' r='50' fill='%23a855f7' fill-opacity='0.07'/%3E%3Cpath fill='%23f472b6' fill-opacity='0.06' d='M0,340L150,290L300,320L460,280L600,310L600,400L0,400Z'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 500' preserveAspectRatio='none'%3E%3Ccircle cx='640' cy='105' r='48' fill='%23f472b6' fill-opacity='0.24'/%3E%3Ccircle cx='150' cy='350' r='70' fill='%23a855f7' fill-opacity='0.18'/%3E%3Cpath fill='%23f472b6' fill-opacity='0.18' d='M0,410L120,350L240,390L380,320L540,375L680,335L800,365L800,500L0,500Z'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: bottom center; background-size: cover; background-attachment: fixed;
 }
 body.theme-cottage {
-  --bg-main: #181710; --bg-card: rgba(34, 32, 22, 0.94); --bg-card-hover: #2c2a1d; --bg-surface: #363323;
-  --border-color: rgba(190, 209, 138, 0.18); --border-highlight: rgba(190, 209, 138, 0.35);
-  --accent: #a3be67; --accent-hover: #8ca850; --accent-soft: rgba(163, 190, 103, 0.16);
+  --bg-main: #181710; --bg-card: rgba(34, 32, 22, 0.85); --bg-card-hover: rgba(44, 42, 29, 0.92); --bg-surface: rgba(54, 51, 35, 0.88);
+  --border-color: rgba(190, 209, 138, 0.24); --border-highlight: rgba(190, 209, 138, 0.44);
+  --accent: #a3be67; --accent-hover: #8ca850; --accent-soft: rgba(163, 190, 103, 0.18);
   --text-main: #f3f0e0; --text-muted: #bdb79c;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Ccircle cx='70' cy='250' r='18' fill='%23a3be67' fill-opacity='0.08'/%3E%3Cpath fill='%23a3be67' fill-opacity='0.08' d='M320,300 C320,255 340,225 360,210 C345,245 340,275 340,300 Z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: bottom right; background-size: 380px 260px; background-attachment: fixed;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 500' preserveAspectRatio='none'%3E%3Cpath fill='%23a3be67' fill-opacity='0.18' d='M0,430Q250,360 520,415T800,390L800,500L0,500Z'/%3E%3Ccircle cx='120' cy='410' r='26' fill='%23d49b5a' fill-opacity='0.25'/%3E%3Crect x='113' y='410' width='14' height='36' rx='4' fill='%23f3f0e0' fill-opacity='0.22'/%3E%3Cpath fill='%23a3be67' fill-opacity='0.24' d='M660,500 C660,410 700,350 750,320 C720,390 710,450 710,500 Z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: bottom center; background-size: cover; background-attachment: fixed;
 }
+.theme-preview-bar {
+  position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+  z-index: 400; display: none; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--bg-card); border: 1px solid var(--accent);
+  border-radius: 999px; padding: 8px 14px; box-shadow: 0 10px 28px rgba(0,0,0,0.6);
+  backdrop-filter: blur(8px);
+}
+.theme-preview-bar.active { display: flex; }
 header {
   background: var(--bg-main);
   border-bottom: 1px solid var(--border-color);
@@ -757,6 +765,11 @@ PRO_MODALS_HTML = r"""
   </div>
 </div>
 
+<div class="theme-preview-bar" id="themePreviewBar">
+  <span id="themePreviewLabel" style="font-size:0.84rem; font-weight:700;">Náhled motivu</span>
+  <button class="btn btn-sm" id="btnPreviewBack">Zpět do obchodu</button>
+  <button class="btn btn-sm btn-primary" id="btnPreviewAction">Koupit / Použít</button>
+</div>
 <div class="pro-toast" id="proToast"></div>
 """
 
@@ -1540,7 +1553,32 @@ async function renderShopModal() {
       </div>
     `;
     const prevBtn = row.querySelector(".btn-preview-theme");
-    if (prevBtn) prevBtn.onclick = () => { applyProTheme(th.id); showProToast(`Náhled motivu: ${th.name}`); };
+    if (prevBtn) prevBtn.onclick = () => {
+      document.getElementById("shopModal").classList.remove("active");
+      showView("decks");
+      applyProTheme(th.id);
+      const bar = document.getElementById("themePreviewBar");
+      const lbl = document.getElementById("themePreviewLabel");
+      const actBtn = document.getElementById("btnPreviewAction");
+      if (lbl) lbl.innerText = `Náhled: ${th.name}`;
+      if (actBtn) {
+        actBtn.innerText = unlocked ? "Použít motiv" : `Koupit (${th.cost} b.)`;
+        actBtn.onclick = async () => {
+          const p = loadProProfile();
+          if (p.unlockedThemes.includes(th.id)) p.activeTheme = th.id;
+          else {
+            if (p.points < th.cost) { alert("Nemáte dostatek bodů."); return; }
+            p.points -= th.cost; p.unlockedThemes.push(th.id); p.activeTheme = th.id;
+          }
+          saveProProfile(p);
+          bar.classList.remove("active");
+          applyProTheme(p.activeTheme);
+          await updateProHud();
+          showProToast(`Motiv aktivován: ${th.name}`);
+        };
+      }
+      if (bar) bar.classList.add("active");
+    };
     row.querySelector(".btn-buy-theme").onclick = async () => {
       const p = loadProProfile();
       if (p.unlockedThemes.includes(th.id)) p.activeTheme = th.id;
@@ -1570,6 +1608,12 @@ async function renderShopModal() {
   });
 }
 
+document.getElementById("btnPreviewBack").onclick = async () => {
+  document.getElementById("themePreviewBar").classList.remove("active");
+  applyProTheme(loadProProfile().activeTheme);
+  await renderShopModal();
+  document.getElementById("shopModal").classList.add("active");
+};
 document.getElementById("btnProSound").onclick = async () => {
   const p = loadProProfile(); p.soundEnabled = (p.soundEnabled === false); saveProProfile(p);
   if (p.soundEnabled) playProTone("good"); await updateProHud();
