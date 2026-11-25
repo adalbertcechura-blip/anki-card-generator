@@ -348,6 +348,50 @@ header {
 .skill-node:nth-child(even) { transform: translateX(14px); }
 .skill-node.completed { border-color: var(--accent); background: var(--accent-soft); }
 
+/* Mini-games Hub & Arenas */
+.games-menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+.game-tile {
+  background: var(--bg-surface); border: 1px solid var(--border-color);
+  border-bottom: 3px solid rgba(0,0,0,0.3); border-radius: 12px;
+  padding: 12px; text-align: left; cursor: pointer; color: var(--text-main);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.game-tile:hover { border-color: var(--accent); background: var(--bg-card-hover); }
+.boss-hp-track {
+  width: 100%; height: 12px; background: var(--bg-main);
+  border-radius: 999px; overflow: hidden; border: 1px solid var(--border-color);
+}
+.boss-hp-fill { height: 100%; background: #c96464; transition: width 0.25s ease; }
+.gravity-arena {
+  position: relative; width: 100%; height: 210px;
+  background: var(--bg-main); border: 1px solid var(--border-color);
+  border-radius: 10px; overflow: hidden; margin-bottom: 10px;
+}
+.gravity-meteor {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  background: var(--bg-surface); border: 1px solid var(--accent);
+  color: var(--text-main); padding: 8px 14px; border-radius: 10px;
+  font-weight: 700; font-size: 0.95rem; white-space: nowrap; max-width: 90%;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.scramble-bank, .scramble-answer {
+  display: flex; flex-wrap: wrap; gap: 8px; min-height: 44px;
+  padding: 8px; border-radius: 10px; background: var(--bg-main);
+  border: 1px solid var(--border-color); margin-bottom: 10px;
+}
+.scramble-chip {
+  background: var(--bg-surface); color: var(--text-main);
+  border: 1px solid var(--border-highlight); border-bottom: 3px solid rgba(0,0,0,0.3);
+  border-radius: 8px; padding: 6px 12px; font-weight: 600; cursor: pointer;
+}
+.timed-match-grid {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px;
+}
+@media (max-width: 520px) {
+  .games-menu-grid { grid-template-columns: 1fr; }
+  .timed-match-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 /* Mobile compact heatmap (7-day week bar) */
 .pro-week-strip { display: none; }
 @media (max-width: 640px) {
@@ -376,6 +420,7 @@ PRO_HEADER_HUD = r"""  <div class="pro-hud" id="proHud">
     <span class="pro-pill points" id="proPointsPill" title="Body">0 b.</span>
     <span class="pro-pill boost" id="proBoostPill" style="display:none;">2x Boost</span>
     <button class="btn btn-sm" id="btnProSound" title="Zvukové efekty">Zvuk: Zap</button>
+    <button class="btn btn-sm" id="btnOpenGames" title="Minihry s kartičkami">Minihry</button>
     <button class="btn btn-sm btn-primary" id="btnOpenShop">Obchod</button>
   </div>"""
 
@@ -483,6 +528,27 @@ PRO_MODALS_HTML = r"""
         </div>
         <button class="btn btn-sm btn-primary" id="btnBuyShieldPack">Koupit (1250 b.)</button>
       </div>
+      <div class="shop-item">
+        <div class="shop-item-info">
+          <div class="shop-item-title">Power-up: Zmrazení času</div>
+          <div class="shop-item-desc">Zastaví odpočet ve Spojovačce nebo pád v Meteoritech na 10 s.</div>
+        </div>
+        <button class="btn btn-sm btn-primary" id="btnBuyTimeFreeze">Koupit (250 b.)</button>
+      </div>
+      <div class="shop-item">
+        <div class="shop-item-info">
+          <div class="shop-item-title">Power-up: Nápověda 50:50</div>
+          <div class="shop-item-desc">Odstraní 2 špatné možnosti v kvízovém režimu (Výběr ze 4).</div>
+        </div>
+        <button class="btn btn-sm btn-primary" id="btnBuyFifty">Koupit (200 b.)</button>
+      </div>
+      <div class="shop-item">
+        <div class="shop-item-info">
+          <div class="shop-item-title">Power-up: Štít Comba</div>
+          <div class="shop-item-desc">Automaticky ochrání vaše Combo při jedné chybě.</div>
+        </div>
+        <button class="btn btn-sm btn-primary" id="btnBuyComboShield">Koupit (300 b.)</button>
+      </div>
     </div>
 
     <h4 style="font-size:0.85rem; color:var(--text-muted); margin-bottom:8px; text-transform:uppercase;">Vzhled aplikace (1500 b.)</h4>
@@ -564,6 +630,84 @@ PRO_MODALS_HTML = r"""
   </div>
 </div>
 
+<!-- MINI-GAMES HUB MODAL -->
+<div class="modal-overlay" id="gamesModal">
+  <div class="modal-content" style="max-width:580px; max-height:90dvh; overflow-y:auto;">
+    <div class="modal-header">
+      <div class="modal-title" id="gamesModalTitle">Minihry s kartičkami</div>
+      <button class="modal-close" id="gamesModalClose">&times;</button>
+    </div>
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
+      <select id="selGameDeck" class="select-sm" style="flex:1;"></select>
+      <button class="btn btn-sm" id="btnGameBackMenu" style="display:none;">Zpět na výběr her</button>
+    </div>
+
+    <div id="gamesMenuPane">
+      <div class="games-menu-grid">
+        <button class="game-tile" id="btnStartTimedMatch">
+          <strong style="font-size:0.95rem;">Spojovačka na čas</strong>
+          <span style="font-size:0.76rem; color:var(--text-muted);">6 dvojic pod časovým limitem 60 s (+40 b.)</span>
+        </button>
+        <button class="game-tile" id="btnStartBossFight">
+          <strong style="font-size:0.95rem;">Karetní souboj (Boss)</strong>
+          <span style="font-size:0.76rem; color:var(--text-muted);">Porazte bosse balíčku (100 HP) bez ztráty životů (+60 b.)</span>
+        </button>
+        <button class="game-tile" id="btnStartGravity">
+          <strong style="font-size:0.95rem;">Pád karet (Meteority)</strong>
+          <span style="font-size:0.76rem; color:var(--text-muted);">Vyberte odpověď dřív, než karta dopadne (+5 b./karta)</span>
+        </button>
+        <button class="game-tile" id="btnStartScramble">
+          <strong style="font-size:0.95rem;">Skládání slov a vět</strong>
+          <span style="font-size:0.76rem; color:var(--text-muted);">Poskládejte rozházená písmena nebo slova (+25 b.)</span>
+        </button>
+      </div>
+    </div>
+
+    <div id="gameTimedMatchPane" style="display:none;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <span id="tmTimerLabel" style="font-weight:700; color:var(--accent);">Čas: 60 s</span>
+        <button class="btn btn-sm" id="btnUseTimeFreezeMatch">Zmrazení času</button>
+      </div>
+      <div class="timed-match-grid" id="tmGrid"></div>
+    </div>
+
+    <div id="gameBossPane" style="display:none;">
+      <div style="display:flex; justify-content:space-between; font-size:0.84rem; font-weight:700; margin-bottom:4px;">
+        <span id="bossNameLabel">Boss</span>
+        <span id="bossHpText">100 / 100 HP</span>
+      </div>
+      <div class="boss-hp-track" style="margin-bottom:8px;"><div class="boss-hp-fill" id="bossHpBar" style="width:100%;"></div></div>
+      <div style="display:flex; justify-content:space-between; font-size:0.82rem; margin-bottom:10px;">
+        <span id="playerBossHpText" style="color:var(--accent); font-weight:700;">Vaše HP: 5 / 5</span>
+        <span id="bossComboText" style="color:var(--text-muted);">Combo: 0x</span>
+      </div>
+      <div id="bossQuestionBox" style="padding:12px; background:var(--bg-main); border:1px solid var(--border-color); border-radius:10px; font-weight:700; margin-bottom:8px;"></div>
+      <div class="quiz-grid" id="bossOptionsGrid"></div>
+    </div>
+
+    <div id="gameGravityPane" style="display:none;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <span id="gravScoreLabel" style="font-weight:700; color:var(--accent);">Skóre: 0</span>
+        <button class="btn btn-sm" id="btnUseTimeFreezeGrav">Zmrazení času</button>
+      </div>
+      <div class="gravity-arena" id="gravArena">
+        <div class="gravity-meteor" id="gravMeteor">...</div>
+      </div>
+      <div class="quiz-grid" id="gravOptionsGrid"></div>
+    </div>
+
+    <div id="gameScramblePane" style="display:none;">
+      <div id="scramblePromptBox" style="font-weight:700; margin-bottom:8px;"></div>
+      <div class="scramble-answer" id="scrambleAnswerBox"></div>
+      <div class="scramble-bank" id="scrambleBankBox"></div>
+      <div style="display:flex; justify-content:space-between; gap:8px;">
+        <button class="btn btn-sm" id="btnScrambleClear">Vymazat</button>
+        <button class="btn btn-sm btn-primary" id="btnScrambleNext">Další slovo</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="pro-toast" id="proToast"></div>
 """
 
@@ -591,6 +735,7 @@ function getDefaultProProfile() {
     boostUntil: 0,
     unlockedThemes: ["default"],
     activeTheme: "default",
+    powerups: { timeFreeze: 1, fiftyFifty: 1, comboShield: 0 },
     milestones: [
       { id: "m7", days: 7, title: "Týden v kuse", bonusPoints: 50, claimed: false },
       { id: "m30", days: 30, title: "Měsíc učení", bonusPoints: 150, claimed: false },
@@ -980,15 +1125,20 @@ rateCard = async function(ratingKey) {
   }
 
   if (ratingKey === "again") {
-    sessionCombo = 0;
+    if (prof.powerups && prof.powerups.comboShield > 0 && sessionCombo > 0) {
+      prof.powerups.comboShield--;
+      showProToast("Štít Comba zachránil vaši sérii!");
+    } else {
+      sessionCombo = 0;
+      const comboEl = document.getElementById("proComboBadge");
+      if (comboEl) { comboEl.style.display = "none"; comboEl.classList.remove("hot"); }
+      showProToast("Karta se vrátí v opravném kole.");
+    }
     _lessonStats.mistakes++;
     prof.dailyQuests.cleanCount = 0;
     playProTone("again");
     setMascotState("encourage", "Nevadí, opravíme na konci lekce!");
-    const comboEl = document.getElementById("proComboBadge");
-    if (comboEl) { comboEl.style.display = "none"; comboEl.classList.remove("hot"); }
     saveProProfile(prof);
-    showProToast("Karta se vrátí v opravném kole.");
     await updateProHud();
     return;
   }
@@ -997,6 +1147,14 @@ rateCard = async function(ratingKey) {
     sessionCombo++;
     prof.dailyQuests.maxCombo = Math.max(prof.dailyQuests.maxCombo || 0, sessionCombo);
     setMascotState("happy", sessionCombo >= 4 ? `Skvělá série ${sessionCombo}x!` : "Výborně!");
+    if (sessionCombo === 8 || sessionCombo === 12) {
+      const luckPts = 50 + Math.floor(Math.random() * 101);
+      prof.points += luckPts;
+      prof.xp = (prof.xp || 0) + luckPts;
+      launchConfetti();
+      playProTone("level");
+      showProToast(`Kartičkové štěstí (${sessionCombo}x Combo): +${luckPts} b.!`);
+    }
   } else {
     setMascotState("neutral", "Dobrá práce, pokračuj!");
   }
@@ -1406,6 +1564,289 @@ document.getElementById("btnBuyShieldPack").onclick = async () => {
   if (p.points < 1250) { alert("Potřebujete alespoň 1250 bodů."); return; }
   p.points -= 1250; p.freezes = 3; saveProProfile(p); showProToast("Zásoba Streak Freeze doplněna na 3/3!"); await updateProHud(); await renderShopModal();
 };
+document.getElementById("btnBuyTimeFreeze").onclick = async () => {
+  const p = loadProProfile(); if (p.points < 250) { alert("Potřebujete alespoň 250 bodů."); return; }
+  p.points -= 250; p.powerups = p.powerups || {}; p.powerups.timeFreeze = (p.powerups.timeFreeze || 0) + 1;
+  saveProProfile(p); showProToast(`Zakoupeno Zmrazení času (celkem ${p.powerups.timeFreeze})`); await updateProHud(); await renderShopModal();
+};
+document.getElementById("btnBuyFifty").onclick = async () => {
+  const p = loadProProfile(); if (p.points < 200) { alert("Potřebujete alespoň 200 bodů."); return; }
+  p.points -= 200; p.powerups = p.powerups || {}; p.powerups.fiftyFifty = (p.powerups.fiftyFifty || 0) + 1;
+  saveProProfile(p); showProToast(`Zakoupena Nápověda 50:50 (celkem ${p.powerups.fiftyFifty})`); await updateProHud(); await renderShopModal();
+};
+document.getElementById("btnBuyComboShield").onclick = async () => {
+  const p = loadProProfile(); if (p.points < 300) { alert("Potřebujete alespoň 300 bodů."); return; }
+  p.points -= 300; p.powerups = p.powerups || {}; p.powerups.comboShield = (p.powerups.comboShield || 0) + 1;
+  saveProProfile(p); showProToast(`Zakoupen Štít Comba (celkem ${p.powerups.comboShield})`); await updateProHud(); await renderShopModal();
+};
+
+// --- MINI-GAMES CONTROLLER ---
+let _tmInterval = null, _gravRaf = null, _gravFrozenUntil = 0;
+function stopAllMiniGames() {
+  if (_tmInterval) { clearInterval(_tmInterval); _tmInterval = null; }
+  if (_gravRaf) { cancelAnimationFrame(_gravRaf); _gravRaf = null; }
+}
+function showGamePane(paneId) {
+  stopAllMiniGames();
+  ["gamesMenuPane", "gameTimedMatchPane", "gameBossPane", "gameGravityPane", "gameScramblePane"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = id === paneId ? "block" : "none";
+  });
+  document.getElementById("btnGameBackMenu").style.display = paneId === "gamesMenuPane" ? "none" : "inline-flex";
+}
+async function openGamesHub(preselectedDeckId = null) {
+  const decks = await dbGetAllDecks();
+  const sel = document.getElementById("selGameDeck");
+  sel.innerHTML = "";
+  decks.forEach(d => {
+    sel.innerHTML += `<option value="${d.id}" ${preselectedDeckId === d.id ? "selected" : ""}>${escapeHtml(d.name)} (${d.cards.length})</option>`;
+  });
+  showGamePane("gamesMenuPane");
+  document.getElementById("gamesModal").classList.add("active");
+}
+async function getSelectedGameDeck() {
+  const id = document.getElementById("selGameDeck").value;
+  return id ? await dbGetDeck(id) : null;
+}
+document.getElementById("btnOpenGames").onclick = () => openGamesHub(currentDeck ? currentDeck.id : null);
+document.getElementById("gamesModalClose").onclick = () => { stopAllMiniGames(); document.getElementById("gamesModal").classList.remove("active"); };
+document.getElementById("btnGameBackMenu").onclick = () => showGamePane("gamesMenuPane");
+
+// 1. Timed Match (6 pairs, 60s)
+let _tmFreezeUntil = 0;
+document.getElementById("btnStartTimedMatch").onclick = async () => {
+  const deck = await getSelectedGameDeck();
+  if (!deck || deck.cards.length < 6) { alert("Potřebujete balíček s alespoň 6 kartami."); return; }
+  showGamePane("gameTimedMatchPane");
+  const sample = [...deck.cards].sort(() => Math.random() - 0.5).slice(0, 6);
+  const tiles = [];
+  sample.forEach(c => {
+    tiles.push({ id: c.id, text: c.title || extractTargetAnswer(c, true), side: "L" });
+    tiles.push({ id: c.id, text: extractTargetAnswer(c, false), side: "R" });
+  });
+  tiles.sort(() => Math.random() - 0.5);
+  const grid = document.getElementById("tmGrid");
+  grid.innerHTML = "";
+  let first = null, matched = 0, timeLeft = 60;
+  _tmFreezeUntil = 0;
+  const lbl = document.getElementById("tmTimerLabel");
+  lbl.innerText = `Čas: ${timeLeft} s`;
+  _tmInterval = setInterval(() => {
+    if (Date.now() < _tmFreezeUntil) { lbl.innerText = `Čas: ${timeLeft} s (Zmrazeno)`; return; }
+    timeLeft--;
+    lbl.innerText = `Čas: ${timeLeft} s`;
+    if (timeLeft <= 0) {
+      stopAllMiniGames();
+      alert("Čas vypršel! Zkuste to znovu.");
+      showGamePane("gamesMenuPane");
+    }
+  }, 1000);
+  tiles.forEach(t => {
+    const b = document.createElement("button");
+    b.className = "match-btn";
+    b.innerText = t.text;
+    b.onclick = async () => {
+      if (!first) { first = { t, b }; b.classList.add("selected"); return; }
+      if (first.b === b) return;
+      if (first.t.id === t.id && first.t.side !== t.side) {
+        first.b.classList.add("matched"); b.classList.add("matched");
+        first = null; matched++; playProTone("good");
+        if (matched === 6) {
+          stopAllMiniGames();
+          const p = loadProProfile(); p.points += 40; p.xp = (p.xp || 0) + 40; saveProProfile(p);
+          launchConfetti(); playProTone("level"); showProToast("Spojovačka dokončena! +40 b.");
+          await updateProHud(); showGamePane("gamesMenuPane");
+        }
+      } else {
+        const prevB = first.b; prevB.classList.remove("selected"); prevB.classList.add("err"); b.classList.add("err");
+        first = null; playProTone("again");
+        setTimeout(() => { prevB.classList.remove("err"); b.classList.remove("err"); }, 350);
+      }
+    };
+    grid.appendChild(b);
+  });
+};
+document.getElementById("btnUseTimeFreezeMatch").onclick = () => {
+  const p = loadProProfile();
+  if (!p.powerups || (p.powerups.timeFreeze || 0) <= 0) { alert("Nemáte Zmrazení času (lze koupit v Obchodě)."); return; }
+  p.powerups.timeFreeze--; saveProProfile(p); _tmFreezeUntil = Date.now() + 10000; showProToast("Čas zmrazen na 10 s!");
+};
+
+// 2. Boss Fight
+document.getElementById("btnStartBossFight").onclick = async () => {
+  const deck = await getSelectedGameDeck();
+  if (!deck || deck.cards.length < 4) { alert("Potřebujete alespoň 4 karty."); return; }
+  showGamePane("gameBossPane");
+  let bossHp = 100, playerHp = 5, bossCombo = 0;
+  document.getElementById("bossNameLabel").innerText = `Boss: ${deck.name}`;
+  function nextBossQ() {
+    document.getElementById("bossHpText").innerText = `${bossHp} / 100 HP`;
+    document.getElementById("bossHpBar").style.width = `${bossHp}%`;
+    document.getElementById("playerBossHpText").innerText = `Vaše HP: ${playerHp} / 5`;
+    document.getElementById("bossComboText").innerText = `Combo: ${bossCombo}x`;
+    const card = deck.cards[Math.floor(Math.random() * deck.cards.length)];
+    const correct = extractTargetAnswer(card, false);
+    document.getElementById("bossQuestionBox").innerText = card.title || extractTargetAnswer(card, true);
+    const pool = deck.cards.filter(c => c.id !== card.id).sort(() => Math.random() - 0.5);
+    const opts = [correct];
+    for (const c of pool) {
+      const a = extractTargetAnswer(c, false);
+      if (a && !opts.includes(a)) { opts.push(a); if (opts.length >= 4) break; }
+    }
+    opts.sort(() => Math.random() - 0.5);
+    const grid = document.getElementById("bossOptionsGrid");
+    grid.innerHTML = "";
+    opts.forEach(o => {
+      const b = document.createElement("button");
+      b.className = "quiz-option";
+      b.innerText = o;
+      b.onclick = async () => {
+        if (o === correct) {
+          bossCombo++;
+          const dmg = bossCombo >= 3 ? 30 : 20;
+          bossHp = Math.max(0, bossHp - dmg);
+          playProTone("good");
+          if (bossHp <= 0) {
+            const p = loadProProfile(); p.points += 60; p.xp = (p.xp || 0) + 60; saveProProfile(p);
+            launchConfetti(); playProTone("level"); showProToast("Boss poražen! +60 b.");
+            await updateProHud(); showGamePane("gamesMenuPane");
+            return;
+          }
+        } else {
+          bossCombo = 0;
+          playerHp--;
+          playProTone("again");
+          if (playerHp <= 0) {
+            alert("Prohráli jste souboj s bossem! Zkuste to znovu.");
+            showGamePane("gamesMenuPane");
+            return;
+          }
+        }
+        nextBossQ();
+      };
+      grid.appendChild(b);
+    });
+  }
+  nextBossQ();
+};
+
+// 3. Gravity / Meteorites
+document.getElementById("btnStartGravity").onclick = async () => {
+  const deck = await getSelectedGameDeck();
+  if (!deck || deck.cards.length < 4) { alert("Potřebujete alespoň 4 karty."); return; }
+  showGamePane("gameGravityPane");
+  let score = 0, yPos = 0, lastTs = performance.now();
+  _gravFrozenUntil = 0;
+  function spawnMeteor() {
+    yPos = 0;
+    document.getElementById("gravScoreLabel").innerText = `Skóre: ${score}`;
+    const card = deck.cards[Math.floor(Math.random() * deck.cards.length)];
+    const correct = extractTargetAnswer(card, false);
+    const meteor = document.getElementById("gravMeteor");
+    meteor.innerText = card.title || extractTargetAnswer(card, true);
+    const pool = deck.cards.filter(c => c.id !== card.id).sort(() => Math.random() - 0.5);
+    const opts = [correct];
+    for (const c of pool) {
+      const a = extractTargetAnswer(c, false);
+      if (a && !opts.includes(a)) { opts.push(a); if (opts.length >= 4) break; }
+    }
+    opts.sort(() => Math.random() - 0.5);
+    const grid = document.getElementById("gravOptionsGrid");
+    grid.innerHTML = "";
+    opts.forEach(o => {
+      const b = document.createElement("button");
+      b.className = "quiz-option";
+      b.innerText = o;
+      b.onclick = async () => {
+        if (o === correct) {
+          score += 5;
+          const p = loadProProfile(); p.points += 5; p.xp = (p.xp || 0) + 5; saveProProfile(p);
+          playProTone("good"); await updateProHud(); spawnMeteor();
+        } else {
+          b.classList.add("wrong"); playProTone("again");
+        }
+      };
+      grid.appendChild(b);
+    });
+  }
+  function step(ts) {
+    const dt = (ts - lastTs) / 1000;
+    lastTs = ts;
+    if (Date.now() >= _gravFrozenUntil) {
+      const speed = 22 + Math.min(60, score * 0.8);
+      yPos += speed * dt;
+    }
+    const meteor = document.getElementById("gravMeteor");
+    if (meteor) meteor.style.top = yPos + "px";
+    if (yPos >= 175) {
+      stopAllMiniGames();
+      alert(`Konec hry! Celkové skóre: ${score} bodů.`);
+      showGamePane("gamesMenuPane");
+      return;
+    }
+    _gravRaf = requestAnimationFrame(step);
+  }
+  spawnMeteor();
+  _gravRaf = requestAnimationFrame(step);
+};
+document.getElementById("btnUseTimeFreezeGrav").onclick = () => {
+  const p = loadProProfile();
+  if (!p.powerups || (p.powerups.timeFreeze || 0) <= 0) { alert("Nemáte Zmrazení času."); return; }
+  p.powerups.timeFreeze--; saveProProfile(p); _gravFrozenUntil = Date.now() + 8000; showProToast("Pád karet zmrazen na 8 s!");
+};
+
+// 4. Word / Sentence Scramble
+let _scrDeck = null, _scrTarget = "", _scrBuilt = [];
+document.getElementById("btnStartScramble").onclick = async () => {
+  _scrDeck = await getSelectedGameDeck();
+  if (!_scrDeck || _scrDeck.cards.length === 0) { alert("Balíček je prázdný."); return; }
+  showGamePane("gameScramblePane");
+  nextScramble();
+};
+function nextScramble() {
+  const card = _scrDeck.cards[Math.floor(Math.random() * _scrDeck.cards.length)];
+  _scrTarget = extractTargetAnswer(card, false).split(/\s*[;/]\s*/)[0].trim();
+  document.getElementById("scramblePromptBox").innerText = card.title || extractTargetAnswer(card, true);
+  const words = _scrTarget.split(/\s+/).filter(Boolean);
+  const tokens = words.length > 1 ? words : _scrTarget.split("");
+  const isWordMode = words.length > 1;
+  const shuffled = tokens.map((val, idx) => ({ val, idx })).sort(() => Math.random() - 0.5);
+  _scrBuilt = [];
+  const ansBox = document.getElementById("scrambleAnswerBox");
+  const bankBox = document.getElementById("scrambleBankBox");
+  const renderScr = () => {
+    ansBox.innerHTML = "";
+    _scrBuilt.forEach(item => {
+      const c = document.createElement("button");
+      c.className = "scramble-chip";
+      c.innerText = item.val;
+      c.onclick = () => { _scrBuilt = _scrBuilt.filter(x => x.idx !== item.idx); renderScr(); };
+      ansBox.appendChild(c);
+    });
+    bankBox.innerHTML = "";
+    shuffled.forEach(item => {
+      if (_scrBuilt.some(x => x.idx === item.idx)) return;
+      const c = document.createElement("button");
+      c.className = "scramble-chip";
+      c.innerText = item.val;
+      c.onclick = async () => {
+        _scrBuilt.push(item);
+        renderScr();
+        const attempt = _scrBuilt.map(x => x.val).join(isWordMode ? " " : "");
+        if (attempt.toLowerCase() === _scrTarget.toLowerCase()) {
+          const p = loadProProfile(); p.points += 25; p.xp = (p.xp || 0) + 25; saveProProfile(p);
+          launchConfetti(); playProTone("level"); showProToast("Složeno správně! +25 b.");
+          await updateProHud();
+          setTimeout(nextScramble, 600);
+        }
+      };
+      bankBox.appendChild(c);
+    });
+  };
+  document.getElementById("btnScrambleClear").onclick = () => { _scrBuilt = []; renderScr(); };
+  renderScr();
+}
+document.getElementById("btnScrambleNext").onclick = nextScramble;
 document.getElementById("btnAddMilestone").onclick = async () => {
   const days = parseInt(document.getElementById("inpNewMsDays").value, 10);
   const title = document.getElementById("inpNewMsReward").value.trim() || `Milník ${days} dní`;
@@ -1458,10 +1899,11 @@ PRO_PATCHES = [
           <button class="btn-mode-tgl active" id="btnModeFlip" title="Režim otáčení karty">Otáčecí</button>
           <button class="btn-mode-tgl" id="btnModeType" title="Režim vepisování z klávesnice">Vepisovací</button>
         </div>''',
-        '''        <div class="mode-toggle-group" style="width:100%; display:grid; grid-template-columns:1fr 1fr 1fr;">
+        '''        <div class="mode-toggle-group" style="width:100%; display:grid; grid-template-columns:1fr 1fr;">
           <button class="btn-mode-tgl active" id="btnModeFlip" title="Režim otáčení karty">Otáčecí</button>
           <button class="btn-mode-tgl" id="btnModeType" title="Režim vepisování z klávesnice">Vepisovací</button>
           <button class="btn-mode-tgl" id="btnModeQuiz" title="Kvízový výběr ze 4 možností">Výběr ze 4</button>
+          <button class="btn-mode-tgl" id="btnModeDictation" title="Poslech a psaní diktátu">Diktát</button>
         </div>''',
     ),
     (
@@ -1476,6 +1918,10 @@ PRO_PATCHES = [
         <label class="switch-label">
           <input type="checkbox" id="chkIgnoreDiacritics">
           <span>Ignorovat diakritiku při psaní</span>
+        </label>
+        <label class="switch-label">
+          <input type="checkbox" id="chkAutoTts">
+          <span>Automaticky přečíst kartu</span>
         </label>
         <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
           <span style="font-size:0.8rem;">Jazyk čtení (TTS):</span>
@@ -1533,6 +1979,7 @@ PRO_PATCHES = [
           <div class="type-input-area" id="typeInputArea" style="display:none;">
             <div class="type-input-box">
               <input type="text" id="typeTextInput" class="type-text-input" placeholder="Vepište odpověď (více variant oddělte / nebo ;)..." autocomplete="off" autocapitalize="off" spellcheck="false">
+              <button class="btn btn-sm" id="btnVoiceInput" style="padding:0 10px;" title="Nadiktovat odpověď hlasem">Mikrofon</button>
               <button class="btn btn-sm" id="btnTypeHint" style="padding:0 12px;" title="Odhalit další písmeno">Nápověda</button>
               <button class="btn btn-primary" id="btnCheckType" style="padding:0 20px;">Ověřit</button>
             </div>
@@ -1543,7 +1990,12 @@ PRO_PATCHES = [
           </div>
 
           <!-- QUIZ 4-CHOICE AREA -->
-          <div class="quiz-grid" id="quizArea" style="display:none;"></div>''',
+          <div style="display:none; flex-direction:column; gap:8px;" id="quizWrapArea">
+            <div style="display:flex; justify-content:flex-end;">
+              <button class="btn btn-sm" id="btnUseFiftyFifty" style="font-size:0.76rem;">Použít 50:50</button>
+            </div>
+            <div class="quiz-grid" id="quizArea"></div>
+          </div>''',
     ),
     (
         '''  // 1. Nahrazení Obsidian obrázků ![[nazev.jpg]]
@@ -1753,24 +2205,33 @@ function renderQuizOptions(card, isReverse) {
     btnFlip.style.display = "block";
   }''',
         '''  const hintBox = document.getElementById("typeHintDisplay");
-  const quizArea = document.getElementById("quizArea");
+  const quizWrap = document.getElementById("quizWrapArea");
   if (hintBox) { hintBox.style.display = "none"; hintBox.innerText = ""; }
-  if (cardStudyMode === "type") {
+  qBox.style.opacity = "1";
+  if (cardStudyMode === "type" || cardStudyMode === "dictation") {
     typeArea.style.display = "flex";
-    if (quizArea) quizArea.style.display = "none";
+    if (quizWrap) quizWrap.style.display = "none";
     typeInput.value = "";
     typeDiff.style.display = "none";
     typeDiff.innerHTML = "";
     btnFlip.style.display = "none";
+    if (cardStudyMode === "dictation") {
+      qBox.innerHTML = `<div style="text-align:center; padding:18px; color:var(--text-muted);">Poslouchejte diktát a napište co slyšíte...</div>`;
+      setTimeout(() => { const b = document.getElementById("btnSpeakQuestion"); if (b) b.click(); }, 150);
+    }
     setTimeout(() => typeInput.focus(), 50);
   } else if (cardStudyMode === "quiz") {
     typeArea.style.display = "none";
-    if (quizArea) { quizArea.style.display = "grid"; renderQuizOptions(currentCard, isReverse); }
+    if (quizWrap) { quizWrap.style.display = "flex"; renderQuizOptions(currentCard, isReverse); }
     btnFlip.style.display = "none";
   } else {
     typeArea.style.display = "none";
-    if (quizArea) quizArea.style.display = "none";
+    if (quizWrap) quizWrap.style.display = "none";
     btnFlip.style.display = "block";
+  }
+  const chkAuto = document.getElementById("chkAutoTts");
+  if (chkAuto && chkAuto.checked && cardStudyMode !== "dictation") {
+    setTimeout(() => { const b = document.getElementById("btnSpeakQuestion"); if (b) b.click(); }, 180);
   }''',
     ),
     (
@@ -1822,17 +2283,63 @@ btnModeType.onclick = () => {
         '''const btnModeFlip = document.getElementById("btnModeFlip");
 const btnModeType = document.getElementById("btnModeType");
 const btnModeQuiz = document.getElementById("btnModeQuiz");
+const btnModeDict = document.getElementById("btnModeDictation");
 
 function setStudyModeUi(mode) {
   cardStudyMode = mode;
   btnModeFlip.classList.toggle("active", mode === "flip");
   btnModeType.classList.toggle("active", mode === "type");
   if (btnModeQuiz) btnModeQuiz.classList.toggle("active", mode === "quiz");
+  if (btnModeDict) btnModeDict.classList.toggle("active", mode === "dictation");
   loadCard(currentIndex);
 }
 btnModeFlip.onclick = () => setStudyModeUi("flip");
 btnModeType.onclick = () => setStudyModeUi("type");
 if (btnModeQuiz) btnModeQuiz.onclick = () => setStudyModeUi("quiz");
+if (btnModeDict) btnModeDict.onclick = () => setStudyModeUi("dictation");
+
+const btnFifty = document.getElementById("btnUseFiftyFifty");
+if (btnFifty) {
+  btnFifty.onclick = () => {
+    const p = loadProProfile();
+    if (!p.powerups || (p.powerups.fiftyFifty || 0) <= 0) { alert("Nemáte Nápovědu 50:50 (lze koupit v Obchodě)."); return; }
+    const isRev = document.getElementById("chkReverseStudy").checked;
+    const correctAns = extractTargetAnswer(currentCard, isRev);
+    const wrongBtns = Array.from(document.querySelectorAll("#quizArea .quiz-option")).filter(b => b.innerText !== correctAns && !b.disabled);
+    if (wrongBtns.length < 2) return;
+    p.powerups.fiftyFifty--; saveProProfile(p);
+    wrongBtns.slice(0, 2).forEach(b => { b.disabled = true; b.style.opacity = "0.25"; });
+    showProToast("Nápověda 50:50 aktivována!");
+  };
+}
+
+const btnVoice = document.getElementById("btnVoiceInput");
+if (btnVoice) {
+  btnVoice.onclick = () => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { alert("Váš prohlížeč nepodporuje hlasové rozpoznávání."); return; }
+    const rec = new SR();
+    const selL = document.getElementById("selTtsLang");
+    rec.lang = selL ? selL.value : "en-US";
+    rec.interimResults = false;
+    btnVoice.innerText = "Poslouchám...";
+    rec.onresult = (ev) => {
+      const txt = ev.results[0][0].transcript;
+      document.getElementById("typeTextInput").value = txt;
+      btnVoice.innerText = "Mikrofon";
+      submitTypeAnswer();
+    };
+    rec.onerror = () => { btnVoice.innerText = "Mikrofon"; };
+    rec.onend = () => { btnVoice.innerText = "Mikrofon"; };
+    rec.start();
+  };
+}
+
+const chkAutoTts = document.getElementById("chkAutoTts");
+if (chkAutoTts) {
+  chkAutoTts.checked = localStorage.getItem("karty_auto_tts") === "1";
+  chkAutoTts.onchange = () => localStorage.setItem("karty_auto_tts", chkAutoTts.checked ? "1" : "0");
+}
 
 const btnEditCur = document.getElementById("btnEditCurrentCard");
 if (btnEditCur) btnEditCur.onclick = () => { studyOptionsBar.classList.remove("open"); openCardEditor(); };
@@ -1870,7 +2377,9 @@ if (btnSpeakQ) {
     if (!("speechSynthesis" in window)) { alert("Váš prohlížeč nepodporuje čtení textu."); return; }
     const qEl = document.getElementById("cardQuestion");
     const aEl = document.getElementById("cardAnswer");
-    const raw = (isCardFlipped && aEl && aEl.innerText.trim()) ? aEl.innerText.trim() : (qEl ? qEl.innerText.trim() : "");
+    const raw = (cardStudyMode === "dictation" || (isCardFlipped && aEl && aEl.innerText.trim()))
+      ? (cardStudyMode === "dictation" ? extractTargetAnswer(currentCard, document.getElementById("chkReverseStudy").checked) : aEl.innerText.trim())
+      : (qEl ? qEl.innerText.trim() : "");
     if (!raw) return;
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(raw);
