@@ -12470,7 +12470,7 @@ if st.session_state.df is not None:
                     progress_bar = st.progress(0.0)
                     status = st.empty()
 
-                    status.text("Připravuji seznam médií ke stažení...")
+                    status.info("Probíhá generování Anki balíčku (.apkg)... Neklikejte prosím znovu, za chvíli bude připraven ke stažení.")
                     media_tasks = {}
                     media_attributions = {}
                     active_cols = list(dict.fromkeys(st.session_state.front_cols_ordered + st.session_state.back_cols_ordered))
@@ -13568,7 +13568,7 @@ if st.session_state.df is not None:
                     progress_bar = st.progress(0.0)
                     status = st.empty()
 
-                    status.text("Připravuji seznam médií pro Obsidian...")
+                    status.info("Probíhá generování balíčku (.zip) pro Karty.html / Obsidian... Neklikejte prosím znovu.")
                     effective_front = st.session_state.obs_front_cols_ordered
                     effective_back = st.session_state.obs_back_cols_ordered
                     sel_card_sep = "??" if "Obousměrné" in st.session_state.get("obs_card_sep_radio", "") else "?"
@@ -14367,7 +14367,7 @@ if st.session_state.df is not None:
 
                     progress_bar = st.progress(0.0)
                     status = st.empty()
-                    status.text("Připravuji podklady a stahuji fotografie pro dokument Word...")
+                    status.info("Probíhá generování dokumentu Word (.docx)... Neklikejte prosím znovu.")
 
                     media_tasks = {}
                     media_attributions = {}

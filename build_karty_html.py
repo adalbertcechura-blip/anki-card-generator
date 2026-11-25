@@ -176,6 +176,19 @@ main {
   flex-direction: column;
 }
 
+.spinner-ring {
+  width: 42px;
+  height: 42px;
+  border: 4px solid rgba(34, 197, 94, 0.22);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spinRing 0.85s linear infinite;
+  margin: 0 auto 12px auto;
+}
+@keyframes spinRing {
+  to { transform: rotate(360deg); }
+}
+
 /* SCREEN: DECKS LIBRARY */
 #decksView {
   display: flex;
@@ -1339,6 +1352,18 @@ main {
   <img class="lightbox-img" id="lightboxImg" src="" alt="Detail">
 </div>
 
+<!-- IMPORT PROGRESS OVERLAY -->
+<div class="modal-overlay" id="importOverlay" style="z-index:200;">
+  <div class="modal-content" style="max-width:380px; text-align:center; padding:24px 20px;">
+    <div class="spinner-ring"></div>
+    <div id="importOverlayTitle" style="font-size:1.05rem; font-weight:700; color:#edf5f0; margin-bottom:6px;">Načítám balíček...</div>
+    <div id="importOverlaySub" style="font-size:0.84rem; color:#95ab9e; margin-bottom:14px;">Prosím nezavírejte okno. U velkých archivů může rozbalení trvat 1–2 minuty.</div>
+    <div style="width:100%; height:8px; background:#0c120e; border:1px solid var(--border-color); border-radius:999px; overflow:hidden;">
+      <div id="importProgressBar" style="width:12%; height:100%; background:var(--accent); transition:width 0.15s ease;"></div>
+    </div>
+  </div>
+</div>
+
 <!-- HELP MODAL -->
 <div class="modal-overlay" id="helpModal">
   <div class="modal-box">
@@ -2095,18 +2120,30 @@ document.getElementById("lightbox").onclick = () => document.getElementById("lig
 async function importZipFile(file) {
   const dropTitleEl = document.querySelector("#dropZone .drop-title");
   const dropSubEl = document.querySelector("#dropZone .drop-subtitle");
+  const overlayEl = document.getElementById("importOverlay");
+  const ovTitle = document.getElementById("importOverlayTitle");
+  const ovSub = document.getElementById("importOverlaySub");
+  const ovBar = document.getElementById("importProgressBar");
   const origTitle = dropTitleEl ? dropTitleEl.innerText : "";
   const origSub = dropSubEl ? dropSubEl.innerText : "";
-  const setStatus = (t, s) => {
+  const setStatus = (t, s, pct = null) => {
     if (dropTitleEl) dropTitleEl.innerText = t;
     if (dropSubEl) dropSubEl.innerText = s;
+    if (ovTitle) ovTitle.innerText = t;
+    if (ovSub) ovSub.innerText = s;
+    if (ovBar && pct !== null) ovBar.style.width = `${Math.max(5, Math.min(100, pct))}%`;
   };
 
   try {
-    setStatus("Načítám archiv .zip...", `${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`);
-    await new Promise(r => setTimeout(r, 10));
+    if (overlayEl) overlayEl.classList.add("active");
+    setStatus(
+      "Rozbaluji archiv .zip...",
+      `${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} MB) – prosím čekejte`,
+      10
+    );
+    await new Promise(r => setTimeout(r, 40));
 
-    const zip = await JSZip.loadAsync(file);
+    const zip = await JSZip.loadAsync(file, { createFolders: false });
     let deckName = file.name.replace(/\.zip$/i, "").replace(/_/g, " ");
     let parsedPreloaded = null;
 
@@ -2273,11 +2310,11 @@ async function importZipFile(file) {
       );
       await dbSaveMediaBatch(deckId, batch);
       savedMediaCount += batch.length;
-      setStatus("Ukládám obrázky do zařízení...", `${savedMediaCount} / ${mediaEntries.length}`);
+      setStatus("Ukládám obrázky do zařízení...", `${savedMediaCount} / ${mediaEntries.length}`, 20 + Math.round((savedMediaCount / Math.max(1, mediaEntries.length)) * 75));
       await new Promise(r => setTimeout(r, 0));
     }
 
-    setStatus("Dokončuji uložení balíčku...", deckName);
+    setStatus("Dokončuji uložení balíčku...", deckName, 98);
     const updatedDeck = {
       id: deckId,
       name: deckName,
@@ -2288,6 +2325,7 @@ async function importZipFile(file) {
     };
 
     await dbSaveDeck(updatedDeck);
+    if (overlayEl) overlayEl.classList.remove("active");
     if (existingDeck) {
       alert(`Aktualizován balíček "${deckName}" (${rawCards.length} kartiček, ${savedMediaCount} fotografií). Postup učení zachován u ${preservedCount} kartiček!`);
     } else {
@@ -2296,8 +2334,10 @@ async function importZipFile(file) {
     await loadDeckList();
   } catch (err) {
     console.error(err);
-    alert("Chyba při čtení archivu .zip: " + err.message);
+    if (overlayEl) overlayEl.classList.remove("active");
+    alert("Chyba při čtení archivu .zip: " + err.message + "\n\nTip pro velké balíčky na mobilu: rozbalte .zip ve správci souborů a vyberte soubory ze složky.");
   } finally {
+    if (overlayEl) overlayEl.classList.remove("active");
     if (dropTitleEl) dropTitleEl.innerText = origTitle;
     if (dropSubEl) dropSubEl.innerText = origSub;
   }
