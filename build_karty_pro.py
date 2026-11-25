@@ -79,6 +79,54 @@ body.theme-mono {
   --accent: #a8b5c4; --accent-hover: #c4ceda; --accent-soft: rgba(168, 181, 196, 0.14);
   --text-main: #e6eaef; --text-muted: #87919e;
 }
+body.theme-ocean {
+  --bg-main: #07161e; --bg-card: rgba(12, 31, 43, 0.92); --bg-card-hover: #112b3b; --bg-surface: #153547;
+  --border-color: rgba(56, 189, 248, 0.18); --border-highlight: rgba(56, 189, 248, 0.35);
+  --accent: #38bdf8; --accent-hover: #0ea5e9; --accent-soft: rgba(56, 189, 248, 0.15);
+  --text-main: #e0f2fe; --text-muted: #7dd3fc;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 320' preserveAspectRatio='none'%3E%3Cpath fill='%2338bdf8' fill-opacity='0.08' d='M0,224L80,213.3C160,203,320,181,480,192C640,203,800,245,960,245.3C1120,245,1200,203,1200,203L1200,320L0,320Z'/%3E%3Cpath fill='%230ea5e9' fill-opacity='0.06' d='M0,256L100,245.3C200,235,400,213,600,224C800,235,1000,277,1100,288L1200,298L1200,320L0,320Z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: bottom center; background-size: 100% 240px; background-attachment: fixed;
+}
+body.theme-desert {
+  --bg-main: #1b110c; --bg-card: rgba(36, 23, 16, 0.93); --bg-card-hover: #2d1d14; --bg-surface: #382419;
+  --border-color: rgba(245, 158, 11, 0.18); --border-highlight: rgba(245, 158, 11, 0.36);
+  --accent: #f59e0b; --accent-hover: #d97706; --accent-soft: rgba(245, 158, 11, 0.16);
+  --text-main: #fef3c7; --text-muted: #d6a87c;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 320' preserveAspectRatio='none'%3E%3Ccircle cx='980' cy='80' r='36' fill='%23f59e0b' fill-opacity='0.12'/%3E%3Cpath fill='%23d97706' fill-opacity='0.09' d='M0,240Q300,150 620,225T1200,210L1200,320L0,320Z'/%3E%3Cpath fill='%23b45309' fill-opacity='0.07' d='M0,275Q400,210 820,270T1200,255L1200,320L0,320Z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: bottom center; background-size: 100% 260px; background-attachment: fixed;
+}
+body.theme-rainforest {
+  --bg-main: #071710; --bg-card: rgba(12, 33, 23, 0.93); --bg-card-hover: #112e20; --bg-surface: #163b29;
+  --border-color: rgba(52, 211, 153, 0.18); --border-highlight: rgba(52, 211, 153, 0.36);
+  --accent: #10b981; --accent-hover: #059669; --accent-soft: rgba(16, 185, 129, 0.16);
+  --text-main: #d1fae5; --text-muted: #6ee7b7;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Cpath fill='%2310b981' fill-opacity='0.07' d='M0,300 C40,210 90,170 160,150 C110,200 85,250 80,300 Z M400,300 C350,200 290,160 220,145 C270,195 300,250 310,300 Z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: bottom center; background-size: 100% 280px; background-attachment: fixed;
+}
+body.theme-space {
+  --bg-main: #070614; --bg-card: rgba(15, 13, 36, 0.92); --bg-card-hover: #17143d; --bg-surface: #1e1a4a;
+  --border-color: rgba(167, 139, 250, 0.2); --border-highlight: rgba(167, 139, 250, 0.4);
+  --accent: #a78bfa; --accent-hover: #8b5cf6; --accent-soft: rgba(167, 139, 250, 0.16);
+  --text-main: #ede9fe; --text-muted: #a5b4fc;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 400'%3E%3Ccircle cx='80' cy='70' r='2' fill='%23fff' fill-opacity='0.3'/%3E%3Ccircle cx='210' cy='40' r='1.5' fill='%23fff' fill-opacity='0.25'/%3E%3Ccircle cx='490' cy='90' r='28' fill='%23a78bfa' fill-opacity='0.09'/%3E%3Cellipse cx='490' cy='90' rx='48' ry='10' transform='rotate(-18 490 90)' fill='none' stroke='%23c4b5fd' stroke-opacity='0.14' stroke-width='2'/%3E%3Ccircle cx='140' cy='280' r='1.8' fill='%23fff' fill-opacity='0.22'/%3E%3Ccircle cx='390' cy='240' r='1.5' fill='%23fff' fill-opacity='0.25'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: center; background-size: cover; background-attachment: fixed;
+}
+body.theme-lofi {
+  --bg-main: #130e1c; --bg-card: rgba(27, 20, 41, 0.93); --bg-card-hover: #251b38; --bg-surface: #2f2247;
+  --border-color: rgba(244, 114, 182, 0.18); --border-highlight: rgba(244, 114, 182, 0.36);
+  --accent: #f472b6; --accent-hover: #ec4899; --accent-soft: rgba(244, 114, 182, 0.15);
+  --text-main: #fce7f3; --text-muted: #d8b4fe;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 400'%3E%3Ccircle cx='480' cy='85' r='34' fill='%23f472b6' fill-opacity='0.09'/%3E%3Ccircle cx='120' cy='320' r='50' fill='%23a855f7' fill-opacity='0.07'/%3E%3Cpath fill='%23f472b6' fill-opacity='0.06' d='M0,340L150,290L300,320L460,280L600,310L600,400L0,400Z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: bottom center; background-size: cover; background-attachment: fixed;
+}
+body.theme-cottage {
+  --bg-main: #181710; --bg-card: rgba(34, 32, 22, 0.94); --bg-card-hover: #2c2a1d; --bg-surface: #363323;
+  --border-color: rgba(190, 209, 138, 0.18); --border-highlight: rgba(190, 209, 138, 0.35);
+  --accent: #a3be67; --accent-hover: #8ca850; --accent-soft: rgba(163, 190, 103, 0.16);
+  --text-main: #f3f0e0; --text-muted: #bdb79c;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Ccircle cx='70' cy='250' r='18' fill='%23a3be67' fill-opacity='0.08'/%3E%3Cpath fill='%23a3be67' fill-opacity='0.08' d='M320,300 C320,255 340,225 360,210 C345,245 340,275 340,300 Z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: bottom right; background-size: 380px 260px; background-attachment: fixed;
+}
 header {
   background: var(--bg-main);
   border-bottom: 1px solid var(--border-color);
@@ -643,6 +691,7 @@ PRO_MODALS_HTML = r"""
     </div>
 
     <div id="gamesMenuPane">
+      <div id="gamesUnlockInfo" style="font-size:0.82rem; color:var(--text-muted); margin-bottom:6px;"></div>
       <div class="games-menu-grid">
         <button class="game-tile" id="btnStartTimedMatch">
           <strong style="font-size:0.95rem;">Spojovačka na čas</strong>
@@ -716,6 +765,12 @@ PRO_JS = r"""
 const PRO_STORAGE_KEY = "karty_pro_profile_v1";
 const PRO_THEMES = [
   { id: "default", name: "Lesní houbař (výchozí)", cost: 0 },
+  { id: "ocean", name: "Moře (vlny)", cost: 1500 },
+  { id: "desert", name: "Poušť (duny)", cost: 1500 },
+  { id: "rainforest", name: "Prales (kapradí)", cost: 1500 },
+  { id: "space", name: "Vesmír (hvězdy a planeta)", cost: 1500 },
+  { id: "lofi", name: "Lo-fi noc", cost: 1500 },
+  { id: "cottage", name: "Cottagecore louka", cost: 1500 },
   { id: "moss", name: "Hluboký mech", cost: 1500 },
   { id: "lichen", name: "Kůra a lišejník", cost: 1500 },
   { id: "amber", name: "Teplý jantar", cost: 1500 },
@@ -796,7 +851,7 @@ function setMascotState(mood, msg) {
 }
 
 function applyProTheme(themeId) {
-  document.body.classList.remove("theme-moss", "theme-midnight", "theme-amber", "theme-heather", "theme-lichen", "theme-mono");
+  document.body.classList.remove("theme-moss", "theme-midnight", "theme-amber", "theme-heather", "theme-lichen", "theme-mono", "theme-ocean", "theme-desert", "theme-rainforest", "theme-space", "theme-lofi", "theme-cottage");
   if (themeId && themeId !== "default") document.body.classList.add("theme-" + themeId);
 }
 
@@ -1581,6 +1636,11 @@ document.getElementById("btnBuyComboShield").onclick = async () => {
 };
 
 // --- MINI-GAMES CONTROLLER ---
+const MIN_SEEN_FOR_GAMES = 10;
+function getSeenDeckCards(deck) {
+  if (!deck || !Array.isArray(deck.cards)) return [];
+  return deck.cards.filter(c => (c.due && c.due > 0) || (c.reps && c.reps > 0) || (c.rev && c.rev.due > 0));
+}
 let _tmInterval = null, _gravRaf = null, _gravFrozenUntil = 0;
 function stopAllMiniGames() {
   if (_tmInterval) { clearInterval(_tmInterval); _tmInterval = null; }
@@ -1594,16 +1654,39 @@ function showGamePane(paneId) {
   });
   document.getElementById("btnGameBackMenu").style.display = paneId === "gamesMenuPane" ? "none" : "inline-flex";
 }
+async function updateGamesLockState() {
+  const deck = await getSelectedGameDeck();
+  const seen = getSeenDeckCards(deck);
+  const unlocked = seen.length >= MIN_SEEN_FOR_GAMES;
+  const infoEl = document.getElementById("gamesUnlockInfo");
+  if (infoEl) {
+    infoEl.innerText = unlocked
+      ? `Odemčeno! Hraje se pouze z vašich ${seen.length} již viděných karet v tomto balíčku.`
+      : `Zamčeno: v tomto balíčku máte zatím viděno ${seen.length} / ${MIN_SEEN_FOR_GAMES} karet. Projděte nejprve alespoň ${MIN_SEEN_FOR_GAMES} karet v učení.`;
+    infoEl.style.color = unlocked ? "var(--accent)" : "#fbbf24";
+  }
+  ["btnStartTimedMatch", "btnStartBossFight", "btnStartGravity", "btnStartScramble"].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      btn.disabled = !unlocked;
+      btn.style.opacity = unlocked ? "1" : "0.45";
+      btn.style.cursor = unlocked ? "pointer" : "not-allowed";
+    }
+  });
+}
 async function openGamesHub(preselectedDeckId = null) {
   const decks = await dbGetAllDecks();
   const sel = document.getElementById("selGameDeck");
   sel.innerHTML = "";
   decks.forEach(d => {
-    sel.innerHTML += `<option value="${d.id}" ${preselectedDeckId === d.id ? "selected" : ""}>${escapeHtml(d.name)} (${d.cards.length})</option>`;
+    const seenCnt = getSeenDeckCards(d).length;
+    sel.innerHTML += `<option value="${d.id}" ${preselectedDeckId === d.id ? "selected" : ""}>${escapeHtml(d.name)} (viděno ${seenCnt}/${d.cards.length})</option>`;
   });
   showGamePane("gamesMenuPane");
+  await updateGamesLockState();
   document.getElementById("gamesModal").classList.add("active");
 }
+document.getElementById("selGameDeck").onchange = () => { showGamePane("gamesMenuPane"); updateGamesLockState(); };
 async function getSelectedGameDeck() {
   const id = document.getElementById("selGameDeck").value;
   return id ? await dbGetDeck(id) : null;
@@ -1616,9 +1699,10 @@ document.getElementById("btnGameBackMenu").onclick = () => showGamePane("gamesMe
 let _tmFreezeUntil = 0;
 document.getElementById("btnStartTimedMatch").onclick = async () => {
   const deck = await getSelectedGameDeck();
-  if (!deck || deck.cards.length < 6) { alert("Potřebujete balíček s alespoň 6 kartami."); return; }
+  const seenCards = getSeenDeckCards(deck);
+  if (seenCards.length < MIN_SEEN_FOR_GAMES) { alert(`Pro odemčení miniher musíte v balíčku projít alespoň ${MIN_SEEN_FOR_GAMES} karet.`); return; }
   showGamePane("gameTimedMatchPane");
-  const sample = [...deck.cards].sort(() => Math.random() - 0.5).slice(0, 6);
+  const sample = [...seenCards].sort(() => Math.random() - 0.5).slice(0, 6);
   const tiles = [];
   sample.forEach(c => {
     tiles.push({ id: c.id, text: c.title || extractTargetAnswer(c, true), side: "L" });
@@ -1675,7 +1759,8 @@ document.getElementById("btnUseTimeFreezeMatch").onclick = () => {
 // 2. Boss Fight
 document.getElementById("btnStartBossFight").onclick = async () => {
   const deck = await getSelectedGameDeck();
-  if (!deck || deck.cards.length < 4) { alert("Potřebujete alespoň 4 karty."); return; }
+  const seenCards = getSeenDeckCards(deck);
+  if (seenCards.length < MIN_SEEN_FOR_GAMES) { alert(`Pro odemčení miniher musíte v balíčku projít alespoň ${MIN_SEEN_FOR_GAMES} karet.`); return; }
   showGamePane("gameBossPane");
   let bossHp = 100, playerHp = 5, bossCombo = 0;
   document.getElementById("bossNameLabel").innerText = `Boss: ${deck.name}`;
@@ -1684,10 +1769,10 @@ document.getElementById("btnStartBossFight").onclick = async () => {
     document.getElementById("bossHpBar").style.width = `${bossHp}%`;
     document.getElementById("playerBossHpText").innerText = `Vaše HP: ${playerHp} / 5`;
     document.getElementById("bossComboText").innerText = `Combo: ${bossCombo}x`;
-    const card = deck.cards[Math.floor(Math.random() * deck.cards.length)];
+    const card = seenCards[Math.floor(Math.random() * seenCards.length)];
     const correct = extractTargetAnswer(card, false);
     document.getElementById("bossQuestionBox").innerText = card.title || extractTargetAnswer(card, true);
-    const pool = deck.cards.filter(c => c.id !== card.id).sort(() => Math.random() - 0.5);
+    const pool = seenCards.filter(c => c.id !== card.id).sort(() => Math.random() - 0.5);
     const opts = [correct];
     for (const c of pool) {
       const a = extractTargetAnswer(c, false);
@@ -1733,18 +1818,19 @@ document.getElementById("btnStartBossFight").onclick = async () => {
 // 3. Gravity / Meteorites
 document.getElementById("btnStartGravity").onclick = async () => {
   const deck = await getSelectedGameDeck();
-  if (!deck || deck.cards.length < 4) { alert("Potřebujete alespoň 4 karty."); return; }
+  const seenCards = getSeenDeckCards(deck);
+  if (seenCards.length < MIN_SEEN_FOR_GAMES) { alert(`Pro odemčení miniher musíte v balíčku projít alespoň ${MIN_SEEN_FOR_GAMES} karet.`); return; }
   showGamePane("gameGravityPane");
   let score = 0, yPos = 0, lastTs = performance.now();
   _gravFrozenUntil = 0;
   function spawnMeteor() {
     yPos = 0;
     document.getElementById("gravScoreLabel").innerText = `Skóre: ${score}`;
-    const card = deck.cards[Math.floor(Math.random() * deck.cards.length)];
+    const card = seenCards[Math.floor(Math.random() * seenCards.length)];
     const correct = extractTargetAnswer(card, false);
     const meteor = document.getElementById("gravMeteor");
     meteor.innerText = card.title || extractTargetAnswer(card, true);
-    const pool = deck.cards.filter(c => c.id !== card.id).sort(() => Math.random() - 0.5);
+    const pool = seenCards.filter(c => c.id !== card.id).sort(() => Math.random() - 0.5);
     const opts = [correct];
     for (const c of pool) {
       const a = extractTargetAnswer(c, false);
@@ -1796,15 +1882,16 @@ document.getElementById("btnUseTimeFreezeGrav").onclick = () => {
 };
 
 // 4. Word / Sentence Scramble
-let _scrDeck = null, _scrTarget = "", _scrBuilt = [];
+let _scrPool = [], _scrTarget = "", _scrBuilt = [];
 document.getElementById("btnStartScramble").onclick = async () => {
-  _scrDeck = await getSelectedGameDeck();
-  if (!_scrDeck || _scrDeck.cards.length === 0) { alert("Balíček je prázdný."); return; }
+  const deck = await getSelectedGameDeck();
+  _scrPool = getSeenDeckCards(deck);
+  if (_scrPool.length < MIN_SEEN_FOR_GAMES) { alert(`Pro odemčení miniher musíte v balíčku projít alespoň ${MIN_SEEN_FOR_GAMES} karet.`); return; }
   showGamePane("gameScramblePane");
   nextScramble();
 };
 function nextScramble() {
-  const card = _scrDeck.cards[Math.floor(Math.random() * _scrDeck.cards.length)];
+  const card = _scrPool[Math.floor(Math.random() * _scrPool.length)];
   _scrTarget = extractTargetAnswer(card, false).split(/\s*[;/]\s*/)[0].trim();
   document.getElementById("scramblePromptBox").innerText = card.title || extractTargetAnswer(card, true);
   const words = _scrTarget.split(/\s+/).filter(Boolean);
