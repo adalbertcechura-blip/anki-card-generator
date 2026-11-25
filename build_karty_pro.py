@@ -114,7 +114,6 @@ header {
   white-space: nowrap;
 }
 .pro-pill.points { color: var(--accent); border-color: var(--border-highlight); }
-.pro-pill.hearts { color: #e88d8d; border-color: rgba(232, 141, 141, 0.25); }
 .pro-pill.boost { color: var(--accent); background: var(--accent-soft); border-color: var(--border-highlight); }
 .pro-pill.level, .pro-pill.streak { color: var(--text-main); }
 
@@ -372,7 +371,6 @@ header {
 """
 
 PRO_HEADER_HUD = r"""  <div class="pro-hud" id="proHud">
-    <span class="pro-pill hearts" id="proHeartsPill" title="Životy (doplňují se časem nebo tréninkem)">Životy: 5/5</span>
     <span class="pro-pill level" id="proLevelPill" title="Vaše úroveň">Lv. 1</span>
     <span class="pro-pill streak" id="proStreakPill" title="Denní série">Série: 0 d</span>
     <span class="pro-pill points" id="proPointsPill" title="Body">0 b.</span>
@@ -414,7 +412,6 @@ PRO_DASHBOARD_HTML = r"""
 PRO_EXTRA_BAR_HTML = r"""
     <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
       <button class="btn btn-sm btn-primary" id="btnProNewCard">+ Nová karta / Rychlý import</button>
-      <button class="btn btn-sm" id="btnProHeartPractice" style="display:none;">Trénink pro obnovení životů (+2)</button>
     </div>
 """
 
@@ -451,13 +448,6 @@ PRO_MODALS_HTML = r"""
 
     <h4 style="font-size:0.85rem; color:var(--text-muted); margin-bottom:8px; text-transform:uppercase;">Vylepšení</h4>
     <div class="shop-grid" style="margin-bottom:14px;">
-      <div class="shop-item">
-        <div class="shop-item-info">
-          <div class="shop-item-title">Doplnit životy (5/5)</div>
-          <div class="shop-item-desc">Okamžitě obnoví všechny životy na maximum.</div>
-        </div>
-        <button class="btn btn-sm btn-primary" id="btnBuyHearts">Koupit (300 b.)</button>
-      </div>
       <div class="shop-item">
         <div class="shop-item-info">
           <div class="shop-item-title">Streak Freeze (max. 3)</div>
@@ -594,8 +584,6 @@ function getDefaultProProfile() {
   return {
     points: 0,
     xp: 0,
-    hearts: 5,
-    lastHeartRegen: Date.now(),
     freezes: 1,
     frozenDates: [],
     dailyGoal: 20,
@@ -619,7 +607,7 @@ function loadProProfile() {
     if (!raw) return getDefaultProProfile();
     const parsed = JSON.parse(raw);
     const def = getDefaultProProfile();
-    const prof = {
+    return {
       ...def,
       ...parsed,
       frozenDates: Array.isArray(parsed.frozenDates) ? parsed.frozenDates : [],
@@ -627,19 +615,6 @@ function loadProProfile() {
       milestones: Array.isArray(parsed.milestones) && parsed.milestones.length > 0 ? parsed.milestones : def.milestones,
       dailyBonusDates: Array.isArray(parsed.dailyBonusDates) ? parsed.dailyBonusDates : []
     };
-    // Regen +1 heart every 30 min
-    if (prof.hearts < 5) {
-      const elapsed = Date.now() - (prof.lastHeartRegen || Date.now());
-      const gained = Math.floor(elapsed / (30 * 60 * 1000));
-      if (gained > 0) {
-        prof.hearts = Math.min(5, prof.hearts + gained);
-        prof.lastHeartRegen = Date.now();
-        localStorage.setItem(PRO_STORAGE_KEY, JSON.stringify(prof));
-      }
-    } else {
-      prof.lastHeartRegen = Date.now();
-    }
-    return prof;
   } catch (e) {
     return getDefaultProProfile();
   }
@@ -811,7 +786,7 @@ function playProTone(kind) {
 
 let sessionCombo = 0;
 let _lessonStartMs = Date.now();
-let _lessonStats = { reviewed: 0, mistakes: 0, xp: 0, isHeartTraining: false };
+let _lessonStats = { reviewed: 0, mistakes: 0, xp: 0 };
 
 function _hashDateSeed(str) {
   let h = 2166136261;
@@ -905,20 +880,16 @@ async function updateProHud() {
   const { prof, streak, todayCount, activeSet, frozenSet } = await computeProStreakAndFreeze();
   applyProTheme(prof.activeTheme);
   const lv = getLevelInfo(prof.xp ?? prof.points);
-  const elHearts = document.getElementById("proHeartsPill");
   const elLevel = document.getElementById("proLevelPill");
   const elStreak = document.getElementById("proStreakPill");
   const elPoints = document.getElementById("proPointsPill");
   const elBoost = document.getElementById("proBoostPill");
   const elSound = document.getElementById("btnProSound");
-  const elHeartBtn = document.getElementById("btnProHeartPractice");
-  if (elHearts) elHearts.innerText = `Životy: ${prof.hearts}/5`;
   if (elLevel) elLevel.innerText = `Lv. ${lv.level}`;
   if (elStreak) elStreak.innerText = `Série: ${streak} d`;
   if (elPoints) elPoints.innerText = `${prof.points} b.`;
   if (elBoost) elBoost.style.display = (prof.boostUntil > Date.now()) ? "inline-flex" : "none";
   if (elSound) elSound.innerText = prof.soundEnabled === false ? "Zvuk: Vyp" : "Zvuk: Zap";
-  if (elHeartBtn) elHeartBtn.style.display = prof.hearts < 5 ? "inline-flex" : "none";
 
   const elRank = document.getElementById("proDashRank");
   const elXpTxt = document.getElementById("proDashXpText");
@@ -967,23 +938,12 @@ function renderMobileWeekStrip(activeSet, frozenSet) {
   };
 }
 
-// Wrap startStudy for Hearts check, Lesson slicing (10-15 cards), and Lesson stats
+// Wrap startStudy for Lesson slicing (10-15 cards) and Lesson stats
 const _origStartStudyPro = startStudy;
 startStudy = async function(deckId, quickMode = false, subdeckFilter = null, keepExtra = false, sliceRange = null) {
   const prof = loadProProfile();
-  if (!quickMode && !_lessonStats.isHeartTraining && prof.hearts <= 0) {
-    if (confirm("Došly vám životy (0/5)! Chcete spustit krátký trénink pro obnovení +2 životů? (Nebo si je můžete doplnit v Obchodě.)")) {
-      _lessonStats = { reviewed: 0, mistakes: 0, xp: 0, isHeartTraining: true };
-      await _origStartStudyPro(deckId, true, subdeckFilter, keepExtra);
-      if (studyQueue.length > 5) studyQueue = studyQueue.slice(0, 5);
-      return;
-    }
-    return;
-  }
   _lessonStartMs = Date.now();
-  if (!_lessonStats.isHeartTraining) {
-    _lessonStats = { reviewed: 0, mistakes: 0, xp: 0, isHeartTraining: false };
-  }
+  _lessonStats = { reviewed: 0, mistakes: 0, xp: 0 };
   await _origStartStudyPro(deckId, quickMode, subdeckFilter, keepExtra);
   if (sliceRange && Array.isArray(sliceRange)) {
     const [sStart, sEnd] = sliceRange;
@@ -993,7 +953,7 @@ startStudy = async function(deckId, quickMode = false, subdeckFilter = null, kee
       currentIndex = 0;
       loadCard(0);
     }
-  } else if (!quickMode && !_lessonStats.isHeartTraining && prof.lessonLength > 0 && studyQueue.length > prof.lessonLength) {
+  } else if (!quickMode && prof.lessonLength > 0 && studyQueue.length > prof.lessonLength) {
     studyQueue = studyQueue.slice(0, prof.lessonLength);
     sessionStats.newCount = studyQueue.filter(c => !getCardSrsObj(c).due || getCardSrsObj(c).due === 0).length;
     sessionStats.dueCount = studyQueue.length - sessionStats.newCount;
@@ -1001,7 +961,7 @@ startStudy = async function(deckId, quickMode = false, subdeckFilter = null, kee
   }
 };
 
-// Wrap rateCard for Hearts, >=1 day scoring, Quests, Mascot, and Repair Round
+// Wrap rateCard for >=1 day scoring, Quests, Mascot, and Repair Round
 const _origRateCardPro = rateCard;
 rateCard = async function(ratingKey) {
   const intervals = calcNextIntervals(currentCard);
@@ -1023,16 +983,12 @@ rateCard = async function(ratingKey) {
     sessionCombo = 0;
     _lessonStats.mistakes++;
     prof.dailyQuests.cleanCount = 0;
-    if (!_lessonStats.isHeartTraining && prof.hearts > 0) {
-      prof.hearts--;
-      prof.lastHeartRegen = Date.now();
-    }
     playProTone("again");
     setMascotState("encourage", "Nevadí, opravíme na konci lekce!");
     const comboEl = document.getElementById("proComboBadge");
     if (comboEl) { comboEl.style.display = "none"; comboEl.classList.remove("hot"); }
     saveProProfile(prof);
-    showProToast("Chyba (-1 život). Karta se vrátí v opravném kole.");
+    showProToast("Karta se vrátí v opravném kole.");
     await updateProHud();
     return;
   }
@@ -1115,18 +1071,10 @@ rateCard = async function(ratingKey) {
   await updateProHud();
 };
 
-// Wrap showFinishedView for Lesson Summary + Heart Training Reward
+// Wrap showFinishedView for Lesson Summary
 const _origShowFinishedPro = showFinishedView;
 showFinishedView = function() {
   _origShowFinishedPro();
-  const prof = loadProProfile();
-  if (_lessonStats.isHeartTraining) {
-    prof.hearts = Math.min(5, prof.hearts + 2);
-    _lessonStats.isHeartTraining = false;
-    saveProProfile(prof);
-    updateProHud();
-    showProToast("Trénink dokončen! +2 životy obnoveny.");
-  }
   const msgEl = document.getElementById("finishedMsg");
   if (msgEl) {
     const secs = Math.max(1, Math.round((Date.now() - _lessonStartMs) / 1000));
@@ -1354,16 +1302,6 @@ document.getElementById("btnRunQuickImport").onclick = async () => {
   }, { passive: true });
 })();
 
-// Heart Recovery Button
-document.getElementById("btnProHeartPractice").onclick = async () => {
-  const decks = await dbGetAllDecks();
-  if (!decks || decks.length === 0) { alert("Nemáte žádný balíček."); return; }
-  _lessonStats = { reviewed: 0, mistakes: 0, xp: 0, isHeartTraining: true };
-  await _origStartStudyPro(decks[0].id, true, null, false);
-  if (studyQueue.length > 5) studyQueue = studyQueue.slice(0, 5);
-  loadCard(0);
-};
-
 // Shop & Sound Modal Listeners
 async function renderShopModal() {
   const { prof, streak } = await computeProStreakAndFreeze();
@@ -1430,11 +1368,6 @@ document.getElementById("shopModal").addEventListener("click", (e) => {
 });
 document.getElementById("selProDailyGoal").onchange = async (e) => { const p = loadProProfile(); p.dailyGoal = parseInt(e.target.value, 10) || 20; saveProProfile(p); await updateProHud(); };
 document.getElementById("selProLessonLen").onchange = async (e) => { const p = loadProProfile(); p.lessonLength = parseInt(e.target.value, 10); saveProProfile(p); };
-document.getElementById("btnBuyHearts").onclick = async () => {
-  const p = loadProProfile(); if (p.hearts >= 5) { alert("Životy už máte plné (5/5)."); return; }
-  if (p.points < 300) { alert("Potřebujete alespoň 300 bodů."); return; }
-  p.points -= 300; p.hearts = 5; saveProProfile(p); showProToast("Životy doplněny na 5/5!"); await updateProHud(); await renderShopModal();
-};
 document.getElementById("btnBuyFreeze").onclick = async () => {
   const p = loadProProfile(); if (p.freezes >= 3) { alert("Máte již plnou zásobu (3/3)."); return; }
   if (p.points < 500) { alert("Potřebujete alespoň 500 bodů."); return; }
@@ -1790,9 +1723,7 @@ function renderQuizOptions(card, isReverse) {
       });
       if (opt !== correctAns) {
         btn.classList.add("wrong");
-        const p = loadProProfile();
-        if (p.hearts > 0) { p.hearts--; saveProProfile(p); updateProHud(); }
-        showProToast("Špatná volba (-1 život)");
+        showProToast("Špatná volba, zkuste si ji zapamatovat.");
       }
       revealAnswer();
     };
