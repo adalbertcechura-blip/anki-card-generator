@@ -1774,6 +1774,8 @@ header {
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
       <h2 style="font-size:1.15rem; font-weight:700;">Balíčky</h2>
       <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <button class="btn btn-sm btn-primary" id="btnCloudSync" title="Synchronizovat postup s druhým zařízením jedním kliknutím">Synchronizovat</button>
+        <button class="btn btn-sm" id="btnCloudSyncSetup" title="Nastavení synchronizace a odkaz pro telefon">Nastavit sync</button>
         <button class="btn btn-sm" id="btnExportProgress" title="Stáhnout lehký soubor .json s postupem učení pro přenos na jiné zařízení">Export postupu (.json)</button>
         <button class="btn btn-sm" id="btnImportProgress" title="Načíst a sloučit postup učení ze souboru .json">Import postupu (.json)</button>
         <input type="file" id="fileProgressInput" accept=".json,application/json" style="display:none">
@@ -2005,60 +2007,60 @@ header {
           <div class="shop-item-title">Streak Freeze (max. 3)</div>
           <div class="shop-item-desc">Automaticky ochrání sérii, pokud některý den vynecháte.</div>
         </div>
-        <button class="btn btn-sm btn-primary" id="btnBuyFreeze">Koupit (500 b.)</button>
+        <button class="btn btn-sm btn-primary" id="btnBuyFreeze">Koupit (1200 b.)</button>
       </div>
       <div class="shop-item">
         <div class="shop-item-info">
           <div class="shop-item-title">2x Body Boost (15 min)</div>
           <div class="shop-item-desc">Zdvojnásobí body ze všech karet po dobu 15 minut.</div>
         </div>
-        <button class="btn btn-sm btn-primary" id="btnBuyBoost">Koupit (400 b.)</button>
+        <button class="btn btn-sm btn-primary" id="btnBuyBoost">Koupit (1000 b.)</button>
       </div>
       <div class="shop-item">
         <div class="shop-item-info">
           <div class="shop-item-title">Obnovení série (max. 3 dny zpět)</div>
           <div class="shop-item-desc">Zpětně zachrání nejbližší vynechaný den za poslední 3 dny.</div>
         </div>
-        <button class="btn btn-sm btn-primary" id="btnBuyRepair">Koupit (800 b.)</button>
+        <button class="btn btn-sm btn-primary" id="btnBuyRepair">Koupit (2000 b.)</button>
       </div>
       <div class="shop-item">
         <div class="shop-item-info">
           <div class="shop-item-title">Tajemná truhla</div>
-          <div class="shop-item-desc">Náhodná odměna: +200 až +700 bodů, Freeze nebo 2x Boost.</div>
+          <div class="shop-item-desc">Náhodná odměna: +450 až +1700 bodů, Freeze nebo 2x Boost.</div>
         </div>
-        <button class="btn btn-sm btn-primary" id="btnBuyMystery">Otevřít (450 b.)</button>
+        <button class="btn btn-sm btn-primary" id="btnBuyMystery">Otevřít (1100 b.)</button>
       </div>
       <div class="shop-item">
         <div class="shop-item-info">
           <div class="shop-item-title">Balíček 3x Streak Freeze</div>
           <div class="shop-item-desc">Doplní zásobu Freeze na 3/3 se slevou.</div>
         </div>
-        <button class="btn btn-sm btn-primary" id="btnBuyShieldPack">Koupit (1250 b.)</button>
+        <button class="btn btn-sm btn-primary" id="btnBuyShieldPack">Koupit (3000 b.)</button>
       </div>
       <div class="shop-item">
         <div class="shop-item-info">
           <div class="shop-item-title">Power-up: Zmrazení času</div>
           <div class="shop-item-desc">Zastaví odpočet ve Spojovačce nebo pád v Meteoritech na 10 s.</div>
         </div>
-        <button class="btn btn-sm btn-primary" id="btnBuyTimeFreeze">Koupit (250 b.)</button>
+        <button class="btn btn-sm btn-primary" id="btnBuyTimeFreeze">Koupit (600 b.)</button>
       </div>
       <div class="shop-item">
         <div class="shop-item-info">
           <div class="shop-item-title">Power-up: Nápověda 50:50</div>
           <div class="shop-item-desc">Odstraní 2 špatné možnosti v kvízovém režimu (Výběr ze 4).</div>
         </div>
-        <button class="btn btn-sm btn-primary" id="btnBuyFifty">Koupit (200 b.)</button>
+        <button class="btn btn-sm btn-primary" id="btnBuyFifty">Koupit (500 b.)</button>
       </div>
       <div class="shop-item">
         <div class="shop-item-info">
           <div class="shop-item-title">Power-up: Štít Comba</div>
           <div class="shop-item-desc">Automaticky ochrání vaše Combo při jedné chybě.</div>
         </div>
-        <button class="btn btn-sm btn-primary" id="btnBuyComboShield">Koupit (300 b.)</button>
+        <button class="btn btn-sm btn-primary" id="btnBuyComboShield">Koupit (750 b.)</button>
       </div>
     </div>
 
-    <h4 style="font-size:0.85rem; color:var(--text-muted); margin-bottom:8px; text-transform:uppercase;">Vzhled aplikace (Monochrom 600 b. · Minimalistické 1200 b. · Pro 2200 b.)</h4>
+    <h4 style="font-size:0.85rem; color:var(--text-muted); margin-bottom:8px; text-transform:uppercase;">Vzhled aplikace (Monochrom 1500 b. · Minimalistické 3000 b. · Pro 5500 b.)</h4>
     <div class="shop-grid" id="shopThemesList" style="margin-bottom:14px;"></div>
 
     <h4 style="font-size:0.85rem; color:var(--text-muted); margin-bottom:8px; text-transform:uppercase;">Nastavitelné milníky série</h4>
@@ -2212,6 +2214,34 @@ header {
         <button class="btn btn-sm" id="btnScrambleClear">Vymazat</button>
         <button class="btn btn-sm btn-primary" id="btnScrambleNext">Další slovo</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- CLOUD SYNC MODAL -->
+<div class="modal-overlay" id="syncModal">
+  <div class="modal-content" style="max-width:460px;">
+    <div class="modal-header">
+      <div class="modal-title">Synchronizace s telefonem</div>
+      <button class="modal-close" id="syncModalClose">&times;</button>
+    </div>
+    <p style="font-size:0.84rem; color:var(--text-muted); line-height:1.45; margin-bottom:10px;">
+      Postup se ukládá do vašeho soukromého <strong>GitHub Gistu</strong> (zdarma, bez serveru). Po nastavení stačí kliknout na tlačítko <strong>Synchronizovat</strong>.
+    </p>
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      <label style="font-size:0.8rem; font-weight:700;">1. GitHub Token (oprávnění <code>gist</code>)</label>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <input type="password" id="inpSyncToken" placeholder="ghp_..." style="flex:1; background:var(--bg-main); border:1px solid var(--border-color); color:var(--text-main); padding:7px 10px; border-radius:8px; font-size:0.84rem;">
+        <a href="https://github.com/settings/tokens/new?description=Karty%20Pro%20Sync&scopes=gist" target="_blank" rel="noopener" class="btn btn-sm">Získat token</a>
+      </div>
+      <label style="font-size:0.8rem; font-weight:700;">2. Gist ID (nechte prázdné pro automatické vytvoření)</label>
+      <input type="text" id="inpSyncGistId" placeholder="automaticky při prvním uložení" style="background:var(--bg-main); border:1px solid var(--border-color); color:var(--text-main); padding:7px 10px; border-radius:8px; font-size:0.84rem;">
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:4px;">
+        <button class="btn btn-sm btn-primary" id="btnSyncSaveConnect">Uložit &amp; synchronizovat</button>
+        <button class="btn btn-sm" id="btnSyncCopyPair">Kopírovat odkaz pro telefon</button>
+        <button class="btn btn-sm btn-danger" id="btnSyncDisconnect" style="margin-left:auto;">Odpojit</button>
+      </div>
+      <div id="syncStatusMsg" style="font-size:0.8rem; color:var(--text-muted); min-height:18px;"></div>
     </div>
   </div>
 </div>
@@ -5025,22 +5055,22 @@ async function checkPreloadedDeck() {
 const PRO_STORAGE_KEY = "karty_pro_profile_v1";
 const PRO_THEMES = [
   { id: "default", name: "Lesní houbař (výchozí)", cost: 0, cat: "Monochrom" },
-  { id: "moss", name: "Hluboký mech", cost: 600, cat: "Monochrom" },
-  { id: "lichen", name: "Kůra a lišejník", cost: 600, cat: "Monochrom" },
-  { id: "amber", name: "Teplý jantar", cost: 600, cat: "Monochrom" },
-  { id: "midnight", name: "Půlnoční modř", cost: 600, cat: "Monochrom" },
-  { id: "heather", name: "Vřesoviště", cost: 600, cat: "Monochrom" },
-  { id: "mono", name: "Břidlicový monochrom", cost: 600, cat: "Monochrom" },
-  { id: "ocean", name: "Moře (vlny)", cost: 1200, cat: "Minimalistické" },
-  { id: "desert", name: "Poušť (duny)", cost: 1200, cat: "Minimalistické" },
-  { id: "rainforest", name: "Prales (kapradí)", cost: 1200, cat: "Minimalistické" },
-  { id: "space", name: "Vesmír (hvězdy a planeta)", cost: 1200, cat: "Minimalistické" },
-  { id: "lofi", name: "Lo-fi noc", cost: 1200, cat: "Minimalistické" },
-  { id: "cottage", name: "Cottagecore louka", cost: 1200, cat: "Minimalistické" },
-  { id: "cats", name: "Kočičky (Cat Café)", cost: 2200, cat: "Pro ilustrované" },
-  { id: "mountains", name: "Horské vrcholy (Alpy)", cost: 2200, cat: "Pro ilustrované" },
-  { id: "sakura", name: "Japonská Sakura", cost: 2200, cat: "Pro ilustrované" },
-  { id: "lighthouse", name: "Maják u útesu", cost: 2200, cat: "Pro ilustrované" }
+  { id: "moss", name: "Hluboký mech", cost: 1500, cat: "Monochrom" },
+  { id: "lichen", name: "Kůra a lišejník", cost: 1500, cat: "Monochrom" },
+  { id: "amber", name: "Teplý jantar", cost: 1500, cat: "Monochrom" },
+  { id: "midnight", name: "Půlnoční modř", cost: 1500, cat: "Monochrom" },
+  { id: "heather", name: "Vřesoviště", cost: 1500, cat: "Monochrom" },
+  { id: "mono", name: "Břidlicový monochrom", cost: 1500, cat: "Monochrom" },
+  { id: "ocean", name: "Moře (vlny)", cost: 3000, cat: "Minimalistické" },
+  { id: "desert", name: "Poušť (duny)", cost: 3000, cat: "Minimalistické" },
+  { id: "rainforest", name: "Prales (kapradí)", cost: 3000, cat: "Minimalistické" },
+  { id: "space", name: "Vesmír (hvězdy a planeta)", cost: 3000, cat: "Minimalistické" },
+  { id: "lofi", name: "Lo-fi noc", cost: 3000, cat: "Minimalistické" },
+  { id: "cottage", name: "Cottagecore louka", cost: 3000, cat: "Minimalistické" },
+  { id: "cats", name: "Kočičky (Cat Café)", cost: 5500, cat: "Pro ilustrované" },
+  { id: "mountains", name: "Horské vrcholy (Alpy)", cost: 5500, cat: "Pro ilustrované" },
+  { id: "sakura", name: "Japonská Sakura", cost: 5500, cat: "Pro ilustrované" },
+  { id: "lighthouse", name: "Maják u útesu", cost: 5500, cat: "Pro ilustrované" }
 ];
 
 function getDefaultProProfile() {
@@ -5262,7 +5292,7 @@ function getDailyQuestsState(prof, todayCount) {
   const todayStr = getLocalDateString();
   if (!prof.dailyQuests || prof.dailyQuests.date !== todayStr) {
     prof.dailyQuests = {
-      date: todayStr, maxCombo: 0, cleanCount: 0, easyCount: 0, goodCount: 0, hardCount: 0, typeCount: 0, xpToday: 0,
+      date: todayStr, maxCombo: 0, cleanCount: 0, easyCount: 0, goodCount: 0, hardCount: 0, typeCount: 0, xpToday: 0, minigameCount: 0,
       readyIds: [], claimedIds: []
     };
     saveProProfile(prof);
@@ -5274,18 +5304,24 @@ function getDailyQuestsState(prof, todayCount) {
     { id: "q_grad10", title: "Dokonči 10 karet (min. 1 den)", cur: todayCount, target: 10, reward: 30 },
     { id: "q_grad25", title: "Dokonči 25 karet (min. 1 den)", cur: todayCount, target: 25, reward: 60 },
     { id: "q_grad40", title: "Dokonči 40 karet (min. 1 den)", cur: todayCount, target: 40, reward: 90 },
+    { id: "q_grad60", title: "Dokonči 60 karet (min. 1 den)", cur: todayCount, target: 60, reward: 130 },
     { id: "q_combo4", title: "Dosáhni Combo 4x", cur: dq.maxCombo || 0, target: 4, reward: 30 },
     { id: "q_combo8", title: "Dosáhni Combo 8x", cur: dq.maxCombo || 0, target: 8, reward: 55 },
     { id: "q_combo12", title: "Dosáhni Combo 12x", cur: dq.maxCombo || 0, target: 12, reward: 80 },
+    { id: "q_combo15", title: "Dosáhni Combo 15x", cur: dq.maxCombo || 0, target: 15, reward: 100 },
     { id: "q_clean10", title: "10 karet bez tlačítka Znovu", cur: dq.cleanCount || 0, target: 10, reward: 45 },
     { id: "q_clean20", title: "20 karet bez tlačítka Znovu", cur: dq.cleanCount || 0, target: 20, reward: 75 },
+    { id: "q_clean30", title: "30 karet bez tlačítka Znovu", cur: dq.cleanCount || 0, target: 30, reward: 110 },
     { id: "q_easy5", title: "Ohodnoť 5 karet jako Snadné", cur: dq.easyCount || 0, target: 5, reward: 35 },
+    { id: "q_easy10", title: "Ohodnoť 10 karet jako Snadné", cur: dq.easyCount || 0, target: 10, reward: 65 },
     { id: "q_good12", title: "Ohodnoť 12 karet jako Dobré", cur: dq.goodCount || 0, target: 12, reward: 40 },
     { id: "q_hard4", title: "Ohodnoť 4 karty jako Těžké", cur: dq.hardCount || 0, target: 4, reward: 35 },
     { id: "q_type5", title: "5 karet ve vepisovacím režimu", cur: dq.typeCount || 0, target: 5, reward: 45 },
     { id: "q_type10", title: "10 karet ve vepisovacím režimu", cur: dq.typeCount || 0, target: 10, reward: 65 },
     { id: "q_xp120", title: "Nasbírej dnes 120 XP", cur: dq.xpToday || 0, target: 120, reward: 50 },
-    { id: "q_xp250", title: "Nasbírej dnes 250 XP", cur: dq.xpToday || 0, target: 250, reward: 85 }
+    { id: "q_xp250", title: "Nasbírej dnes 250 XP", cur: dq.xpToday || 0, target: 250, reward: 85 },
+    { id: "q_xp400", title: "Nasbírej dnes 400 XP", cur: dq.xpToday || 0, target: 400, reward: 120 },
+    { id: "q_mini1", title: "Dokonči 1 minihru", cur: dq.minigameCount || 0, target: 1, reward: 70 }
   ];
   let seed = _hashDateSeed(todayStr);
   const pool = [...allDefs];
@@ -5870,12 +5906,12 @@ document.getElementById("selProDailyGoal").onchange = async (e) => { const p = l
 document.getElementById("selProLessonLen").onchange = async (e) => { const p = loadProProfile(); p.lessonLength = parseInt(e.target.value, 10); saveProProfile(p); };
 document.getElementById("btnBuyFreeze").onclick = async () => {
   const p = loadProProfile(); if (p.freezes >= 3) { alert("Máte již plnou zásobu (3/3)."); return; }
-  if (p.points < 500) { alert("Potřebujete alespoň 500 bodů."); return; }
-  p.points -= 500; p.freezes++; saveProProfile(p); showProToast("Zakoupen Streak Freeze!"); await updateProHud(); await renderShopModal();
+  if (p.points < 1200) { alert("Potřebujete alespoň 1200 bodů."); return; }
+  p.points -= 1200; p.freezes++; saveProProfile(p); showProToast("Zakoupen Streak Freeze!"); await updateProHud(); await renderShopModal();
 };
 document.getElementById("btnBuyBoost").onclick = async () => {
-  const p = loadProProfile(); if (p.points < 400) { alert("Potřebujete alespoň 400 bodů."); return; }
-  p.points -= 400; p.boostUntil = Date.now() + 15 * 60 * 1000; saveProProfile(p); showProToast("Aktivován 2x Body Boost na 15 min!"); await updateProHud(); await renderShopModal();
+  const p = loadProProfile(); if (p.points < 1000) { alert("Potřebujete alespoň 1000 bodů."); return; }
+  p.points -= 1000; p.boostUntil = Date.now() + 15 * 60 * 1000; saveProProfile(p); showProToast("Aktivován 2x Body Boost na 15 min!"); await updateProHud(); await renderShopModal();
 };
 document.getElementById("btnBuyRepair").onclick = async () => {
   const p = loadProProfile();
@@ -5888,39 +5924,49 @@ document.getElementById("btnBuyRepair").onclick = async () => {
     if (!activeDates.has(c) && !p.frozenDates.includes(c)) { targetDay = c; break; }
   }
   if (!targetDay) { alert("Za poslední 3 dny nemáte žádný nechráněný vynechaný den."); return; }
-  if (p.points < 800) { alert("Potřebujete alespoň 800 bodů."); return; }
-  p.points -= 800; p.frozenDates.push(targetDay); saveProProfile(p); showProToast(`Série opravena pro den ${targetDay}!`); await renderHeatmap(); await renderShopModal();
+  if (p.points < 2000) { alert("Potřebujete alespoň 2000 bodů."); return; }
+  p.points -= 2000; p.frozenDates.push(targetDay); saveProProfile(p); showProToast(`Série opravena pro den ${targetDay}!`); await renderHeatmap(); await renderShopModal();
 };
 document.getElementById("btnBuyMystery").onclick = async () => {
-  const p = loadProProfile(); if (p.points < 450) { alert("Potřebujete alespoň 450 bodů."); return; }
-  p.points -= 450;
+  const p = loadProProfile(); if (p.points < 1100) { alert("Potřebujete alespoň 1100 bodů."); return; }
+  p.points -= 1100;
   const roll = Math.random();
   let msg = "";
   if (roll < 0.25 && p.freezes < 3) { p.freezes++; msg = "Tajemná truhla: 1x Streak Freeze!"; }
   else if (roll < 0.5) { p.boostUntil = Date.now() + 15 * 60 * 1000; msg = "Tajemná truhla: 2x Body Boost!"; }
-  else { const w = [200, 350, 500, 700][Math.floor(Math.random() * 4)]; p.points += w; msg = `Tajemná truhla: +${w} bodů!`; }
+  else { const w = [450, 800, 1200, 1700][Math.floor(Math.random() * 4)]; p.points += w; msg = `Tajemná truhla: +${w} bodů!`; }
   saveProProfile(p); launchConfetti(); playProTone("level"); showProToast(msg); await updateProHud(); await renderShopModal();
 };
 document.getElementById("btnBuyShieldPack").onclick = async () => {
   const p = loadProProfile(); if (p.freezes >= 3) { alert("Zásobu Freeze už máte plnou (3/3)."); return; }
-  if (p.points < 1250) { alert("Potřebujete alespoň 1250 bodů."); return; }
-  p.points -= 1250; p.freezes = 3; saveProProfile(p); showProToast("Zásoba Streak Freeze doplněna na 3/3!"); await updateProHud(); await renderShopModal();
+  if (p.points < 3000) { alert("Potřebujete alespoň 3000 bodů."); return; }
+  p.points -= 3000; p.freezes = 3; saveProProfile(p); showProToast("Zásoba Streak Freeze doplněna na 3/3!"); await updateProHud(); await renderShopModal();
 };
 document.getElementById("btnBuyTimeFreeze").onclick = async () => {
-  const p = loadProProfile(); if (p.points < 250) { alert("Potřebujete alespoň 250 bodů."); return; }
-  p.points -= 250; p.powerups = p.powerups || {}; p.powerups.timeFreeze = (p.powerups.timeFreeze || 0) + 1;
+  const p = loadProProfile(); if (p.points < 600) { alert("Potřebujete alespoň 600 bodů."); return; }
+  p.points -= 600; p.powerups = p.powerups || {}; p.powerups.timeFreeze = (p.powerups.timeFreeze || 0) + 1;
   saveProProfile(p); showProToast(`Zakoupeno Zmrazení času (celkem ${p.powerups.timeFreeze})`); await updateProHud(); await renderShopModal();
 };
 document.getElementById("btnBuyFifty").onclick = async () => {
-  const p = loadProProfile(); if (p.points < 200) { alert("Potřebujete alespoň 200 bodů."); return; }
-  p.points -= 200; p.powerups = p.powerups || {}; p.powerups.fiftyFifty = (p.powerups.fiftyFifty || 0) + 1;
+  const p = loadProProfile(); if (p.points < 500) { alert("Potřebujete alespoň 500 bodů."); return; }
+  p.points -= 500; p.powerups = p.powerups || {}; p.powerups.fiftyFifty = (p.powerups.fiftyFifty || 0) + 1;
   saveProProfile(p); showProToast(`Zakoupena Nápověda 50:50 (celkem ${p.powerups.fiftyFifty})`); await updateProHud(); await renderShopModal();
 };
 document.getElementById("btnBuyComboShield").onclick = async () => {
-  const p = loadProProfile(); if (p.points < 300) { alert("Potřebujete alespoň 300 bodů."); return; }
-  p.points -= 300; p.powerups = p.powerups || {}; p.powerups.comboShield = (p.powerups.comboShield || 0) + 1;
+  const p = loadProProfile(); if (p.points < 750) { alert("Potřebujete alespoň 750 bodů."); return; }
+  p.points -= 750; p.powerups = p.powerups || {}; p.powerups.comboShield = (p.powerups.comboShield || 0) + 1;
   saveProProfile(p); showProToast(`Zakoupen Štít Comba (celkem ${p.powerups.comboShield})`); await updateProHud(); await renderShopModal();
 };
+
+function recordMinigameQuestProgress() {
+  const p = loadProProfile();
+  const todayStr = getLocalDateString();
+  if (!p.dailyQuests || p.dailyQuests.date !== todayStr) {
+    p.dailyQuests = { date: todayStr, maxCombo: 0, cleanCount: 0, easyCount: 0, goodCount: 0, hardCount: 0, typeCount: 0, xpToday: 0, minigameCount: 0, readyIds: [], claimedIds: [] };
+  }
+  p.dailyQuests.minigameCount = (p.dailyQuests.minigameCount || 0) + 1;
+  saveProProfile(p);
+}
 
 // --- MINI-GAMES CONTROLLER ---
 function cleanGameLine(raw) {
@@ -6062,6 +6108,7 @@ document.getElementById("btnStartTimedMatch").onclick = async () => {
         if (matched === 6) {
           stopAllMiniGames();
           const p = loadProProfile(); p.points += 40; p.xp = (p.xp || 0) + 40; saveProProfile(p);
+          recordMinigameQuestProgress();
           launchConfetti(); playProTone("level"); showProToast("Spojovačka dokončena! +40 b.");
           await updateProHud(); showGamePane("gamesMenuPane");
         }
@@ -6118,6 +6165,7 @@ document.getElementById("btnStartBossFight").onclick = async () => {
           playProTone("good");
           if (bossHp <= 0) {
             const p = loadProProfile(); p.points += 60; p.xp = (p.xp || 0) + 60; saveProProfile(p);
+            recordMinigameQuestProgress();
             launchConfetti(); playProTone("level"); showProToast("Boss poražen! +60 b.");
             await updateProHud(); showGamePane("gamesMenuPane");
             return;
@@ -6249,6 +6297,7 @@ function nextScramble() {
         const attempt = _scrBuilt.map(x => x.val).join(isWordMode ? " " : "");
         if (attempt.toLowerCase() === _scrTarget.toLowerCase()) {
           const p = loadProProfile(); p.points += 25; p.xp = (p.xp || 0) + 25; saveProProfile(p);
+          recordMinigameQuestProgress();
           launchConfetti(); playProTone("level"); showProToast("Složeno správně! +25 b.");
           await updateProHud();
           setTimeout(nextScramble, 600);
@@ -6271,7 +6320,210 @@ document.getElementById("btnAddMilestone").onclick = async () => {
   saveProProfile(p); document.getElementById("inpNewMsReward").value = ""; await renderShopModal();
 };
 
+// --- ONE-CLICK CLOUD SYNC (GITHUB GIST) ---
+const CLOUD_SYNC_KEY = "karty_pro_sync_v1";
+function loadSyncConfig() {
+  try { return JSON.parse(localStorage.getItem(CLOUD_SYNC_KEY) || "null"); } catch { return null; }
+}
+function saveSyncConfig(cfg) {
+  if (!cfg) localStorage.removeItem(CLOUD_SYNC_KEY);
+  else localStorage.setItem(CLOUD_SYNC_KEY, JSON.stringify(cfg));
+}
+function openSyncModal(msg = "") {
+  const cfg = loadSyncConfig() || {};
+  document.getElementById("inpSyncToken").value = cfg.token || "";
+  document.getElementById("inpSyncGistId").value = cfg.gistId || "";
+  document.getElementById("syncStatusMsg").innerText = msg;
+  document.getElementById("syncModal").classList.add("active");
+}
+async function runCloudSync(silentIfUnconfigured = false) {
+  const cfg = loadSyncConfig();
+  if (!cfg || !cfg.token) {
+    if (!silentIfUnconfigured) openSyncModal("Pro první synchronizaci vložte GitHub Token.");
+    return;
+  }
+  const btn = document.getElementById("btnCloudSync");
+  const origText = btn ? btn.innerText : "Synchronizovat";
+  if (btn) { btn.disabled = true; btn.innerText = "Synchronizuji..."; }
+  try {
+    let remote = null;
+    if (cfg.gistId) {
+      const res = await fetch(`https://api.github.com/gists/${encodeURIComponent(cfg.gistId)}`, {
+        headers: { Authorization: `Bearer ${cfg.token}`, Accept: "application/vnd.github+json" }
+      });
+      if (!res.ok) throw new Error(`GitHub Gist HTTP ${res.status}`);
+      const gist = await res.json();
+      const fileObj = gist.files && gist.files["karty_sync.json"];
+      if (fileObj && fileObj.content) {
+        try { remote = JSON.parse(fileObj.content); } catch {}
+      }
+    }
+
+    const localDecks = await dbGetAllDecks();
+    const localReviews = await dbGetAllReviews();
+    const localProf = loadProProfile();
+
+    // Merge proProfile
+    const remProf = (remote && remote.proProfile) || {};
+    const mergedProf = {
+      ...getDefaultProProfile(),
+      ...localProf,
+      points: Math.max(localProf.points || 0, remProf.points || 0),
+      xp: Math.max(localProf.xp || 0, remProf.xp || 0),
+      freezes: Math.max(localProf.freezes || 0, remProf.freezes || 0),
+      boostUntil: Math.max(localProf.boostUntil || 0, remProf.boostUntil || 0),
+      unlockedThemes: Array.from(new Set([...(localProf.unlockedThemes || []), ...(remProf.unlockedThemes || [])])),
+      frozenDates: Array.from(new Set([...(localProf.frozenDates || []), ...(remProf.frozenDates || [])])),
+      dailyBonusDates: Array.from(new Set([...(localProf.dailyBonusDates || []), ...(remProf.dailyBonusDates || [])])),
+      powerups: {
+        timeFreeze: Math.max(localProf.powerups?.timeFreeze || 0, remProf.powerups?.timeFreeze || 0),
+        fiftyFifty: Math.max(localProf.powerups?.fiftyFifty || 0, remProf.powerups?.fiftyFifty || 0),
+        comboShield: Math.max(localProf.powerups?.comboShield || 0, remProf.powerups?.comboShield || 0)
+      }
+    };
+    saveProProfile(mergedProf);
+
+    // Merge decks & cards
+    const normName = (s) => (s || "").toLowerCase().replace(/[_\s]+/g, " ").trim();
+    const remDecks = (remote && Array.isArray(remote.decks)) ? remote.decks : [];
+    let mergedCardUpdates = 0;
+    for (const d of localDecks) {
+      const rd = remDecks.find(x => (x.id && x.id === d.id) || normName(x.name) === normName(d.name));
+      if (!rd) continue;
+      const byId = new Map();
+      const byTitle = new Map();
+      for (const rc of (rd.cards || [])) {
+        if (rc.id) byId.set(rc.id, rc);
+        if (rc.title) byTitle.set(rc.title.trim().toLowerCase(), rc);
+      }
+      let changed = false;
+      d.cards = (d.cards || []).map(lc => {
+        const rc = (lc.id && byId.get(lc.id)) || (lc.title && byTitle.get(lc.title.trim().toLowerCase()));
+        if (!rc) return lc;
+        const lLast = lc.lastReview || 0, rLast = rc.lastReview || 0;
+        const lReps = lc.reps || 0, rReps = rc.reps || 0;
+        if (rLast > lLast || (rLast === lLast && (rReps > lReps || (rReps === lReps && (rc.due || 0) > (lc.due || 0))))) {
+          changed = true; mergedCardUpdates++;
+          lc = { ...lc, interval: rc.interval || 0, reps: rc.reps || 0, ease: rc.ease || 2.5, due: rc.due || 0, state: rc.state || 0, lastReview: rc.lastReview || 0 };
+        }
+        if (rc.rev && (!lc.rev || (rc.rev.lastReview || 0) > (lc.rev.lastReview || 0) || (rc.rev.reps || 0) > (lc.rev.reps || 0))) {
+          changed = true;
+          lc = { ...lc, rev: { ...rc.rev } };
+        }
+        return lc;
+      });
+      if (changed) await dbSaveDeck(d);
+    }
+
+    // Merge reviews for heatmap
+    const revKey = (r) => `${r.dateStr || ""}|${r.cardId || ""}|${r.deckId || ""}|${r.interval || 0}`;
+    const localRevSet = new Set(localReviews.map(revKey));
+    const remReviews = (remote && Array.isArray(remote.reviews)) ? remote.reviews : [];
+    const mergedReviews = [...localReviews];
+    for (const rr of remReviews) {
+      const k = revKey(rr);
+      if (!localRevSet.has(k)) {
+        localRevSet.add(k);
+        mergedReviews.push(rr);
+        await dbAddReview(rr);
+      }
+    }
+
+    // Build payload to upload (preserve remote decks not present locally too)
+    const exportDecks = localDecks.map(d => ({
+      id: d.id, name: d.name,
+      cards: (d.cards || []).map(c => ({
+        id: c.id, title: c.title, interval: c.interval || 0, reps: c.reps || 0,
+        ease: c.ease || 2.5, due: c.due || 0, state: c.state || 0, lastReview: c.lastReview || 0,
+        rev: c.rev || null
+      }))
+    }));
+    for (const rd of remDecks) {
+      if (!exportDecks.some(x => (x.id && x.id === rd.id) || normName(x.name) === normName(rd.name))) {
+        exportDecks.push(rd);
+      }
+    }
+    const payload = { version: 1, syncedAt: Date.now(), proProfile: mergedProf, decks: exportDecks, reviews: mergedReviews.slice(-4000) };
+    const body = { description: "Karty Pro Sync", public: false, files: { "karty_sync.json": { content: JSON.stringify(payload) } } };
+    const endpoint = cfg.gistId ? `https://api.github.com/gists/${encodeURIComponent(cfg.gistId)}` : "https://api.github.com/gists";
+    const method = cfg.gistId ? "PATCH" : "POST";
+    const saveRes = await fetch(endpoint, {
+      method,
+      headers: { Authorization: `Bearer ${cfg.token}`, Accept: "application/vnd.github+json", "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    if (!saveRes.ok) throw new Error(`Uložení do Gistu selhalo (HTTP ${saveRes.status})`);
+    const savedGist = await saveRes.json();
+    if (!cfg.gistId && savedGist.id) {
+      cfg.gistId = savedGist.id;
+      saveSyncConfig(cfg);
+      const gi = document.getElementById("inpSyncGistId");
+      if (gi) gi.value = savedGist.id;
+    }
+
+    if (typeof renderDecks === "function") await renderDecks();
+    if (typeof renderHeatmap === "function") await renderHeatmap();
+    await updateProHud();
+    showProToast(`Synchronizováno! (${mergedCardUpdates} aktualizací karet)`);
+    const sm = document.getElementById("syncStatusMsg");
+    if (sm) sm.innerText = "Hotovo! Postup je synchronizován.";
+  } catch (err) {
+    console.error(err);
+    showProToast("Chyba synchronizace: " + err.message);
+    const sm = document.getElementById("syncStatusMsg");
+    if (sm) sm.innerText = "Chyba: " + err.message;
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerText = origText; }
+  }
+}
+
+document.getElementById("syncModalClose").onclick = () => document.getElementById("syncModal").classList.remove("active");
+document.getElementById("syncModal").addEventListener("click", (e) => { if (e.target.id === "syncModal") e.target.classList.remove("active"); });
+document.getElementById("btnSyncSaveConnect").onclick = async () => {
+  const token = document.getElementById("inpSyncToken").value.trim();
+  const gistId = document.getElementById("inpSyncGistId").value.trim();
+  if (!token) { alert("Vložte prosím GitHub Token."); return; }
+  saveSyncConfig({ token, gistId });
+  await runCloudSync(false);
+};
+document.getElementById("btnSyncCopyPair").onclick = async () => {
+  const cfg = loadSyncConfig();
+  if (!cfg || !cfg.token || !cfg.gistId) { alert("Nejprve klikněte na 'Uložit & synchronizovat', aby se vytvořilo Gist ID."); return; }
+  const pairUrl = `${location.origin}${location.pathname}#sync=${encodeURIComponent(cfg.gistId + ":" + cfg.token)}`;
+  try {
+    await navigator.clipboard.writeText(pairUrl);
+    showProToast("Párovací odkaz zkopírován! Otevřete ho na telefonu.");
+  } catch {
+    prompt("Zkopírujte tento odkaz a otevřete ho na telefonu:", pairUrl);
+  }
+};
+document.getElementById("btnSyncDisconnect").onclick = () => {
+  saveSyncConfig(null);
+  document.getElementById("inpSyncToken").value = "";
+  document.getElementById("inpSyncGistId").value = "";
+  document.getElementById("syncStatusMsg").innerText = "Synchronizace odpojena.";
+};
+
 window.addEventListener("DOMContentLoaded", () => {
+  if (location.hash && location.hash.startsWith("#sync=")) {
+    try {
+      const raw = decodeURIComponent(location.hash.slice(6));
+      const idx = raw.indexOf(":");
+      if (idx > 0) {
+        const gistId = raw.slice(0, idx).trim();
+        const token = raw.slice(idx + 1).trim();
+        if (gistId && token) {
+          saveSyncConfig({ gistId, token });
+          history.replaceState(null, "", location.pathname + location.search);
+          setTimeout(() => runCloudSync(true), 600);
+        }
+      }
+    } catch {}
+  }
+  const bSync = document.getElementById("btnCloudSync");
+  const bSetup = document.getElementById("btnCloudSyncSetup");
+  if (bSync) bSync.onclick = () => runCloudSync(false);
+  if (bSetup) bSetup.onclick = () => openSyncModal();
   setTimeout(() => { updateProHud(); }, 300);
 });
 
