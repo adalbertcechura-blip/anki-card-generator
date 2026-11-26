@@ -1638,7 +1638,7 @@ header {
   border-radius: 8px; padding: 6px 12px; font-weight: 600; cursor: pointer;
 }
 .timed-match-grid {
-  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 8px;
 }
 @media (max-width: 520px) {
   .games-menu-grid { grid-template-columns: 1fr; }
@@ -6021,13 +6021,18 @@ document.getElementById("btnStartTimedMatch").onclick = async () => {
   if (seenCards.length < MIN_SEEN_FOR_GAMES) { alert(`Pro odemčení miniher musíte v balíčku projít alespoň ${MIN_SEEN_FOR_GAMES} karet.`); return; }
   showGamePane("gameTimedMatchPane");
   const sample = [...seenCards].sort(() => Math.random() - 0.5).slice(0, 6);
-  const tiles = [];
+  const leftTiles = [], rightTiles = [];
   sample.forEach(c => {
     const pair = getGamePairForCard(c);
-    tiles.push({ id: c.id, text: pair.prompt, side: "L" });
-    tiles.push({ id: c.id, text: pair.answer, side: "R" });
+    leftTiles.push({ id: c.id, text: pair.prompt, side: "L" });
+    rightTiles.push({ id: c.id, text: pair.answer, side: "R" });
   });
-  tiles.sort(() => Math.random() - 0.5);
+  leftTiles.sort(() => Math.random() - 0.5);
+  rightTiles.sort(() => Math.random() - 0.5);
+  const tiles = [];
+  for (let i = 0; i < leftTiles.length; i++) {
+    tiles.push(leftTiles[i], rightTiles[i]);
+  }
   const grid = document.getElementById("tmGrid");
   grid.innerHTML = "";
   let first = null, matched = 0, timeLeft = 60;
