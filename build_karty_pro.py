@@ -214,6 +214,7 @@ body.theme-lighthouse {
   backdrop-filter: blur(8px);
 }
 .theme-preview-bar.active { display: flex; }
+#btnHelp, header .nav-actions { display: none !important; }
 body.studying-active .pro-hud { display: none !important; }
 header {
   background: var(--bg-main);
@@ -532,8 +533,12 @@ header {
 .pro-week-strip { display: none; }
 @media (max-width: 640px) {
   html { font-size: 17px; }
-  header { flex-wrap: wrap; gap: 6px; padding: 8px 10px; }
-  .pro-pill { padding: 4px 9px; font-size: 0.78rem; }
+  header { flex-wrap: nowrap; justify-content: space-between; gap: 6px; padding: 8px 10px; }
+  header .logo { font-size: 1rem; white-space: nowrap; flex-shrink: 0; }
+  .pro-hud { flex-wrap: nowrap; gap: 4px; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
+  .pro-hud::-webkit-scrollbar { display: none; }
+  .pro-pill { padding: 3px 6px; font-size: 0.7rem; white-space: nowrap; flex-shrink: 0; }
+  .pro-hud .btn-sm { padding: 4px 8px; font-size: 0.72rem; white-space: nowrap; flex-shrink: 0; }
   .flashcard-content, .card-question, .card-answer { font-size: 1.08rem; line-height: 1.55; }
   .deck-item-name { font-size: 1.02rem; }
   .btn-rate { font-size: 0.98rem; padding: 10px 6px; }
@@ -561,7 +566,6 @@ PRO_HEADER_HUD = r"""  <div class="pro-hud" id="proHud">
     <span class="pro-pill streak" id="proStreakPill" title="Denní série">Série: 0 d</span>
     <span class="pro-pill points" id="proPointsPill" title="Body">0 b.</span>
     <span class="pro-pill boost" id="proBoostPill" style="display:none;">2x Boost</span>
-    <button class="btn btn-sm" id="btnProSound" title="Zvukové efekty">Zvuk: Zap</button>
     <button class="btn btn-sm" id="btnOpenGames" title="Minihry s kartičkami">Minihry</button>
     <button class="btn btn-sm btn-primary" id="btnOpenShop">Obchod</button>
   </div>"""
@@ -1693,10 +1697,13 @@ document.getElementById("btnPreviewBack").onclick = async () => {
   await renderShopModal();
   document.getElementById("shopModal").classList.add("active");
 };
-document.getElementById("btnProSound").onclick = async () => {
-  const p = loadProProfile(); p.soundEnabled = (p.soundEnabled === false); saveProProfile(p);
-  if (p.soundEnabled) playProTone("good"); await updateProHud();
-};
+const _btnProSoundEl = document.getElementById("btnProSound");
+if (_btnProSoundEl) {
+  _btnProSoundEl.onclick = async () => {
+    const p = loadProProfile(); p.soundEnabled = (p.soundEnabled === false); saveProProfile(p);
+    if (p.soundEnabled) playProTone("good"); await updateProHud();
+  };
+}
 document.getElementById("btnOpenShop").onclick = async () => { await renderShopModal(); document.getElementById("shopModal").classList.add("active"); };
 document.getElementById("shopModalClose").onclick = () => { applyProTheme(loadProProfile().activeTheme); document.getElementById("shopModal").classList.remove("active"); };
 document.getElementById("shopModal").addEventListener("click", (e) => {
