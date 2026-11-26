@@ -5,7 +5,6 @@ from Karty.html without modifying the public Karty.html / index.html.
 """
 import os
 import shutil
-from generate_language_decks import get_builtin_language_decks_json
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PRO_DIR = os.path.join(BASE_DIR, "pro")
@@ -543,6 +542,24 @@ header {
 .game-card-img-meteor {
   max-width: 180px; max-height: 110px; border-radius: 8px; object-fit: cover; pointer-events: none; display: block;
 }
+@media (min-width: 641px) {
+  #gamesModal { padding: 0; align-items: stretch; justify-content: stretch; }
+  #gamesModal .modal-content {
+    width: 100vw !important; max-width: 100vw !important;
+    height: 100dvh !important; max-height: 100dvh !important;
+    border-radius: 0 !important; border: none !important;
+    padding: 24px max(28px, calc((100vw - 960px) / 2)) !important;
+    box-sizing: border-box;
+  }
+  #gamesModal .timed-match-grid { gap: 12px; }
+  #gamesModal .timed-match-grid .match-btn { min-height: 76px; font-size: 1.05rem; }
+  #gamesModal .timed-match-grid .match-btn.has-img { min-height: 175px; }
+  #gamesModal .timed-match-grid .game-card-img { max-height: 185px; }
+  #gamesModal .gravity-arena { height: 360px; }
+  #gamesModal .game-card-img-lg { max-height: 300px; }
+  #gamesModal .quiz-grid { gap: 12px; }
+  #gamesModal .quiz-option { padding: 14px 16px; font-size: 1.05rem; }
+}
 @media (max-width: 520px) {
   .games-menu-grid { grid-template-columns: 1fr; }
   .timed-match-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -639,7 +656,6 @@ PRO_DASHBOARD_HTML = r"""
 PRO_EXTRA_BAR_HTML = r"""
     <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
       <button class="btn btn-sm btn-primary" id="btnProNewCard">+ Nová karta / Rychlý import</button>
-      <button class="btn btn-sm" id="btnAddBuiltinLangs" title="Přidat vestavěné jazykové balíčky (Angličtina C1/C2, Francouzština A2–B1, Němčina A2–B1)">+ Jazyky (EN/FR/DE)</button>
     </div>
 """
 
@@ -2351,7 +2367,9 @@ document.getElementById("btnStartGravity").onclick = async () => {
     }
     const meteor = document.getElementById("gravMeteor");
     if (meteor) meteor.style.top = yPos + "px";
-    if (yPos + ((meteor && meteor.offsetHeight) || 36) >= 254) {
+    const arena = document.getElementById("gravArena");
+    const maxY = ((arena && arena.clientHeight) || 260) - 6;
+    if (yPos + ((meteor && meteor.offsetHeight) || 36) >= maxY) {
       stopAllMiniGames();
       alert(`Konec hry! Celkové skóre: ${score} bodů.`);
       showGamePane("gamesMenuPane");
@@ -2675,56 +2693,6 @@ document.getElementById("btnSyncDisconnect").onclick = () => {
   document.getElementById("syncStatusMsg").innerText = "Synchronizace odpojena.";
 };
 
-// --- BUILT-IN LANGUAGE DECKS (500 cards each: EN C1/C2, FR A2-B1, DE A2-B1) ---
-const BUILTIN_LANG_DECKS = __BUILTIN_LANG_DECKS_JSON__;
-
-async function seedBuiltInLanguageDecks(forceNotify = false) {
-  try {
-    const existing = await dbGetAllDecks();
-    let added = 0, upgraded = 0;
-    for (const bd of BUILTIN_LANG_DECKS) {
-      const found = existing.find(d => d.id === bd.id || (d.name || "").toLowerCase() === bd.name.toLowerCase());
-      if (found) {
-        const curTitles = new Set((found.cards || []).map(c => (c.title || "").trim().toLowerCase()));
-        let addedHere = 0;
-        for (const c of bd.cards) {
-          if (!curTitles.has((c.title || "").trim().toLowerCase())) {
-            curTitles.add((c.title || "").trim().toLowerCase());
-            found.cards.push({
-              id: c.id, title: c.title, front: c.f, back: c.b, answer: c.a,
-              interval: 0, reps: 0, ease: 2.5, due: 0, state: 0, lastReview: 0
-            });
-            addedHere++;
-          }
-        }
-        if (addedHere > 0) { await dbSaveDeck(found); upgraded++; }
-        continue;
-      }
-      const deckObj = {
-        id: bd.id,
-        name: bd.name,
-        createdAt: Date.now(),
-        settings: { newCardsPerDay: 20, newCardOrder: "sequential" },
-        history: [],
-        cards: bd.cards.map(c => ({
-          id: c.id, title: c.title, front: c.f, back: c.b, answer: c.a,
-          interval: 0, reps: 0, ease: 2.5, due: 0, state: 0, lastReview: 0
-        }))
-      };
-      await dbSaveDeck(deckObj);
-      added++;
-    }
-    localStorage.setItem("karty_builtin_langs_seeded_v2", "1");
-    if ((added > 0 || upgraded > 0) && typeof loadDeckList === "function") await loadDeckList();
-    if (forceNotify) {
-      if (added > 0 || upgraded > 0) showProToast(`Jazykové balíčky aktualizovány (přidáno ${added}, rozšířeno ${upgraded})!`);
-      else showProToast("Všechny 3 jazykové balíčky (500 karet) už máte.");
-    }
-  } catch (e) {
-    console.error("Builtin lang seed error:", e);
-  }
-}
-
 window.addEventListener("DOMContentLoaded", () => {
   if (location.hash && location.hash.startsWith("#sync=")) {
     try {
@@ -2743,18 +2711,12 @@ window.addEventListener("DOMContentLoaded", () => {
   }
   const bSync = document.getElementById("btnCloudSync");
   const bSetup = document.getElementById("btnCloudSyncSetup");
-  const bLangs = document.getElementById("btnAddBuiltinLangs");
   if (bSync) bSync.onclick = () => runCloudSync(false);
   if (bSetup) bSetup.onclick = () => openSyncModal();
-  if (bLangs) bLangs.onclick = () => seedBuiltInLanguageDecks(true);
-  if (!localStorage.getItem("karty_builtin_langs_seeded_v2")) {
-    setTimeout(() => seedBuiltInLanguageDecks(false), 500);
-  }
   setTimeout(() => { updateProHud(); }, 300);
 });
 """
 
-PRO_JS = PRO_JS.replace("__BUILTIN_LANG_DECKS_JSON__", get_builtin_language_decks_json())
 assert "</style>" in html
 html = html.replace("</style>", PRO_CSS + "\n</style>", 1)
 
@@ -2792,11 +2754,10 @@ PRO_PATCHES = [
           <button class="btn-mode-tgl active" id="btnModeFlip" title="Režim otáčení karty">Otáčecí</button>
           <button class="btn-mode-tgl" id="btnModeType" title="Režim vepisování z klávesnice">Vepisovací</button>
         </div>''',
-        '''        <div class="mode-toggle-group" style="width:100%; display:grid; grid-template-columns:1fr 1fr;">
+        '''        <div class="mode-toggle-group" style="width:100%; display:grid; grid-template-columns:1fr 1fr 1fr;">
           <button class="btn-mode-tgl active" id="btnModeFlip" title="Režim otáčení karty">Otáčecí</button>
           <button class="btn-mode-tgl" id="btnModeType" title="Režim vepisování z klávesnice">Vepisovací</button>
           <button class="btn-mode-tgl" id="btnModeQuiz" title="Kvízový výběr ze 4 možností">Výběr ze 4</button>
-          <button class="btn-mode-tgl" id="btnModeDictation" title="Poslech a psaní diktátu">Diktát</button>
         </div>''',
     ),
     (
@@ -2811,22 +2772,7 @@ PRO_PATCHES = [
         <label class="switch-label">
           <input type="checkbox" id="chkIgnoreDiacritics">
           <span>Ignorovat diakritiku při psaní</span>
-        </label>
-        <label class="switch-label">
-          <input type="checkbox" id="chkAutoTts">
-          <span>Automaticky přečíst kartu</span>
-        </label>
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-          <span style="font-size:0.8rem;">Jazyk čtení (TTS):</span>
-          <select id="selTtsLang" class="select-sm">
-            <option value="en-US">Angličtina (EN)</option>
-            <option value="de-DE">Němčina (DE)</option>
-            <option value="es-ES">Španělština (ES)</option>
-            <option value="fr-FR">Francouzština (FR)</option>
-            <option value="it-IT">Italština (IT)</option>
-            <option value="cs-CZ">Čeština (CS)</option>
-          </select>
-        </div>''',
+        </label>''',
     ),
     (
         '''        <button class="btn-mode-tgl" id="btnStudyRenameDeck" style="width:100%; border:1px solid var(--border-color); padding:7px 10px;" title="Přejmenovat tento balíček">Přejmenovat balíček</button>''',
@@ -2863,9 +2809,6 @@ PRO_PATCHES = [
           </div>''',
         '''          <div class="card-question" id="cardQuestion">
             <!-- Otázka -->
-          </div>
-          <div style="display:flex; justify-content:center; gap:8px; margin-top:4px;">
-            <button class="btn btn-sm" id="btnSpeakQuestion" style="font-size:0.78rem; padding:4px 10px;" title="Přečíst text karty nahlas">Přečíst nahlas</button>
           </div>
 
           <!-- TYPE-IN INPUT BOX (VISIBLE ONLY IN TYPE MODE) -->
@@ -3108,10 +3051,6 @@ function renderQuizOptions(card, isReverse) {
     typeDiff.style.display = "none";
     typeDiff.innerHTML = "";
     btnFlip.style.display = "none";
-    if (cardStudyMode === "dictation") {
-      qBox.innerHTML = `<div style="text-align:center; padding:18px; color:var(--text-muted);">Poslouchejte diktát a napište co slyšíte...</div>`;
-      setTimeout(() => { const b = document.getElementById("btnSpeakQuestion"); if (b) b.click(); }, 150);
-    }
     setTimeout(() => typeInput.focus(), 50);
   } else if (cardStudyMode === "quiz") {
     typeArea.style.display = "none";
@@ -3121,10 +3060,6 @@ function renderQuizOptions(card, isReverse) {
     typeArea.style.display = "none";
     if (quizWrap) quizWrap.style.display = "none";
     btnFlip.style.display = "block";
-  }
-  const chkAuto = document.getElementById("chkAutoTts");
-  if (chkAuto && chkAuto.checked && cardStudyMode !== "dictation") {
-    setTimeout(() => { const b = document.getElementById("btnSpeakQuestion"); if (b) b.click(); }, 180);
   }''',
     ),
     (
@@ -3176,20 +3111,17 @@ btnModeType.onclick = () => {
         '''const btnModeFlip = document.getElementById("btnModeFlip");
 const btnModeType = document.getElementById("btnModeType");
 const btnModeQuiz = document.getElementById("btnModeQuiz");
-const btnModeDict = document.getElementById("btnModeDictation");
 
 function setStudyModeUi(mode) {
   cardStudyMode = mode;
   btnModeFlip.classList.toggle("active", mode === "flip");
   btnModeType.classList.toggle("active", mode === "type");
   if (btnModeQuiz) btnModeQuiz.classList.toggle("active", mode === "quiz");
-  if (btnModeDict) btnModeDict.classList.toggle("active", mode === "dictation");
   loadCard(currentIndex);
 }
 btnModeFlip.onclick = () => setStudyModeUi("flip");
 btnModeType.onclick = () => setStudyModeUi("type");
 if (btnModeQuiz) btnModeQuiz.onclick = () => setStudyModeUi("quiz");
-if (btnModeDict) btnModeDict.onclick = () => setStudyModeUi("dictation");
 
 const btnFifty = document.getElementById("btnUseFiftyFifty");
 if (btnFifty) {
@@ -3212,8 +3144,7 @@ if (btnVoice) {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { alert("Váš prohlížeč nepodporuje hlasové rozpoznávání."); return; }
     const rec = new SR();
-    const selL = document.getElementById("selTtsLang");
-    rec.lang = selL ? selL.value : "en-US";
+    rec.lang = "cs-CZ";
     rec.interimResults = false;
     btnVoice.innerText = "Poslouchám...";
     rec.onresult = (ev) => {
@@ -3226,12 +3157,6 @@ if (btnVoice) {
     rec.onend = () => { btnVoice.innerText = "Mikrofon"; };
     rec.start();
   };
-}
-
-const chkAutoTts = document.getElementById("chkAutoTts");
-if (chkAutoTts) {
-  chkAutoTts.checked = localStorage.getItem("karty_auto_tts") === "1";
-  chkAutoTts.onchange = () => localStorage.setItem("karty_auto_tts", chkAutoTts.checked ? "1" : "0");
 }
 
 const btnEditCur = document.getElementById("btnEditCurrentCard");
@@ -3253,32 +3178,10 @@ if (btnTypeHint) {
     if (hb) { hb.innerText = masked; hb.style.display = "block"; }
   };
 }
-const selTtsLang = document.getElementById("selTtsLang");
-if (selTtsLang) {
-  const savedLang = localStorage.getItem("karty_tts_lang");
-  if (savedLang) selTtsLang.value = savedLang;
-  selTtsLang.onchange = () => localStorage.setItem("karty_tts_lang", selTtsLang.value);
-}
 const chkIgnoreDia = document.getElementById("chkIgnoreDiacritics");
 if (chkIgnoreDia) {
   chkIgnoreDia.checked = localStorage.getItem("karty_ignore_dia") === "1";
   chkIgnoreDia.onchange = () => localStorage.setItem("karty_ignore_dia", chkIgnoreDia.checked ? "1" : "0");
-}
-const btnSpeakQ = document.getElementById("btnSpeakQuestion");
-if (btnSpeakQ) {
-  btnSpeakQ.onclick = () => {
-    if (!("speechSynthesis" in window)) { alert("Váš prohlížeč nepodporuje čtení textu."); return; }
-    const qEl = document.getElementById("cardQuestion");
-    const aEl = document.getElementById("cardAnswer");
-    const raw = (cardStudyMode === "dictation" || (isCardFlipped && aEl && aEl.innerText.trim()))
-      ? (cardStudyMode === "dictation" ? extractTargetAnswer(currentCard, document.getElementById("chkReverseStudy").checked) : aEl.innerText.trim())
-      : (qEl ? qEl.innerText.trim() : "");
-    if (!raw) return;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(raw);
-    u.lang = selTtsLang ? selTtsLang.value : "en-US";
-    window.speechSynthesis.speak(u);
-  };
 }''',
     ),
     (
