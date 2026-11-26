@@ -1640,6 +1640,18 @@ header {
 .timed-match-grid {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 8px;
 }
+.match-btn.has-img, .quiz-option.has-img {
+  padding: 5px; display: flex; align-items: center; justify-content: center; min-height: 66px;
+}
+.game-card-img {
+  max-width: 100%; max-height: 62px; border-radius: 6px; object-fit: cover; pointer-events: none; display: block;
+}
+.game-card-img-lg {
+  max-width: 100%; max-height: 150px; border-radius: 8px; object-fit: contain; pointer-events: none; display: block; margin: 0 auto;
+}
+.game-card-img-meteor {
+  max-width: 110px; max-height: 64px; border-radius: 6px; object-fit: cover; pointer-events: none; display: block;
+}
 @media (max-width: 520px) {
   .games-menu-grid { grid-template-columns: 1fr; }
   .timed-match-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1648,18 +1660,24 @@ header {
 /* Mobile compact heatmap (7-day week bar) */
 .pro-week-strip { display: none; }
 @media (max-width: 640px) {
-  html { font-size: 17px; }
+  html { font-size: 19px; }
+  body { font-size: 1rem; }
   header { flex-wrap: nowrap; justify-content: space-between; gap: 6px; padding: 8px 10px; }
-  header .logo { font-size: 1rem; white-space: nowrap; flex-shrink: 0; }
+  header .logo { font-size: 17px; white-space: nowrap; flex-shrink: 0; }
   .pro-hud { flex-wrap: nowrap; gap: 4px; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
   .pro-hud::-webkit-scrollbar { display: none; }
-  .pro-pill { padding: 3px 6px; font-size: 0.7rem; white-space: nowrap; flex-shrink: 0; }
-  .pro-hud .btn-sm { padding: 4px 8px; font-size: 0.72rem; white-space: nowrap; flex-shrink: 0; }
-  .flashcard-content, .card-question, .card-answer { font-size: 1.08rem; line-height: 1.55; }
-  .deck-item-name { font-size: 1.02rem; }
-  .btn-rate { font-size: 0.98rem; padding: 10px 6px; }
-  .btn-rate .interval { font-size: 0.82rem; }
-  .quiz-option, .match-btn { font-size: 0.98rem; padding: 11px 12px; }
+  .pro-pill { padding: 3px 6px; font-size: 12px; white-space: nowrap; flex-shrink: 0; }
+  .pro-hud .btn-sm { padding: 4px 8px; font-size: 12px; white-space: nowrap; flex-shrink: 0; }
+  .flashcard-content, .card-question, .card-answer { font-size: 1.18rem; line-height: 1.6; }
+  .card-answer h2, .card-question h2 { font-size: 1.45rem !important; }
+  .card-answer h3, .card-question h3 { font-size: 1.25rem !important; }
+  .deck-item-name { font-size: 1.1rem; }
+  .deck-stats { font-size: 0.95rem; }
+  .pro-quest-card { font-size: 0.92rem; }
+  .btn-flip { font-size: 1.05rem; padding: 14px 12px; }
+  .btn-rate { font-size: 1.04rem; padding: 11px 6px; }
+  .btn-rate .interval { font-size: 0.86rem; }
+  .quiz-option, .match-btn { font-size: 1.04rem; padding: 12px 12px; }
   .pro-dashboard { grid-template-columns: 1fr; gap: 8px; padding: 10px 12px; }
   .pro-quests-strip { grid-template-columns: 1fr; gap: 6px; }
   .quiz-grid { grid-template-columns: 1fr; }
@@ -2152,11 +2170,19 @@ header {
     </div>
 
     <div id="gamesMenuPane">
-      <div id="gamesUnlockInfo" style="font-size:0.82rem; color:var(--text-muted); margin-bottom:6px;"></div>
+      <div id="gamesUnlockInfo" style="font-size:0.82rem; color:var(--text-muted); margin-bottom:8px;"></div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
+        <label style="font-size:0.78rem; color:var(--text-muted);">Otázka (zadání):
+          <select id="selGamePromptField" class="select-sm" style="width:100%; margin-top:3px;"></select>
+        </label>
+        <label style="font-size:0.78rem; color:var(--text-muted);">Odpověď (cíl):
+          <select id="selGameAnswerField" class="select-sm" style="width:100%; margin-top:3px;"></select>
+        </label>
+      </div>
       <div class="games-menu-grid">
         <button class="game-tile" id="btnStartTimedMatch">
-          <strong style="font-size:0.95rem;">Spojovačka na čas</strong>
-          <span style="font-size:0.76rem; color:var(--text-muted);">6 dvojic pod časovým limitem 60 s (+40 b.)</span>
+          <strong style="font-size:0.95rem;">Spojovačka na čas (5 kol)</strong>
+          <span style="font-size:0.76rem; color:var(--text-muted);">5 zrychlujících se kol, průběžně doplňované dvojice (+100 b.)</span>
         </button>
         <button class="game-tile" id="btnStartBossFight">
           <strong style="font-size:0.95rem;">Karetní souboj (Boss)</strong>
@@ -2174,7 +2200,8 @@ header {
     </div>
 
     <div id="gameTimedMatchPane" style="display:none;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
+        <span id="tmRoundLabel" style="font-weight:700; font-size:0.86rem;">Kolo 1/5 · 0/10</span>
         <span id="tmTimerLabel" style="font-weight:700; color:var(--accent);">Čas: 60 s</span>
         <button class="btn btn-sm" id="btnUseTimeFreezeMatch">Zmrazení času</button>
       </div>
@@ -6038,6 +6065,130 @@ async function updateGamesLockState() {
     }
   });
 }
+const GAME_FIELDS_KEY = "karty_game_fields_v1";
+function extractFirstCardImage(card) {
+  const combined = `${card.front || ""}\n${card.back || ""}`;
+  const m1 = combined.match(/!\[\[([^\]]+)\]\]/);
+  if (m1) return m1[1].split("|")[0].trim();
+  const m2 = combined.match(/!\[[^\]]*\]\(([^)]+)\)/);
+  if (m2) return m2[1].trim();
+  const m3 = combined.match(/<img[^>]+src=["']([^"']+)["']/i);
+  if (m3) return m3[1].trim();
+  return "";
+}
+function extractCardLabeledFields(card) {
+  const map = {};
+  const lines = `${card.front || ""}\n${card.back || ""}`.split(/\r?\n/);
+  for (const raw of lines) {
+    const plain = raw.replace(/!\[\[.*?\]\]/g, "").replace(/!\[[^\]]*\]\([^)]*\)/g, "").replace(/<[^>]+>/g, " ").replace(/[*_`~]/g, "").trim();
+    const m = plain.match(/^([A-Za-zÀ-ž0-9\s/()_-]{2,32}):\s+(.+)$/);
+    if (m) {
+      const lbl = m[1].trim();
+      const val = m[2].replace(/\s+/g, " ").trim();
+      if (lbl && val && !map[lbl]) map[lbl] = val;
+    }
+  }
+  return map;
+}
+function discoverDeckGameFields(deck) {
+  if (!deck || !Array.isArray(deck.cards)) return { hasImages: false, labels: [] };
+  let hasImages = false;
+  const counts = new Map();
+  const sample = deck.cards.slice(0, 40);
+  for (const c of sample) {
+    if (!hasImages && extractFirstCardImage(c)) hasImages = true;
+    const flds = extractCardLabeledFields(c);
+    for (const k of Object.keys(flds)) counts.set(k, (counts.get(k) || 0) + 1);
+  }
+  const labels = Array.from(counts.entries()).filter(([, cnt]) => cnt >= 2 || sample.length < 5).map(([k]) => k);
+  return { hasImages, labels };
+}
+function populateGameFieldSelectors(deck) {
+  const selP = document.getElementById("selGamePromptField");
+  const selA = document.getElementById("selGameAnswerField");
+  if (!selP || !selA || !deck) return;
+  const { hasImages, labels } = discoverDeckGameFields(deck);
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(GAME_FIELDS_KEY) || "{}"); } catch {}
+  const prev = saved[deck.id] || {};
+
+  const buildOpts = (isPrompt) => {
+    let html = `<option value="__auto__">Automaticky</option>`;
+    if (isPrompt && hasImages) html += `<option value="__image__">Obrázek karty</option>`;
+    html += `<option value="__title__">Název karty (title)</option>`;
+    labels.forEach(l => { html += `<option value="field:${escapeHtml(l)}">${escapeHtml(l)}</option>`; });
+    if (!isPrompt && hasImages) html += `<option value="__image__">Obrázek karty</option>`;
+    return html;
+  };
+  selP.innerHTML = buildOpts(true);
+  selA.innerHTML = buildOpts(false);
+  if (prev.prompt && Array.from(selP.options).some(o => o.value === prev.prompt)) selP.value = prev.prompt;
+  else if (hasImages) selP.value = "__auto__";
+  if (prev.answer && Array.from(selA.options).some(o => o.value === prev.answer)) selA.value = prev.answer;
+
+  const saveSel = () => {
+    try {
+      const cur = JSON.parse(localStorage.getItem(GAME_FIELDS_KEY) || "{}");
+      cur[deck.id] = { prompt: selP.value, answer: selA.value };
+      localStorage.setItem(GAME_FIELDS_KEY, JSON.stringify(cur));
+    } catch {}
+  };
+  selP.onchange = saveSel;
+  selA.onchange = saveSel;
+}
+function resolveFieldSide(card, spec, fallbackText) {
+  if (spec === "__image__") {
+    const fn = extractFirstCardImage(card);
+    if (fn) return { type: "image", src: fn, key: "img:" + fn };
+  }
+  if (spec === "__title__") {
+    const t = (card.title || extractTargetAnswer(card, true) || fallbackText || "Pojem").trim();
+    return { type: "text", text: t, key: t };
+  }
+  if (spec && spec.startsWith("field:")) {
+    const lbl = spec.slice(6);
+    const flds = extractCardLabeledFields(card);
+    if (flds[lbl]) {
+      const v = flds[lbl].length > 70 ? flds[lbl].slice(0, 67).trim() + "..." : flds[lbl];
+      return { type: "text", text: v, key: v };
+    }
+  }
+  return { type: "text", text: fallbackText, key: fallbackText };
+}
+function getSelectedGamePair(card) {
+  const autoPair = getGamePairForCard(card);
+  const pSpec = document.getElementById("selGamePromptField")?.value || "__auto__";
+  const aSpec = document.getElementById("selGameAnswerField")?.value || "__auto__";
+  const promptSide = pSpec === "__auto__" ? { type: "text", text: autoPair.prompt, key: autoPair.prompt } : resolveFieldSide(card, pSpec, autoPair.prompt);
+  const answerSide = aSpec === "__auto__" ? { type: "text", text: autoPair.answer, key: autoPair.answer } : resolveFieldSide(card, aSpec, autoPair.answer);
+  return {
+    promptSide,
+    answerSide,
+    textPrompt: autoPair.prompt,
+    textAnswer: answerSide.type === "text" ? answerSide.text : autoPair.answer
+  };
+}
+async function renderGameSideInto(el, sideObj, deckId, imgClass = "game-card-img") {
+  el.innerHTML = "";
+  if (sideObj.type === "image" && sideObj.src) {
+    el.classList.add("has-img");
+    const img = document.createElement("img");
+    img.className = imgClass;
+    img.alt = "obrázek";
+    el.appendChild(img);
+    try {
+      const url = typeof getMediaUrl === "function" ? await getMediaUrl(deckId, sideObj.src) : "";
+      img.src = url || sideObj.src;
+      if (!url) img.onerror = () => { img.onerror = () => { img.style.display = "none"; el.innerText = "Obrázek"; }; img.src = "media/" + sideObj.src; };
+    } catch {
+      img.src = sideObj.src;
+    }
+  } else {
+    el.classList.remove("has-img");
+    el.innerText = sideObj.text || "";
+  }
+}
+
 async function openGamesHub(preselectedDeckId = null) {
   const decks = await dbGetAllDecks();
   const sel = document.getElementById("selGameDeck");
@@ -6047,10 +6198,17 @@ async function openGamesHub(preselectedDeckId = null) {
     sel.innerHTML += `<option value="${d.id}" ${preselectedDeckId === d.id ? "selected" : ""}>${escapeHtml(d.name)} (viděno ${seenCnt}/${d.cards.length})</option>`;
   });
   showGamePane("gamesMenuPane");
+  const curDeck = await getSelectedGameDeck();
+  populateGameFieldSelectors(curDeck);
   await updateGamesLockState();
   document.getElementById("gamesModal").classList.add("active");
 }
-document.getElementById("selGameDeck").onchange = () => { showGamePane("gamesMenuPane"); updateGamesLockState(); };
+document.getElementById("selGameDeck").onchange = async () => {
+  showGamePane("gamesMenuPane");
+  const d = await getSelectedGameDeck();
+  populateGameFieldSelectors(d);
+  await updateGamesLockState();
+};
 async function getSelectedGameDeck() {
   const id = document.getElementById("selGameDeck").value;
   return id ? await dbGetDeck(id) : null;
@@ -6059,67 +6217,147 @@ document.getElementById("btnOpenGames").onclick = () => openGamesHub(currentDeck
 document.getElementById("gamesModalClose").onclick = () => { stopAllMiniGames(); document.getElementById("gamesModal").classList.remove("active"); };
 document.getElementById("btnGameBackMenu").onclick = () => showGamePane("gamesMenuPane");
 
-// 1. Timed Match (6 pairs, 60s)
+// 1. Timed Match (5 rounds, decreasing time, continuous shuffled replacement)
 let _tmFreezeUntil = 0;
 document.getElementById("btnStartTimedMatch").onclick = async () => {
   const deck = await getSelectedGameDeck();
   const seenCards = getSeenDeckCards(deck);
   if (seenCards.length < MIN_SEEN_FOR_GAMES) { alert(`Pro odemčení miniher musíte v balíčku projít alespoň ${MIN_SEEN_FOR_GAMES} karet.`); return; }
   showGamePane("gameTimedMatchPane");
-  const sample = [...seenCards].sort(() => Math.random() - 0.5).slice(0, 6);
-  const leftTiles = [], rightTiles = [];
-  sample.forEach(c => {
-    const pair = getGamePairForCard(c);
-    leftTiles.push({ id: c.id, text: pair.prompt, side: "L" });
-    rightTiles.push({ id: c.id, text: pair.answer, side: "R" });
-  });
-  leftTiles.sort(() => Math.random() - 0.5);
-  rightTiles.sort(() => Math.random() - 0.5);
-  const tiles = [];
-  for (let i = 0; i < leftTiles.length; i++) {
-    tiles.push(leftTiles[i], rightTiles[i]);
-  }
-  const grid = document.getElementById("tmGrid");
-  grid.innerHTML = "";
-  let first = null, matched = 0, timeLeft = 60;
+
+  const ROUND_TIMES = [60, 50, 40, 32, 25];
+  const PAIRS_PER_ROUND = 10;
+  const VISIBLE_SLOTS = 5;
+  let roundIdx = 0;
+  let matchedInRound = 0;
+  let timeLeft = ROUND_TIMES[0];
+  let first = null;
+  let roundLocked = false;
   _tmFreezeUntil = 0;
+
+  const grid = document.getElementById("tmGrid");
   const lbl = document.getElementById("tmTimerLabel");
-  lbl.innerText = `Čas: ${timeLeft} s`;
+  const roundLbl = document.getElementById("tmRoundLabel");
+  let leftSlots = [];
+  let rightSlots = [];
+
+  function pickFreshCard(excludeIds) {
+    const avail = seenCards.filter(c => !excludeIds.has(c.id));
+    const pool = avail.length > 0 ? avail : seenCards;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  function updateLabels() {
+    if (roundLbl) roundLbl.innerText = `Kolo ${roundIdx + 1}/5 · ${matchedInRound}/${PAIRS_PER_ROUND}`;
+    if (lbl) lbl.innerText = Date.now() < _tmFreezeUntil ? `Čas: ${timeLeft} s (Zmrazeno)` : `Čas: ${timeLeft} s`;
+  }
+
+  function renderGrid() {
+    grid.innerHTML = "";
+    for (let i = 0; i < VISIBLE_SLOTS; i++) {
+      [leftSlots[i], rightSlots[i]].forEach((slot) => {
+        const b = document.createElement("button");
+        b.className = "match-btn";
+        if (!slot) { b.style.visibility = "hidden"; grid.appendChild(b); return; }
+        renderGameSideInto(b, slot.sideObj, deck.id, "game-card-img");
+        b.onclick = () => handleTileClick(slot, b);
+        slot.el = b;
+        grid.appendChild(b);
+      });
+    }
+  }
+
+  function dealRound() {
+    matchedInRound = 0;
+    first = null;
+    roundLocked = false;
+    timeLeft = ROUND_TIMES[roundIdx];
+    const sample = [...seenCards].sort(() => Math.random() - 0.5).slice(0, VISIBLE_SLOTS);
+    leftSlots = sample.map(c => ({ id: c.id, side: "L", sideObj: getSelectedGamePair(c).promptSide, el: null }));
+    rightSlots = sample.map(c => ({ id: c.id, side: "R", sideObj: getSelectedGamePair(c).answerSide, el: null }));
+    leftSlots.sort(() => Math.random() - 0.5);
+    rightSlots.sort(() => Math.random() - 0.5);
+    updateLabels();
+    renderGrid();
+  }
+
+  async function handleTileClick(slot, btn) {
+    if (roundLocked || btn.classList.contains("matched")) return;
+    if (!first) { first = { slot, btn }; btn.classList.add("selected"); return; }
+    if (first.btn === btn) { btn.classList.remove("selected"); first = null; return; }
+    if (first.slot.side === slot.side) {
+      first.btn.classList.remove("selected");
+      first = { slot, btn };
+      btn.classList.add("selected");
+      return;
+    }
+
+    if (first.slot.id === slot.id) {
+      const aSlot = first.slot, aBtn = first.btn;
+      const bSlot = slot, bBtn = btn;
+      first = null;
+      aBtn.classList.remove("selected");
+      aBtn.classList.add("matched");
+      bBtn.classList.add("matched");
+      matchedInRound++;
+      playProTone("good");
+      updateLabels();
+
+      if (matchedInRound >= PAIRS_PER_ROUND) {
+        roundLocked = true;
+        if (roundIdx + 1 < ROUND_TIMES.length) {
+          roundIdx++;
+          showProToast(`Kolo ${roundIdx}/5 hotovo! Další kolo je rychlejší.`);
+          setTimeout(() => dealRound(), 450);
+        } else {
+          stopAllMiniGames();
+          const p = loadProProfile(); p.points += 100; p.xp = (p.xp || 0) + 100; saveProProfile(p);
+          recordMinigameQuestProgress();
+          launchConfetti(); playProTone("level"); showProToast("Všech 5 kol spojovačky dokončeno! +100 b.");
+          await updateProHud(); showGamePane("gamesMenuPane");
+        }
+        return;
+      }
+
+      // Replace matched pair with a fresh shuffled pair
+      setTimeout(() => {
+        if (roundLocked) return;
+        const activeIds = new Set(leftSlots.filter(Boolean).map(s => s.id));
+        const nextCard = pickFreshCard(activeIds);
+        const pair = getSelectedGamePair(nextCard);
+        const lIdx = leftSlots.indexOf(aSlot.side === "L" ? aSlot : bSlot);
+        const rIdx = rightSlots.indexOf(aSlot.side === "R" ? aSlot : bSlot);
+        if (lIdx >= 0 && rIdx >= 0) {
+          const newL = { id: nextCard.id, side: "L", sideObj: pair.promptSide, el: null };
+          const newR = { id: nextCard.id, side: "R", sideObj: pair.answerSide, el: null };
+          // Swap into random slot positions so new pair is shuffled
+          const swapL = Math.floor(Math.random() * VISIBLE_SLOTS);
+          const swapR = Math.floor(Math.random() * VISIBLE_SLOTS);
+          leftSlots[lIdx] = leftSlots[swapL];
+          leftSlots[swapL] = newL;
+          rightSlots[rIdx] = rightSlots[swapR];
+          rightSlots[swapR] = newR;
+          renderGrid();
+        }
+      }, 220);
+    } else {
+      const prevB = first.btn; prevB.classList.remove("selected"); prevB.classList.add("err"); btn.classList.add("err");
+      first = null; playProTone("again");
+      setTimeout(() => { prevB.classList.remove("err"); btn.classList.remove("err"); }, 350);
+    }
+  }
+
+  dealRound();
   _tmInterval = setInterval(() => {
-    if (Date.now() < _tmFreezeUntil) { lbl.innerText = `Čas: ${timeLeft} s (Zmrazeno)`; return; }
+    if (Date.now() < _tmFreezeUntil) { updateLabels(); return; }
     timeLeft--;
-    lbl.innerText = `Čas: ${timeLeft} s`;
+    updateLabels();
     if (timeLeft <= 0) {
       stopAllMiniGames();
-      alert("Čas vypršel! Zkuste to znovu.");
+      alert(`Čas vypršel v kole ${roundIdx + 1}/5! Zkuste to znovu.`);
       showGamePane("gamesMenuPane");
     }
   }, 1000);
-  tiles.forEach(t => {
-    const b = document.createElement("button");
-    b.className = "match-btn";
-    b.innerText = t.text;
-    b.onclick = async () => {
-      if (!first) { first = { t, b }; b.classList.add("selected"); return; }
-      if (first.b === b) return;
-      if (first.t.id === t.id && first.t.side !== t.side) {
-        first.b.classList.add("matched"); b.classList.add("matched");
-        first = null; matched++; playProTone("good");
-        if (matched === 6) {
-          stopAllMiniGames();
-          const p = loadProProfile(); p.points += 40; p.xp = (p.xp || 0) + 40; saveProProfile(p);
-          recordMinigameQuestProgress();
-          launchConfetti(); playProTone("level"); showProToast("Spojovačka dokončena! +40 b.");
-          await updateProHud(); showGamePane("gamesMenuPane");
-        }
-      } else {
-        const prevB = first.b; prevB.classList.remove("selected"); prevB.classList.add("err"); b.classList.add("err");
-        first = null; playProTone("again");
-        setTimeout(() => { prevB.classList.remove("err"); b.classList.remove("err"); }, 350);
-      }
-    };
-    grid.appendChild(b);
-  });
 };
 document.getElementById("btnUseTimeFreezeMatch").onclick = () => {
   const p = loadProProfile();
@@ -6141,24 +6379,25 @@ document.getElementById("btnStartBossFight").onclick = async () => {
     document.getElementById("playerBossHpText").innerText = `Vaše HP: ${playerHp} / 5`;
     document.getElementById("bossComboText").innerText = `Combo: ${bossCombo}x`;
     const card = seenCards[Math.floor(Math.random() * seenCards.length)];
-    const pair = getGamePairForCard(card);
-    const correct = pair.answer;
-    document.getElementById("bossQuestionBox").innerText = pair.prompt;
+    const pair = getSelectedGamePair(card);
+    const correctKey = pair.answerSide.key;
+    renderGameSideInto(document.getElementById("bossQuestionBox"), pair.promptSide, deck.id, "game-card-img-lg");
     const pool = seenCards.filter(c => c.id !== card.id).sort(() => Math.random() - 0.5);
-    const opts = [correct];
+    const opts = [pair.answerSide];
+    const usedKeys = new Set([correctKey]);
     for (const c of pool) {
-      const a = getGamePairForCard(c).answer;
-      if (a && !opts.includes(a)) { opts.push(a); if (opts.length >= 4) break; }
+      const aSide = getSelectedGamePair(c).answerSide;
+      if (aSide.key && !usedKeys.has(aSide.key)) { usedKeys.add(aSide.key); opts.push(aSide); if (opts.length >= 4) break; }
     }
     opts.sort(() => Math.random() - 0.5);
     const grid = document.getElementById("bossOptionsGrid");
     grid.innerHTML = "";
-    opts.forEach(o => {
+    opts.forEach(oSide => {
       const b = document.createElement("button");
       b.className = "quiz-option";
-      b.innerText = o;
+      renderGameSideInto(b, oSide, deck.id, "game-card-img");
       b.onclick = async () => {
-        if (o === correct) {
+        if (oSide.key === correctKey) {
           bossCombo++;
           const dmg = bossCombo >= 3 ? 30 : 20;
           bossHp = Math.max(0, bossHp - dmg);
@@ -6200,25 +6439,26 @@ document.getElementById("btnStartGravity").onclick = async () => {
     yPos = 0;
     document.getElementById("gravScoreLabel").innerText = `Skóre: ${score}`;
     const card = seenCards[Math.floor(Math.random() * seenCards.length)];
-    const pair = getGamePairForCard(card);
-    const correct = pair.answer;
+    const pair = getSelectedGamePair(card);
+    const correctKey = pair.answerSide.key;
     const meteor = document.getElementById("gravMeteor");
-    meteor.innerText = pair.prompt;
+    renderGameSideInto(meteor, pair.promptSide, deck.id, "game-card-img-meteor");
     const pool = seenCards.filter(c => c.id !== card.id).sort(() => Math.random() - 0.5);
-    const opts = [correct];
+    const opts = [pair.answerSide];
+    const usedKeys = new Set([correctKey]);
     for (const c of pool) {
-      const a = getGamePairForCard(c).answer;
-      if (a && !opts.includes(a)) { opts.push(a); if (opts.length >= 4) break; }
+      const aSide = getSelectedGamePair(c).answerSide;
+      if (aSide.key && !usedKeys.has(aSide.key)) { usedKeys.add(aSide.key); opts.push(aSide); if (opts.length >= 4) break; }
     }
     opts.sort(() => Math.random() - 0.5);
     const grid = document.getElementById("gravOptionsGrid");
     grid.innerHTML = "";
-    opts.forEach(o => {
+    opts.forEach(oSide => {
       const b = document.createElement("button");
       b.className = "quiz-option";
-      b.innerText = o;
+      renderGameSideInto(b, oSide, deck.id, "game-card-img");
       b.onclick = async () => {
-        if (o === correct) {
+        if (oSide.key === correctKey) {
           score += 5;
           const p = loadProProfile(); p.points += 5; p.xp = (p.xp || 0) + 5; saveProProfile(p);
           playProTone("good"); await updateProHud(); spawnMeteor();
@@ -6238,7 +6478,7 @@ document.getElementById("btnStartGravity").onclick = async () => {
     }
     const meteor = document.getElementById("gravMeteor");
     if (meteor) meteor.style.top = yPos + "px";
-    if (yPos >= 175) {
+    if (yPos + ((meteor && meteor.offsetHeight) || 36) >= 205) {
       stopAllMiniGames();
       alert(`Konec hry! Celkové skóre: ${score} bodů.`);
       showGamePane("gamesMenuPane");
@@ -6256,19 +6496,20 @@ document.getElementById("btnUseTimeFreezeGrav").onclick = () => {
 };
 
 // 4. Word / Sentence Scramble
-let _scrPool = [], _scrTarget = "", _scrBuilt = [];
+let _scrPool = [], _scrDeckId = null, _scrTarget = "", _scrBuilt = [];
 document.getElementById("btnStartScramble").onclick = async () => {
   const deck = await getSelectedGameDeck();
   _scrPool = getSeenDeckCards(deck);
+  _scrDeckId = deck ? deck.id : null;
   if (_scrPool.length < MIN_SEEN_FOR_GAMES) { alert(`Pro odemčení miniher musíte v balíčku projít alespoň ${MIN_SEEN_FOR_GAMES} karet.`); return; }
   showGamePane("gameScramblePane");
   nextScramble();
 };
 function nextScramble() {
   const card = _scrPool[Math.floor(Math.random() * _scrPool.length)];
-  const pair = getGamePairForCard(card);
-  _scrTarget = pair.answer.split(/\s*[;/]\s*/)[0].trim();
-  document.getElementById("scramblePromptBox").innerText = pair.prompt;
+  const pair = getSelectedGamePair(card);
+  _scrTarget = pair.textAnswer.split(/\s*[;/]\s*/)[0].trim();
+  renderGameSideInto(document.getElementById("scramblePromptBox"), pair.promptSide, _scrDeckId, "game-card-img-lg");
   const words = _scrTarget.split(/\s+/).filter(Boolean);
   const tokens = words.length > 1 ? words : _scrTarget.split("");
   const isWordMode = words.length > 1;
