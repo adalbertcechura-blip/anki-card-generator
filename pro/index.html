@@ -1655,7 +1655,11 @@ header {
 @media (max-width: 520px) {
   .games-menu-grid { grid-template-columns: 1fr; }
   .timed-match-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .milestone-add-grid { grid-template-columns: 64px minmax(0, 1fr) !important; }
 }
+.shop-item, .milestone-row { min-width: 0; }
+.shop-item-info { min-width: 0; }
+.shop-item .btn-sm { white-space: nowrap; flex-shrink: 0; }
 
 /* Mobile compact heatmap (7-day week bar) */
 .pro-week-strip { display: none; }
@@ -1997,7 +2001,7 @@ header {
 
 <!-- PRO SHOP & MILESTONES MODAL -->
 <div class="modal-overlay" id="shopModal">
-  <div class="modal-content" style="max-width:520px; max-height:88dvh; overflow-y:auto;">
+  <div class="modal-content" style="width:min(520px, calc(100vw - 16px)); max-width:100%; max-height:88dvh; overflow-y:auto; overflow-x:hidden; box-sizing:border-box;">
     <div class="modal-header">
       <div class="modal-title">Obchod, série a milníky</div>
       <button class="modal-close" id="shopModalClose">&times;</button>
@@ -2032,56 +2036,56 @@ header {
           <div class="shop-item-title">Streak Freeze (max. 3)</div>
           <div class="shop-item-desc">Automaticky ochrání sérii, pokud některý den vynecháte.</div>
         </div>
-        <button class="btn btn-sm btn-primary" id="btnBuyFreeze">Koupit (1200 b.)</button>
+        <button class="btn btn-sm btn-primary" id="btnBuyFreeze">1200 b.</button>
       </div>
       <div class="shop-item">
         <div class="shop-item-info">
           <div class="shop-item-title">2x Body Boost (15 min)</div>
           <div class="shop-item-desc">Zdvojnásobí body ze všech karet po dobu 15 minut.</div>
         </div>
-        <button class="btn btn-sm btn-primary" id="btnBuyBoost">Koupit (1000 b.)</button>
+        <button class="btn btn-sm btn-primary" id="btnBuyBoost">1000 b.</button>
       </div>
       <div class="shop-item">
         <div class="shop-item-info">
           <div class="shop-item-title">Obnovení série (max. 3 dny zpět)</div>
           <div class="shop-item-desc">Zpětně zachrání nejbližší vynechaný den za poslední 3 dny.</div>
         </div>
-        <button class="btn btn-sm btn-primary" id="btnBuyRepair">Koupit (2000 b.)</button>
+        <button class="btn btn-sm btn-primary" id="btnBuyRepair">2000 b.</button>
       </div>
       <div class="shop-item">
         <div class="shop-item-info">
           <div class="shop-item-title">Tajemná truhla</div>
           <div class="shop-item-desc">Náhodná odměna: +450 až +1700 bodů, Freeze nebo 2x Boost.</div>
         </div>
-        <button class="btn btn-sm btn-primary" id="btnBuyMystery">Otevřít (1100 b.)</button>
+        <button class="btn btn-sm btn-primary" id="btnBuyMystery">1100 b.</button>
       </div>
       <div class="shop-item">
         <div class="shop-item-info">
           <div class="shop-item-title">Balíček 3x Streak Freeze</div>
           <div class="shop-item-desc">Doplní zásobu Freeze na 3/3 se slevou.</div>
         </div>
-        <button class="btn btn-sm btn-primary" id="btnBuyShieldPack">Koupit (3000 b.)</button>
+        <button class="btn btn-sm btn-primary" id="btnBuyShieldPack">3000 b.</button>
       </div>
       <div class="shop-item">
         <div class="shop-item-info">
           <div class="shop-item-title">Power-up: Zmrazení času</div>
           <div class="shop-item-desc">Zastaví odpočet ve Spojovačce nebo pád v Meteoritech na 10 s.</div>
         </div>
-        <button class="btn btn-sm btn-primary" id="btnBuyTimeFreeze">Koupit (600 b.)</button>
+        <button class="btn btn-sm btn-primary" id="btnBuyTimeFreeze">600 b.</button>
       </div>
       <div class="shop-item">
         <div class="shop-item-info">
           <div class="shop-item-title">Power-up: Nápověda 50:50</div>
           <div class="shop-item-desc">Odstraní 2 špatné možnosti v kvízovém režimu (Výběr ze 4).</div>
         </div>
-        <button class="btn btn-sm btn-primary" id="btnBuyFifty">Koupit (500 b.)</button>
+        <button class="btn btn-sm btn-primary" id="btnBuyFifty">500 b.</button>
       </div>
       <div class="shop-item">
         <div class="shop-item-info">
           <div class="shop-item-title">Power-up: Štít Comba</div>
           <div class="shop-item-desc">Automaticky ochrání vaše Combo při jedné chybě.</div>
         </div>
-        <button class="btn btn-sm btn-primary" id="btnBuyComboShield">Koupit (750 b.)</button>
+        <button class="btn btn-sm btn-primary" id="btnBuyComboShield">750 b.</button>
       </div>
     </div>
 
@@ -2090,11 +2094,11 @@ header {
 
     <h4 style="font-size:0.85rem; color:var(--text-muted); margin-bottom:8px; text-transform:uppercase;">Nastavitelné milníky série</h4>
     <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;" id="shopMilestonesList"></div>
-    <div style="display:grid; grid-template-columns:70px 1fr 74px auto; gap:6px; align-items:center;">
-      <input type="number" id="inpNewMsDays" min="1" max="3650" value="50" style="background:var(--bg-main); border:1px solid var(--border-color); color:var(--text-main); padding:6px 8px; border-radius:6px; font-size:0.82rem;">
-      <input type="text" id="inpNewMsReward" placeholder="Odměna (např. Volný večer)" style="background:var(--bg-main); border:1px solid var(--border-color); color:var(--text-main); padding:6px 8px; border-radius:6px; font-size:0.82rem;">
-      <input type="number" id="inpNewMsBonus" min="0" max="10000" value="250" style="background:var(--bg-main); border:1px solid var(--border-color); color:var(--text-main); padding:6px 8px; border-radius:6px; font-size:0.82rem;">
-      <button class="btn btn-sm btn-primary" id="btnAddMilestone">Přidat</button>
+    <div class="milestone-add-grid" style="display:grid; grid-template-columns:60px minmax(0,1fr) 68px auto; gap:6px; align-items:center;">
+      <input type="number" id="inpNewMsDays" min="1" max="3650" value="50" style="min-width:0; width:100%; box-sizing:border-box; background:var(--bg-main); border:1px solid var(--border-color); color:var(--text-main); padding:6px 8px; border-radius:6px; font-size:0.82rem;">
+      <input type="text" id="inpNewMsReward" placeholder="Odměna (např. Volný večer)" style="min-width:0; width:100%; box-sizing:border-box; background:var(--bg-main); border:1px solid var(--border-color); color:var(--text-main); padding:6px 8px; border-radius:6px; font-size:0.82rem;">
+      <input type="number" id="inpNewMsBonus" min="0" max="10000" value="250" style="min-width:0; width:100%; box-sizing:border-box; background:var(--bg-main); border:1px solid var(--border-color); color:var(--text-main); padding:6px 8px; border-radius:6px; font-size:0.82rem;">
+      <button class="btn btn-sm btn-primary" id="btnAddMilestone" style="width:100%;">Přidat</button>
     </div>
   </div>
 </div>
@@ -2189,19 +2193,19 @@ header {
       <div class="games-menu-grid">
         <button class="game-tile" id="btnStartTimedMatch">
           <strong style="font-size:0.95rem;">Spojovačka na čas (5 kol)</strong>
-          <span style="font-size:0.76rem; color:var(--text-muted);">5 zrychlujících se kol, průběžně doplňované dvojice (+100 b.)</span>
+          <span style="font-size:0.76rem; color:var(--text-muted);">5 zrychlujících se kol, průběžně doplňované dvojice (+35 b.)</span>
         </button>
         <button class="game-tile" id="btnStartBossFight">
           <strong style="font-size:0.95rem;">Karetní souboj (Boss)</strong>
-          <span style="font-size:0.76rem; color:var(--text-muted);">Porazte bosse balíčku (100 HP) bez ztráty životů (+60 b.)</span>
+          <span style="font-size:0.76rem; color:var(--text-muted);">Porazte bosse balíčku (100 HP) bez ztráty životů (+20 b.)</span>
         </button>
         <button class="game-tile" id="btnStartGravity">
           <strong style="font-size:0.95rem;">Pád karet (Meteority)</strong>
-          <span style="font-size:0.76rem; color:var(--text-muted);">Vyberte odpověď dřív, než karta dopadne (+5 b./karta)</span>
+          <span style="font-size:0.76rem; color:var(--text-muted);">Vyberte odpověď dřív, než karta dopadne (+2 b./karta)</span>
         </button>
         <button class="game-tile" id="btnStartScramble">
           <strong style="font-size:0.95rem;">Skládání slov a vět</strong>
-          <span style="font-size:0.76rem; color:var(--text-muted);">Poskládejte rozházená písmena nebo slova (+25 b.)</span>
+          <span style="font-size:0.76rem; color:var(--text-muted);">Poskládejte rozházená písmena nebo slova (+8 b.)</span>
         </button>
       </div>
     </div>
@@ -5860,7 +5864,7 @@ async function renderShopModal() {
       </div>
       <div style="display:flex; gap:6px; align-items:center;">
         ${!isActive ? `<button class="btn btn-sm btn-preview-theme">Náhled</button>` : ""}
-        <button class="btn btn-sm ${isActive ? "" : "btn-primary"} btn-buy-theme">${isActive ? "Aktivní" : (unlocked ? "Použít" : `Koupit (${th.cost} b.)`)}</button>
+        <button class="btn btn-sm ${isActive ? "" : "btn-primary"} btn-buy-theme">${isActive ? "Aktivní" : (unlocked ? "Použít" : `${th.cost} b.`)}</button>
       </div>
     `;
     const prevBtn = row.querySelector(".btn-preview-theme");
@@ -5873,7 +5877,7 @@ async function renderShopModal() {
       const actBtn = document.getElementById("btnPreviewAction");
       if (lbl) lbl.innerText = `Náhled: ${th.name}`;
       if (actBtn) {
-        actBtn.innerText = unlocked ? "Použít motiv" : `Koupit (${th.cost} b.)`;
+        actBtn.innerText = unlocked ? "Použít motiv" : `${th.cost} b.`;
         actBtn.onclick = async () => {
           const p = loadProProfile();
           if (p.unlockedThemes.includes(th.id)) p.activeTheme = th.id;
@@ -6319,9 +6323,9 @@ document.getElementById("btnStartTimedMatch").onclick = async () => {
           setTimeout(() => dealRound(), 450);
         } else {
           stopAllMiniGames();
-          const p = loadProProfile(); p.points += 100; p.xp = (p.xp || 0) + 100; saveProProfile(p);
+          const p = loadProProfile(); p.points += 35; p.xp = (p.xp || 0) + 35; saveProProfile(p);
           recordMinigameQuestProgress();
-          launchConfetti(); playProTone("level"); showProToast("Všech 5 kol spojovačky dokončeno! +100 b.");
+          launchConfetti(); playProTone("level"); showProToast("Všech 5 kol spojovačky dokončeno! +35 b.");
           await updateProHud(); showGamePane("gamesMenuPane");
         }
         return;
@@ -6411,9 +6415,9 @@ document.getElementById("btnStartBossFight").onclick = async () => {
           bossHp = Math.max(0, bossHp - dmg);
           playProTone("good");
           if (bossHp <= 0) {
-            const p = loadProProfile(); p.points += 60; p.xp = (p.xp || 0) + 60; saveProProfile(p);
+            const p = loadProProfile(); p.points += 20; p.xp = (p.xp || 0) + 20; saveProProfile(p);
             recordMinigameQuestProgress();
-            launchConfetti(); playProTone("level"); showProToast("Boss poražen! +60 b.");
+            launchConfetti(); playProTone("level"); showProToast("Boss poražen! +20 b.");
             await updateProHud(); showGamePane("gamesMenuPane");
             return;
           }
@@ -6467,8 +6471,8 @@ document.getElementById("btnStartGravity").onclick = async () => {
       renderGameSideInto(b, oSide, deck.id, "game-card-img");
       b.onclick = async () => {
         if (oSide.key === correctKey) {
-          score += 5;
-          const p = loadProProfile(); p.points += 5; p.xp = (p.xp || 0) + 5; saveProProfile(p);
+          score += 2;
+          const p = loadProProfile(); p.points += 2; p.xp = (p.xp || 0) + 2; saveProProfile(p);
           playProTone("good"); await updateProHud(); spawnMeteor();
         } else {
           b.classList.add("wrong"); playProTone("again");
@@ -6545,9 +6549,9 @@ function nextScramble() {
         renderScr();
         const attempt = _scrBuilt.map(x => x.val).join(isWordMode ? " " : "");
         if (attempt.toLowerCase() === _scrTarget.toLowerCase()) {
-          const p = loadProProfile(); p.points += 25; p.xp = (p.xp || 0) + 25; saveProProfile(p);
+          const p = loadProProfile(); p.points += 8; p.xp = (p.xp || 0) + 8; saveProProfile(p);
           recordMinigameQuestProgress();
-          launchConfetti(); playProTone("level"); showProToast("Složeno správně! +25 b.");
+          launchConfetti(); playProTone("level"); showProToast("Složeno správně! +8 b.");
           await updateProHud();
           setTimeout(nextScramble, 600);
         }
