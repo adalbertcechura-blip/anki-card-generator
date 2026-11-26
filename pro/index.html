@@ -6908,7 +6908,20 @@ async function runCloudSync(silentIfUnconfigured = false) {
         exportDecks.push(rd);
       }
     }
-    const payload = { version: 1, syncedAt: Date.now(), proProfile: mergedProf, decks: exportDecks, reviews: mergedReviews.slice(-4000) };
+    const trainingSaves = {
+      chess: loadTrainingState("chess"),
+      blind: loadTrainingState("blind"),
+      math: loadTrainingState("math")
+    };
+    const remTr = (remote && remote.trainingSaves) || {};
+    for (const k of ["chess", "blind", "math"]) {
+      const lS = trainingSaves[k], rS = remTr[k];
+      if (rS && (!lS || (rS.updatedAt || 0) > (lS.updatedAt || 0))) {
+        trainingSaves[k] = rS;
+        saveTrainingState(k, rS);
+      }
+    }
+    const payload = { version: 1, syncedAt: Date.now(), proProfile: mergedProf, decks: exportDecks, reviews: mergedReviews.slice(-4000), trainingSaves };
     const body = { description: "Karty Pro Sync", public: false, files: { "karty_sync.json": { content: JSON.stringify(payload) } } };
     const endpoint = cfg.gistId ? `https://api.github.com/gists/${encodeURIComponent(cfg.gistId)}` : "https://api.github.com/gists";
     const method = cfg.gistId ? "PATCH" : "POST";
@@ -7002,6 +7015,30 @@ async function awardTrainingCompletion(xpPts, toastMsg, countReview = true) {
   if (typeof renderHeatmap === "function") await renderHeatmap();
 }
 
+const TRAINING_SAVES_PREFIX = "karty_pro_tr_save_";
+function loadTrainingState(key) {
+  try { return JSON.parse(localStorage.getItem(TRAINING_SAVES_PREFIX + key) || "null"); } catch { return null; }
+}
+function saveTrainingState(key, data) {
+  if (!data) localStorage.removeItem(TRAINING_SAVES_PREFIX + key);
+  else localStorage.setItem(TRAINING_SAVES_PREFIX + key, JSON.stringify({ ...data, updatedAt: data.updatedAt || Date.now() }));
+}
+function saveCurrentChessProgress() {
+  if (!_cpState) return;
+  if (_cpState.over) { saveTrainingState("chess", null); return; }
+  saveTrainingState("chess", {
+    fen: _cpState.game.fen(),
+    diff: _cpState.diff,
+    playerColor: _cpState.playerColor,
+    aiColor: _cpState.aiColor,
+    wSec: _cpState.wSec,
+    bSec: _cpState.bSec,
+    lastMove: _cpState.lastMove,
+    over: false,
+    updatedAt: Date.now()
+  });
+}
+
 function showTrainingPane(paneId) {
   ["trChessPlayPane", "trChessBlindPane", "trMathPane"].forEach(id => {
     const el = document.getElementById(id);
@@ -7011,6 +7048,7 @@ function showTrainingPane(paneId) {
   document.getElementById("trainingModal").classList.add("active");
 }
 document.getElementById("trainingModalClose").onclick = () => {
+  saveCurrentChessProgress();
   stopChessClock();
   document.getElementById("trainingModal").classList.remove("active");
 };
@@ -7110,6 +7148,7 @@ async function finishChessMatch(winnerColor, reason) {
   if (!s || s.over) return;
   s.over = true;
   stopChessClock();
+  saveTrainingState("chess", null);
   const statusEl = document.getElementById("cpStatusPill");
   if (winnerColor === s.playerColor) {
     const xp = s.diff === "hard" ? 80 : (s.diff === "medium" ? 50 : 30);
@@ -7125,21 +7164,38 @@ async function finishChessMatch(winnerColor, reason) {
   }
 }
 
-function startPlayableChessGame() {
+function startPlayableChessGame(forceNew = false) {
   showTrainingPane("trChessPlayPane");
   stopChessClock();
   if (typeof Chess === "undefined") {
     document.getElementById("cpStatusPill").innerText = "Chybí knihovna chess.js.";
     return;
   }
-  const diff = document.getElementById("selChessDiff").value || "medium";
-  const playerColor = Math.random() < 0.5 ? "w" : "b";
-  const aiColor = playerColor === "w" ? "b" : "w";
-  const game = new Chess();
+  const saved = !forceNew ? loadTrainingState("chess") : null;
+  let diff, playerColor, aiColor, game, wSec, bSec, lastMove;
+  if (saved && saved.fen && !saved.over) {
+    diff = saved.diff || "medium";
+    document.getElementById("selChessDiff").value = diff;
+    playerColor = saved.playerColor || "w";
+    aiColor = saved.aiColor || (playerColor === "w" ? "b" : "w");
+    game = new Chess(saved.fen);
+    wSec = typeof saved.wSec === "number" ? saved.wSec : 600;
+    bSec = typeof saved.bSec === "number" ? saved.bSec : 600;
+    lastMove = saved.lastMove || null;
+  } else {
+    diff = document.getElementById("selChessDiff").value || "medium";
+    playerColor = Math.random() < 0.5 ? "w" : "b";
+    aiColor = playerColor === "w" ? "b" : "w";
+    game = new Chess();
+    wSec = 600;
+    bSec = 600;
+    lastMove = null;
+  }
   _cpState = {
     game, diff, playerColor, aiColor,
-    wSec: 600, bSec: 600, selectedSq: null, lastMove: null, over: false, aiThinking: false
+    wSec, bSec, selectedSq: null, lastMove, over: false, aiThinking: false
   };
+  saveCurrentChessProgress();
   document.getElementById("trStepLabel").innerText = playerColor === "w" ? "Hrajete: Bílý" : "Hrajete: Černý";
   document.getElementById("trProgressBar").style.width = "50%";
   updateChessClocksUi();
@@ -7151,14 +7207,15 @@ function startPlayableChessGame() {
     if (s.game.turn() === "w") s.wSec--;
     else s.bSec--;
     updateChessClocksUi();
+    if ((s.wSec + s.bSec) % 5 === 0) saveCurrentChessProgress();
     if (s.wSec <= 0) finishChessMatch("b", "vypršel čas");
     else if (s.bSec <= 0) finishChessMatch("w", "vypršel čas");
   }, 1000);
 
-  if (playerColor === "b") {
+  if (game.turn() === aiColor) {
     triggerAiMove();
   } else {
-    document.getElementById("cpStatusPill").innerText = "Váš tah (Bílý)";
+    document.getElementById("cpStatusPill").innerText = game.in_check() ? "Šach! Váš tah" : `Váš tah (${playerColor === "w" ? "Bílý" : "Černý"})`;
   }
 }
 
@@ -7176,6 +7233,7 @@ function triggerAiMove() {
       playProTone("good");
     }
     s.aiThinking = false;
+    saveCurrentChessProgress();
     renderPlayableChessBoard();
     if (s.game.in_checkmate()) finishChessMatch(s.aiColor, "mat");
     else if (s.game.in_draw() || s.game.in_stalemate()) finishChessMatch(null, "pat / remíza");
@@ -7241,6 +7299,7 @@ function onPlayableChessClick(sq, divEl) {
   s.lastMove = { from: mv.from, to: mv.to };
   s.selectedSq = null;
   playProTone("good");
+  saveCurrentChessProgress();
   renderPlayableChessBoard();
 
   if (s.game.in_checkmate()) finishChessMatch(s.playerColor, "mat");
@@ -7248,25 +7307,32 @@ function onPlayableChessClick(sq, divEl) {
   else triggerAiMove();
 }
 
-document.getElementById("btnOpenChessPlay").onclick = startPlayableChessGame;
-document.getElementById("btnChessNewGame").onclick = startPlayableChessGame;
-document.getElementById("selChessDiff").onchange = startPlayableChessGame;
+document.getElementById("btnOpenChessPlay").onclick = () => startPlayableChessGame(false);
+document.getElementById("btnChessNewGame").onclick = () => startPlayableChessGame(true);
+document.getElementById("selChessDiff").onchange = () => startPlayableChessGame(true);
 
 // 1B. CHESS BLINDFOLD (10 rounds, no labels)
 let _cbState = null;
-function startChessBlindfold() {
+function startChessBlindfold(forceNew = false) {
   showTrainingPane("trChessBlindPane");
-  _cbState = { round: 0, total: 10, score: 0, current: null, locked: false };
+  const saved = !forceNew ? loadTrainingState("blind") : null;
+  if (saved && saved.round > 0 && saved.round < (saved.total || 10)) {
+    _cbState = { round: saved.round, total: saved.total || 10, score: saved.score || 0, current: null, locked: false };
+  } else {
+    _cbState = { round: 0, total: 10, score: 0, current: null, locked: false };
+  }
   nextBlindRound();
 }
 function nextBlindRound() {
   const s = _cbState;
   if (!s) return;
   if (s.round >= s.total) {
+    saveTrainingState("blind", null);
     document.getElementById("trainingModal").classList.remove("active");
     awardTrainingCompletion(25, `Slepá šachovnice dokončena (${s.score}/10)! +25 XP`);
     return;
   }
+  saveTrainingState("blind", { round: s.round, total: s.total, score: s.score });
   s.locked = false;
   document.getElementById("trStepLabel").innerText = `${s.round + 1} / ${s.total}`;
   document.getElementById("trProgressBar").style.width = `${Math.round((s.round / s.total) * 100)}%`;
@@ -7348,7 +7414,7 @@ function handleBlindChoice(opt) {
 }
 document.getElementById("btnCbOptA").onclick = () => handleBlindChoice("A");
 document.getElementById("btnCbOptB").onclick = () => handleBlindChoice("B");
-document.getElementById("btnOpenChessBlind").onclick = startChessBlindfold;
+document.getElementById("btnOpenChessBlind").onclick = () => startChessBlindfold(false);
 
 // 2. MATH & LOGIC PUZZLES (10-round procedural generator)
 let _mlState = { cat: "mix", round: 0, total: 10, score: 0, current: null, answered: false };
@@ -7472,19 +7538,29 @@ function genCombQuestion() {
   }
 }
 
-function startMathLogicSession() {
+function startMathLogicSession(forceNew = false) {
   showTrainingPane("trMathPane");
-  _mlState.round = 0;
-  _mlState.score = 0;
+  const saved = !forceNew ? loadTrainingState("math") : null;
+  if (saved && saved.round > 0 && saved.round < (saved.total || 10)) {
+    _mlState.round = saved.round;
+    _mlState.score = saved.score || 0;
+    _mlState.cat = saved.cat || "mix";
+    document.querySelectorAll("#mathCatPills .math-cat-pill").forEach(x => x.classList.toggle("active", x.dataset.cat === _mlState.cat));
+  } else {
+    _mlState.round = 0;
+    _mlState.score = 0;
+  }
   nextMathRound();
 }
 function nextMathRound() {
   const s = _mlState;
   if (s.round >= s.total) {
+    saveTrainingState("math", null);
     document.getElementById("trainingModal").classList.remove("active");
     awardTrainingCompletion(30, `Matematický trénink hotov (${s.score}/10)! +30 XP`);
     return;
   }
+  saveTrainingState("math", { round: s.round, total: s.total, score: s.score, cat: s.cat });
   s.answered = false;
   document.getElementById("trStepLabel").innerText = `${s.round + 1} / ${s.total}`;
   document.getElementById("trProgressBar").style.width = `${Math.round((s.round / s.total) * 100)}%`;
@@ -7529,13 +7605,13 @@ function nextMathRound() {
   });
 }
 document.getElementById("btnMlNext").onclick = () => { _mlState.round++; nextMathRound(); };
-document.getElementById("btnOpenMathLogic").onclick = startMathLogicSession;
+document.getElementById("btnOpenMathLogic").onclick = () => startMathLogicSession(false);
 document.querySelectorAll("#mathCatPills .math-cat-pill").forEach(btn => {
   btn.onclick = () => {
     document.querySelectorAll("#mathCatPills .math-cat-pill").forEach(x => x.classList.remove("active"));
     btn.classList.add("active");
     _mlState.cat = btn.dataset.cat;
-    startMathLogicSession();
+    startMathLogicSession(true);
   };
 });
 
