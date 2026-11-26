@@ -5,6 +5,7 @@ from Karty.html without modifying the public Karty.html / index.html.
 """
 import os
 import shutil
+from generate_language_decks import get_builtin_language_decks_json
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PRO_DIR = os.path.join(BASE_DIR, "pro")
@@ -525,10 +526,16 @@ header {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 8px;
 }
 .match-btn.has-img, .quiz-option.has-img {
-  padding: 6px; display: flex; align-items: center; justify-content: center; min-height: 110px;
+  padding: 6px; display: flex; align-items: center; justify-content: center; min-height: 115px;
+}
+.timed-match-grid .match-btn.has-img {
+  padding: 4px; min-height: 148px;
 }
 .game-card-img {
-  width: 100%; max-height: 120px; border-radius: 8px; object-fit: cover; pointer-events: none; display: block;
+  width: 100%; max-height: 130px; border-radius: 8px; object-fit: cover; pointer-events: none; display: block;
+}
+.timed-match-grid .game-card-img {
+  max-height: 165px;
 }
 .game-card-img-lg {
   max-width: 100%; max-height: 240px; border-radius: 10px; object-fit: contain; pointer-events: none; display: block; margin: 0 auto;
@@ -632,6 +639,7 @@ PRO_DASHBOARD_HTML = r"""
 PRO_EXTRA_BAR_HTML = r"""
     <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
       <button class="btn btn-sm btn-primary" id="btnProNewCard">+ Nová karta / Rychlý import</button>
+      <button class="btn btn-sm" id="btnAddBuiltinLangs" title="Přidat vestavěné jazykové balíčky (Angličtina C1/C2, Francouzština A2–B1, Němčina A2–B1)">+ Jazyky (EN/FR/DE)</button>
     </div>
 """
 
@@ -971,7 +979,9 @@ function getDefaultProProfile() {
       { id: "m50", days: 50, title: "50 dní odhodlání", bonusPoints: 300, claimed: false },
       { id: "m100", days: 100, title: "Stovka mistrů", bonusPoints: 700, claimed: false }
     ],
-    dailyBonusDates: []
+    dailyBonusDates: [],
+    pointsUpdatedAt: 0,
+    updatedAt: 0
   };
 }
 
@@ -995,6 +1005,16 @@ function loadProProfile() {
 }
 
 function saveProProfile(prof) {
+  let prevPoints = null;
+  try {
+    const prevRaw = localStorage.getItem(PRO_STORAGE_KEY);
+    if (prevRaw) prevPoints = JSON.parse(prevRaw).points;
+  } catch {}
+  const now = Date.now();
+  if (prevPoints === null || prof.points !== prevPoints || !prof.pointsUpdatedAt) {
+    prof.pointsUpdatedAt = now;
+  }
+  prof.updatedAt = now;
   localStorage.setItem(PRO_STORAGE_KEY, JSON.stringify(prof));
 }
 
@@ -2079,8 +2099,8 @@ document.getElementById("btnStartTimedMatch").onclick = async () => {
   showGamePane("gameTimedMatchPane");
 
   const ROUND_TIMES = [60, 50, 40, 32, 25];
-  const PAIRS_PER_ROUND = 10;
-  const VISIBLE_SLOTS = 5;
+  const PAIRS_PER_ROUND = 8;
+  const VISIBLE_SLOTS = 4;
   let roundIdx = 0;
   let matchedInRound = 0;
   let timeLeft = ROUND_TIMES[0];
@@ -2487,12 +2507,23 @@ async function runCloudSync(silentIfUnconfigured = false) {
       if (cur) msMap.set(rm.id, { ...cur, claimed: Boolean(cur.claimed || rm.claimed) });
       else msMap.set(rm.id, { ...rm });
     }
+    const lPtsTime = localProf.pointsUpdatedAt || 0;
+    const rPtsTime = remProf.pointsUpdatedAt || 0;
+    const mergedPoints = (lPtsTime !== rPtsTime)
+      ? (lPtsTime > rPtsTime ? (localProf.points ?? 0) : (remProf.points ?? 0))
+      : Math.max(localProf.points || 0, remProf.points || 0);
+    const mergedPtsTime = Math.max(lPtsTime, rPtsTime);
+    const lUpd = localProf.updatedAt || 0;
+    const rUpd = remProf.updatedAt || 0;
+    const useLocalSpendables = lUpd >= rUpd;
     const mergedProf = {
       ...getDefaultProProfile(),
       ...localProf,
-      points: Math.max(localProf.points || 0, remProf.points || 0),
+      points: mergedPoints,
+      pointsUpdatedAt: mergedPtsTime,
+      updatedAt: Math.max(lUpd, rUpd, Date.now()),
       xp: Math.max(localProf.xp || 0, remProf.xp || 0),
-      freezes: Math.max(localProf.freezes || 0, remProf.freezes || 0),
+      freezes: useLocalSpendables ? (localProf.freezes ?? 1) : (remProf.freezes ?? 1),
       boostUntil: Math.max(localProf.boostUntil || 0, remProf.boostUntil || 0),
       unlockedThemes: Array.from(new Set([...(localProf.unlockedThemes || []), ...(remProf.unlockedThemes || [])])),
       frozenDates: Array.from(new Set([...(localProf.frozenDates || []), ...(remProf.frozenDates || [])])),
@@ -2500,12 +2531,12 @@ async function runCloudSync(silentIfUnconfigured = false) {
       dailyQuests: mergedDq,
       milestones: Array.from(msMap.values()),
       powerups: {
-        timeFreeze: Math.max(localProf.powerups?.timeFreeze || 0, remProf.powerups?.timeFreeze || 0),
-        fiftyFifty: Math.max(localProf.powerups?.fiftyFifty || 0, remProf.powerups?.fiftyFifty || 0),
-        comboShield: Math.max(localProf.powerups?.comboShield || 0, remProf.powerups?.comboShield || 0)
+        timeFreeze: useLocalSpendables ? (localProf.powerups?.timeFreeze || 0) : (remProf.powerups?.timeFreeze || 0),
+        fiftyFifty: useLocalSpendables ? (localProf.powerups?.fiftyFifty || 0) : (remProf.powerups?.fiftyFifty || 0),
+        comboShield: useLocalSpendables ? (localProf.powerups?.comboShield || 0) : (remProf.powerups?.comboShield || 0)
       }
     };
-    saveProProfile(mergedProf);
+    localStorage.setItem(PRO_STORAGE_KEY, JSON.stringify(mergedProf));
 
     // Merge decks, opened/seen cards, settings & history
     const normName = (s) => (s || "").toLowerCase().replace(/[_\s]+/g, " ").trim();
@@ -2644,6 +2675,56 @@ document.getElementById("btnSyncDisconnect").onclick = () => {
   document.getElementById("syncStatusMsg").innerText = "Synchronizace odpojena.";
 };
 
+// --- BUILT-IN LANGUAGE DECKS (500 cards each: EN C1/C2, FR A2-B1, DE A2-B1) ---
+const BUILTIN_LANG_DECKS = __BUILTIN_LANG_DECKS_JSON__;
+
+async function seedBuiltInLanguageDecks(forceNotify = false) {
+  try {
+    const existing = await dbGetAllDecks();
+    let added = 0, upgraded = 0;
+    for (const bd of BUILTIN_LANG_DECKS) {
+      const found = existing.find(d => d.id === bd.id || (d.name || "").toLowerCase() === bd.name.toLowerCase());
+      if (found) {
+        const curTitles = new Set((found.cards || []).map(c => (c.title || "").trim().toLowerCase()));
+        let addedHere = 0;
+        for (const c of bd.cards) {
+          if (!curTitles.has((c.title || "").trim().toLowerCase())) {
+            curTitles.add((c.title || "").trim().toLowerCase());
+            found.cards.push({
+              id: c.id, title: c.title, front: c.f, back: c.b, answer: c.a,
+              interval: 0, reps: 0, ease: 2.5, due: 0, state: 0, lastReview: 0
+            });
+            addedHere++;
+          }
+        }
+        if (addedHere > 0) { await dbSaveDeck(found); upgraded++; }
+        continue;
+      }
+      const deckObj = {
+        id: bd.id,
+        name: bd.name,
+        createdAt: Date.now(),
+        settings: { newCardsPerDay: 20, newCardOrder: "sequential" },
+        history: [],
+        cards: bd.cards.map(c => ({
+          id: c.id, title: c.title, front: c.f, back: c.b, answer: c.a,
+          interval: 0, reps: 0, ease: 2.5, due: 0, state: 0, lastReview: 0
+        }))
+      };
+      await dbSaveDeck(deckObj);
+      added++;
+    }
+    localStorage.setItem("karty_builtin_langs_seeded_v2", "1");
+    if ((added > 0 || upgraded > 0) && typeof loadDeckList === "function") await loadDeckList();
+    if (forceNotify) {
+      if (added > 0 || upgraded > 0) showProToast(`Jazykové balíčky aktualizovány (přidáno ${added}, rozšířeno ${upgraded})!`);
+      else showProToast("Všechny 3 jazykové balíčky (500 karet) už máte.");
+    }
+  } catch (e) {
+    console.error("Builtin lang seed error:", e);
+  }
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   if (location.hash && location.hash.startsWith("#sync=")) {
     try {
@@ -2662,12 +2743,18 @@ window.addEventListener("DOMContentLoaded", () => {
   }
   const bSync = document.getElementById("btnCloudSync");
   const bSetup = document.getElementById("btnCloudSyncSetup");
+  const bLangs = document.getElementById("btnAddBuiltinLangs");
   if (bSync) bSync.onclick = () => runCloudSync(false);
   if (bSetup) bSetup.onclick = () => openSyncModal();
+  if (bLangs) bLangs.onclick = () => seedBuiltInLanguageDecks(true);
+  if (!localStorage.getItem("karty_builtin_langs_seeded_v2")) {
+    setTimeout(() => seedBuiltInLanguageDecks(false), 500);
+  }
   setTimeout(() => { updateProHud(); }, 300);
 });
 """
 
+PRO_JS = PRO_JS.replace("__BUILTIN_LANG_DECKS_JSON__", get_builtin_language_decks_json())
 assert "</style>" in html
 html = html.replace("</style>", PRO_CSS + "\n</style>", 1)
 
