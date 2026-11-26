@@ -1647,8 +1647,14 @@ header {
 /* Mobile compact heatmap (7-day week bar) */
 .pro-week-strip { display: none; }
 @media (max-width: 640px) {
+  html { font-size: 17px; }
   header { flex-wrap: wrap; gap: 6px; padding: 8px 10px; }
-  .pro-pill { padding: 2px 7px; font-size: 0.7rem; }
+  .pro-pill { padding: 4px 9px; font-size: 0.78rem; }
+  .flashcard-content, .card-question, .card-answer { font-size: 1.08rem; line-height: 1.55; }
+  .deck-item-name { font-size: 1.02rem; }
+  .btn-rate { font-size: 0.98rem; padding: 10px 6px; }
+  .btn-rate .interval { font-size: 0.82rem; }
+  .quiz-option, .match-btn { font-size: 0.98rem; padding: 11px 12px; }
   .pro-dashboard { grid-template-columns: 1fr; gap: 8px; padding: 10px 12px; }
   .pro-quests-strip { grid-template-columns: 1fr; gap: 6px; }
   .quiz-grid { grid-template-columns: 1fr; }
@@ -1896,19 +1902,19 @@ header {
         <button class="btn-side-peek" id="btnSidePeek" style="display:none;">↻ Zobrazit líc</button>
         <div class="rating-grid" id="ratingGrid">
           <button class="btn-rate btn-rate-again" id="btnAgain" title="Klávesa 1">
-            <span>Znovu (1)</span>
+            <span>Znovu</span>
             <span class="interval" id="intAgain">&lt; 10m</span>
           </button>
           <button class="btn-rate btn-rate-hard" id="btnHard" title="Klávesa 2">
-            <span>Těžké (2)</span>
+            <span>Těžké</span>
             <span class="interval" id="intHard">1 d</span>
           </button>
           <button class="btn-rate btn-rate-good" id="btnGood" title="Klávesa 3">
-            <span>Dobré (3)</span>
+            <span>Dobré</span>
             <span class="interval" id="intGood">3 d</span>
           </button>
           <button class="btn-rate btn-rate-easy" id="btnEasy" title="Klávesa 4">
-            <span>Snadné (4)</span>
+            <span>Snadné</span>
             <span class="interval" id="intEasy">7 d</span>
           </button>
         </div>
