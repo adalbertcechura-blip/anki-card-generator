@@ -740,10 +740,10 @@ PRO_TRAINING_HTML = r"""
       </div>
       <div class="pro-training-grid">
         <div class="pro-training-card">
-          <div style="font-weight:800; font-size:0.96rem;">♟️ Šachy (Taktika &amp; Vizualizace)</div>
-          <div style="font-size:0.78rem; color:var(--text-muted); line-height:1.4;">Lichess taktické úlohy (tap-to-move) i slepá šachovnice pro trénink souřadnic a diagonál.</div>
+          <div style="font-weight:800; font-size:0.96rem;">♟️ Šachy (Proti AI &amp; Slepá šachovnice)</div>
+          <div style="font-size:0.78rem; color:var(--text-muted); line-height:1.4;">Hratelné šachy (3 obtížnosti, 10 min na hráče, náhodný los barvy) i slepá šachovnice.</div>
           <div class="pro-training-actions">
-            <button class="btn btn-sm btn-primary" id="btnOpenChessTactics">Taktické úlohy</button>
+            <button class="btn btn-sm btn-primary" id="btnOpenChessPlay">Hrát šachy</button>
             <button class="btn btn-sm" id="btnOpenChessBlind">Slepá šachovnice</button>
           </div>
         </div>
@@ -1025,20 +1025,26 @@ PRO_MODALS_HTML = r"""
       <span id="trStepLabel" style="font-size:0.82rem; font-weight:700; color:var(--accent);">1 / 10</span>
     </div>
 
-    <!-- CHESS TACTICS PANE -->
-    <div id="trChessTacticsPane" style="display:none; flex-direction:column; gap:8px;">
+    <!-- PLAYABLE CHESS VS AI PANE -->
+    <div id="trChessPlayPane" style="display:none; flex-direction:column; gap:8px;">
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
-        <strong id="ctTitle" style="font-size:0.98rem;">Taktická úloha</strong>
         <div style="display:flex; gap:6px; align-items:center;">
-          <span id="ctStatusPill" style="font-size:0.8rem; font-weight:700; color:var(--accent);">Načítám...</span>
-          <button class="btn btn-sm" id="btnCtDaily">Denní Lichess</button>
-          <button class="btn btn-sm btn-primary" id="btnCtNext">Další úloha</button>
+          <select id="selChessDiff" class="select-sm" title="Obtížnost AI">
+            <option value="easy">Lehká AI</option>
+            <option value="medium" selected>Střední AI</option>
+            <option value="hard">Těžká AI</option>
+          </select>
+          <button class="btn btn-sm btn-primary" id="btnChessNewGame">Nová partie</button>
         </div>
+        <span id="cpStatusPill" style="font-size:0.82rem; font-weight:700; color:var(--accent);">Na tahu: Bílý</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; width:min(100%, 400px); margin:0 auto; padding:4px 8px; background:var(--bg-surface); border-radius:8px; border:1px solid var(--border-color); font-size:0.84rem; font-weight:700;">
+        <span id="cpTopClock">🤖 AI: 10:00</span>
+        <span id="cpBottomClock" style="color:var(--accent);">👤 Vy: 10:00</span>
       </div>
       <div class="chess-board-wrap">
-        <div class="chess-board" id="ctBoard"></div>
+        <div class="chess-board" id="cpBoard"></div>
       </div>
-      <div id="ctFeedback" class="pro-toast" style="position:static; transform:none; opacity:1; display:none; text-align:center;"></div>
     </div>
 
     <!-- CHESS BLINDFOLD PANE -->
@@ -2890,127 +2896,194 @@ async function awardTrainingCompletion(xpPts, toastMsg, countReview = true) {
 }
 
 function showTrainingPane(paneId) {
-  ["trChessTacticsPane", "trChessBlindPane", "trMathPane"].forEach(id => {
+  ["trChessPlayPane", "trChessBlindPane", "trMathPane"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = id === paneId ? "flex" : "none";
   });
+  if (paneId !== "trChessPlayPane") stopChessClock();
   document.getElementById("trainingModal").classList.add("active");
 }
-document.getElementById("trainingModalClose").onclick = () => document.getElementById("trainingModal").classList.remove("active");
+document.getElementById("trainingModalClose").onclick = () => {
+  stopChessClock();
+  document.getElementById("trainingModal").classList.remove("active");
+};
 
-// 1A. CHESS TACTICS (Lichess API + 30 verified fallback puzzles)
+// 1A. PLAYABLE CHESS VS AI (3 difficulties, randomized starting player, 10:00 per player)
 const CHESS_PIECE_CHARS = {
   wp: "♙", wn: "♘", wb: "♗", wr: "♖", wq: "♕", wk: "♔",
   bp: "♟", bn: "♞", bb: "♝", br: "♜", bq: "♛", bk: "♚"
 };
-const CHESS_FALLBACK_PUZZLES = [
-  { fen: "6k1/5ppp/8/8/8/8/5PPP/4R1K1 w - - 0 1", sol: ["e1e8"], theme: "Mat na poslední řadě" },
-  { fen: "r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4", sol: ["h5f7"], theme: "Ovčácký mat" },
-  { fen: "5rk1/5ppp/8/8/8/8/1Q3PPP/6K1 w - - 0 1", sol: ["b2g7"], theme: "Mat dámou" },
-  { fen: "r4rk1/ppp2ppp/8/8/8/5N2/PPP2PPP/R3R1K1 w - - 0 1", sol: ["e1e8"], theme: "Věž na 8. řadě" },
-  { fen: "6k1/3R1ppp/8/8/8/8/5PPP/6K1 w - - 0 1", sol: ["d7d8"], theme: "Mat věží" },
-  { fen: "3r2k1/5ppp/8/8/8/8/5PPP/3RR1K1 w - - 0 1", sol: ["d1d8"], theme: "Odtažný mat" },
-  { fen: "r1b1k2r/pppp1ppp/2n2q2/2b5/4P3/2N2N2/PPPP1PPP/R1BQKB1R b KQkq - 0 1", sol: ["f6f2"], theme: "Útok na f2" },
-  { fen: "6k1/4Rppp/8/8/8/1B6/5PPP/6K1 w - - 0 1", sol: ["e7e8"], theme: "Mat s podporou" },
-  { fen: "2kr4/ppp5/8/8/8/8/PPP2Q2/2K5 w - - 0 1", sol: ["f2a7"], theme: "Útok na pěšce" },
-  { fen: "r2qk2r/ppp2ppp/2n1bn2/2b1p3/4P3/2NP1N2/PPP2PPP/R1BQKB1R w KQkq - 0 1", sol: ["f3e5"], theme: "Zisk pěšce" },
-  { fen: "4r1k1/5ppp/8/8/8/8/5PPP/3QR1K1 w - - 0 1", sol: ["e1e8"], theme: "Mat na 8. řadě" },
-  { fen: "6k1/5ppp/8/4N3/8/8/5PPP/4R1K1 w - - 0 1", sol: ["e1e8"], theme: "Krytý mat věží" },
-  { fen: "r3k2r/ppp2ppp/8/8/8/8/PPP2PPP/R3K2R w KQkq - 0 1", sol: ["e1g1"], theme: "Krátká rošáda" },
-  { fen: "5rk1/4Qppp/8/8/8/8/5PPP/6K1 w - - 0 1", sol: ["e7f8"], theme: "Výměna do matu" },
-  { fen: "6k1/5ppp/5n2/8/8/1Q6/5PPP/6K1 w - - 0 1", sol: ["b3b8"], theme: "Mat na 8. řadě" },
-  { fen: "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/3P1N2/PPP2PPP/RNBQK2R w KQkq - 0 1", sol: ["c4f7"], theme: "Oběť na f7" },
-  { fen: "6k1/p4ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1", sol: ["d1d8"], theme: "Mat věží" },
-  { fen: "2r3k1/5ppp/8/8/8/8/4QPPP/4R1K1 w - - 0 1", sol: ["e2e8"], theme: "Mat dámou" },
-  { fen: "r5k1/5ppp/8/8/8/5Q2/5PPP/6K1 w - - 0 1", sol: ["f3a8"], theme: "Mat na a8" },
-  { fen: "6k1/4bppp/8/8/8/8/1Q3PPP/4R1K1 w - - 0 1", sol: ["e1e7"], theme: "Zisk střelce" },
-  { fen: "4k3/4P3/4K3/8/8/8/8/8 w - - 0 1", sol: ["e7e8q"], theme: "Proměna pěšce v dámu" },
-  { fen: "6k1/5p1p/6p1/8/8/8/5PPP/4R1K1 w - - 0 1", sol: ["e1e8"], theme: "Slabá poslední řada" },
-  { fen: "r2q1rk1/ppp2ppp/2n5/3np3/8/2NP1N2/PPP2PPP/R1BQ1RK1 w - - 0 1", sol: ["c3d5"], theme: "Výměna v centru" },
-  { fen: "1r4k1/5ppp/8/8/8/8/5PPP/1R3QK1 w - - 0 1", sol: ["b1b8"], theme: "Mat přes věž" },
-  { fen: "6k1/5ppp/8/8/3N4/8/5PPP/6K1 b - - 0 1", sol: ["g8f8"], theme: "Aktivace krále" },
-  { fen: "3qk3/8/8/8/8/8/4R3/4K3 w - - 0 1", sol: ["e2d2"], theme: "Vazba na dámu" },
-  { fen: "6k1/5ppp/4p3/8/8/1B6/5PPP/4R1K1 w - - 0 1", sol: ["b3e6"], theme: "Průlom na e6" },
-  { fen: "r4rk1/5ppp/8/8/8/8/5PPP/R3Q1K1 w - - 0 1", sol: ["e1e8"], theme: "Dvojí útok na e8" },
-  { fen: "6k1/5p2/6p1/8/8/7Q/5PPP/6K1 w - - 0 1", sol: ["h3c8"], theme: "Mat dámou po diagonále" },
-  { fen: "4r1k1/6pp/8/8/8/8/4RPPP/4R1K1 w - - 0 1", sol: ["e2e8"], theme: "Zdvojené věže" }
-];
+const PIECE_VAL = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000 };
+let _cpState = null, _cpTimer = null;
 
-let _ctState = null;
-async function loadChessTacticPuzzle(useDaily = false) {
-  showTrainingPane("trChessTacticsPane");
-  const statusEl = document.getElementById("ctStatusPill");
-  const titleEl = document.getElementById("ctTitle");
-  const fbEl = document.getElementById("ctFeedback");
-  fbEl.style.display = "none";
-  statusEl.innerText = "Načítám úlohu...";
-
-  if (typeof Chess === "undefined") {
-    statusEl.innerText = "Chybí knihovna chess.js (zkontrolujte připojení).";
-    return;
-  }
-
-  let fen = null, sol = [], theme = "Taktická úloha", preMoveUci = null;
-  try {
-    const ctrl = new AbortController();
-    const tId = setTimeout(() => ctrl.abort(), 3800);
-    const url = useDaily ? "https://lichess.org/api/puzzle/daily" : "https://lichess.org/api/puzzle/next";
-    const res = await fetch(url, { signal: ctrl.signal, headers: { Accept: "application/json" } });
-    clearTimeout(tId);
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data.game && data.puzzle && Array.isArray(data.puzzle.solution)) {
-        const tmp = new Chess();
-        if (tmp.load_pgn(data.game.pgn || "")) {
-          const hist = tmp.history({ verbose: true });
-          const ply = Math.min(hist.length, (data.puzzle.initialPly || 0) + 1);
-          const replay = new Chess();
-          for (let i = 0; i < ply - 1; i++) replay.move(hist[i]);
-          const lastM = hist[ply - 1];
-          fen = replay.fen();
-          if (lastM) preMoveUci = lastM.from + lastM.to + (lastM.promotion || "");
-          sol = data.puzzle.solution;
-          theme = (data.puzzle.themes || []).slice(0, 2).join(", ") || "Lichess úloha";
-        }
-      }
+function stopChessClock() {
+  if (_cpTimer) { clearInterval(_cpTimer); _cpTimer = null; }
+}
+function fmtClock(sec) {
+  const s = Math.max(0, Math.floor(sec));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
+}
+function evalChessBoard(game, aiColor) {
+  if (game.in_checkmate()) return game.turn() === aiColor ? -99999 : 99999;
+  if (game.in_draw() || game.in_stalemate() || game.in_threefold_repetition()) return 0;
+  let score = 0;
+  const b = game.board();
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const p = b[r][c];
+      if (!p) continue;
+      const centerBonus = (r >= 2 && r <= 5 && c >= 2 && c <= 5) ? 14 : 0;
+      const v = (PIECE_VAL[p.type] || 0) + centerBonus;
+      score += (p.color === aiColor ? v : -v);
     }
-  } catch {}
-
-  if (!fen) {
-    const fb = CHESS_FALLBACK_PUZZLES[Math.floor(Math.random() * CHESS_FALLBACK_PUZZLES.length)];
-    fen = fb.fen; sol = [...fb.sol]; theme = fb.theme + " (offline)";
   }
-
-  const game = new Chess(fen);
-  _ctState = { game, sol, solIdx: 0, selectedSq: null, lastMove: null, flip: false, solved: false, errors: 0 };
-  titleEl.innerText = useDaily ? `Denní Lichess · ${theme}` : theme;
-
-  if (preMoveUci) {
-    _ctState.flip = game.turn() === "w";
-    renderChessTacticsBoard();
-    statusEl.innerText = "Soupeř táhne...";
-    setTimeout(() => {
-      if (!_ctState || _ctState.game !== game) return;
-      const m = game.move({ from: preMoveUci.slice(0, 2), to: preMoveUci.slice(2, 4), promotion: preMoveUci[4] || "q" });
-      if (m) _ctState.lastMove = { from: m.from, to: m.to };
-      _ctState.flip = game.turn() === "b";
-      statusEl.innerText = game.turn() === "w" ? "Na tahu: Bílý" : "Na tahu: Černý";
-      renderChessTacticsBoard();
-    }, 450);
+  return score;
+}
+function minimaxChess(game, depth, alpha, beta, isMax, aiColor) {
+  if (depth === 0 || game.game_over()) return evalChessBoard(game, aiColor);
+  const moves = game.moves({ verbose: true });
+  moves.sort((a, b) => (b.captured ? 10 : 0) - (a.captured ? 10 : 0));
+  if (isMax) {
+    let best = -Infinity;
+    for (const m of moves) {
+      game.move(m);
+      best = Math.max(best, minimaxChess(game, depth - 1, alpha, beta, false, aiColor));
+      game.undo();
+      alpha = Math.max(alpha, best);
+      if (beta <= alpha) break;
+    }
+    return best;
   } else {
-    _ctState.flip = game.turn() === "b";
-    statusEl.innerText = game.turn() === "w" ? "Na tahu: Bílý" : "Na tahu: Černý";
-    renderChessTacticsBoard();
+    let best = Infinity;
+    for (const m of moves) {
+      game.move(m);
+      best = Math.min(best, minimaxChess(game, depth - 1, alpha, beta, true, aiColor));
+      game.undo();
+      beta = Math.min(beta, best);
+      if (beta <= alpha) break;
+    }
+    return best;
+  }
+}
+function pickAiChessMove(game, diff, aiColor) {
+  const moves = game.moves({ verbose: true });
+  if (moves.length === 0) return null;
+  if (diff === "easy") {
+    const caps = moves.filter(m => m.captured);
+    if (caps.length > 0 && Math.random() < 0.45) return caps[Math.floor(Math.random() * caps.length)];
+    return moves[Math.floor(Math.random() * moves.length)];
+  }
+  const depth = diff === "hard" ? 2 : 1;
+  let bestScore = -Infinity;
+  let bestMoves = [];
+  moves.sort((a, b) => (b.captured ? 10 : 0) - (a.captured ? 10 : 0));
+  for (const m of moves) {
+    game.move(m);
+    const sc = minimaxChess(game, depth - 1, -Infinity, Infinity, false, aiColor) + (Math.random() * 4 - 2);
+    game.undo();
+    if (sc > bestScore) { bestScore = sc; bestMoves = [m]; }
+    else if (Math.abs(sc - bestScore) < 3) bestMoves.push(m);
+  }
+  return bestMoves[Math.floor(Math.random() * bestMoves.length)] || moves[0];
+}
+
+function updateChessClocksUi() {
+  const s = _cpState;
+  if (!s) return;
+  const playerTime = s.playerColor === "w" ? s.wSec : s.bSec;
+  const aiTime = s.playerColor === "w" ? s.bSec : s.wSec;
+  document.getElementById("cpTopClock").innerText = `🤖 AI (${s.aiColor === "w" ? "Bílý" : "Černý"}): ${fmtClock(aiTime)}`;
+  document.getElementById("cpBottomClock").innerText = `👤 Vy (${s.playerColor === "w" ? "Bílý" : "Černý"}): ${fmtClock(playerTime)}`;
+}
+
+async function finishChessMatch(winnerColor, reason) {
+  const s = _cpState;
+  if (!s || s.over) return;
+  s.over = true;
+  stopChessClock();
+  const statusEl = document.getElementById("cpStatusPill");
+  if (winnerColor === s.playerColor) {
+    const xp = s.diff === "hard" ? 80 : (s.diff === "medium" ? 50 : 30);
+    statusEl.innerText = `Výhra (${reason})! +${xp} XP`;
+    document.getElementById("trProgressBar").style.width = "100%";
+    await awardTrainingCompletion(xp, `Šachová výhra (${reason})! +${xp} XP`);
+  } else if (winnerColor === s.aiColor) {
+    statusEl.innerText = `Prohra (${reason})`;
+    playProTone("again");
+  } else {
+    statusEl.innerText = `Remíza (${reason})`;
+    await awardTrainingCompletion(15, `Šachová remíza (${reason})! +15 XP`);
   }
 }
 
-function renderChessTacticsBoard() {
-  const s = _ctState;
+function startPlayableChessGame() {
+  showTrainingPane("trChessPlayPane");
+  stopChessClock();
+  if (typeof Chess === "undefined") {
+    document.getElementById("cpStatusPill").innerText = "Chybí knihovna chess.js.";
+    return;
+  }
+  const diff = document.getElementById("selChessDiff").value || "medium";
+  const playerColor = Math.random() < 0.5 ? "w" : "b";
+  const aiColor = playerColor === "w" ? "b" : "w";
+  const game = new Chess();
+  _cpState = {
+    game, diff, playerColor, aiColor,
+    wSec: 600, bSec: 600, selectedSq: null, lastMove: null, over: false, aiThinking: false
+  };
+  document.getElementById("trStepLabel").innerText = playerColor === "w" ? "Hrajete: Bílý" : "Hrajete: Černý";
+  document.getElementById("trProgressBar").style.width = "50%";
+  updateChessClocksUi();
+  renderPlayableChessBoard();
+
+  _cpTimer = setInterval(() => {
+    const s = _cpState;
+    if (!s || s.over) return;
+    if (s.game.turn() === "w") s.wSec--;
+    else s.bSec--;
+    updateChessClocksUi();
+    if (s.wSec <= 0) finishChessMatch("b", "vypršel čas");
+    else if (s.bSec <= 0) finishChessMatch("w", "vypršel čas");
+  }, 1000);
+
+  if (playerColor === "b") {
+    triggerAiMove();
+  } else {
+    document.getElementById("cpStatusPill").innerText = "Váš tah (Bílý)";
+  }
+}
+
+function triggerAiMove() {
+  const s = _cpState;
+  if (!s || s.over || s.game.turn() !== s.aiColor) return;
+  s.aiThinking = true;
+  document.getElementById("cpStatusPill").innerText = "AI přemýšlí...";
+  setTimeout(() => {
+    if (!_cpState || _cpState !== s || s.over) return;
+    const mv = pickAiChessMove(s.game, s.diff, s.aiColor);
+    if (mv) {
+      s.game.move(mv);
+      s.lastMove = { from: mv.from, to: mv.to };
+      playProTone("good");
+    }
+    s.aiThinking = false;
+    renderPlayableChessBoard();
+    if (s.game.in_checkmate()) finishChessMatch(s.aiColor, "mat");
+    else if (s.game.in_draw() || s.game.in_stalemate()) finishChessMatch(null, "pat / remíza");
+    else document.getElementById("cpStatusPill").innerText = s.game.in_check() ? "Šach! Váš tah" : `Váš tah (${s.playerColor === "w" ? "Bílý" : "Černý"})`;
+  }, 280);
+}
+
+function renderPlayableChessBoard() {
+  const s = _cpState;
   if (!s) return;
-  const boardEl = document.getElementById("ctBoard");
+  const boardEl = document.getElementById("cpBoard");
   boardEl.innerHTML = "";
-  const files = s.flip ? ["h","g","f","e","d","c","b","a"] : ["a","b","c","d","e","f","g","h"];
-  const ranks = s.flip ? [1,2,3,4,5,6,7,8] : [8,7,6,5,4,3,2,1];
+  const flip = s.playerColor === "b";
+  const files = flip ? ["h","g","f","e","d","c","b","a"] : ["a","b","c","d","e","f","g","h"];
+  const ranks = flip ? [1,2,3,4,5,6,7,8] : [8,7,6,5,4,3,2,1];
   const legalTargets = s.selectedSq ? new Set(s.game.moves({ square: s.selectedSq, verbose: true }).map(m => m.to)) : new Set();
 
   ranks.forEach((rk, rIdx) => {
@@ -3019,7 +3092,6 @@ function renderChessTacticsBoard() {
       const isLight = (fl.charCodeAt(0) - 97 + rk) % 2 === 1;
       const div = document.createElement("div");
       div.className = `chess-sq ${isLight ? "light" : "dark"}`;
-      div.dataset.sq = sq;
       if (s.selectedSq === sq) div.classList.add("selected");
       if (s.lastMove && (s.lastMove.from === sq || s.lastMove.to === sq)) div.classList.add("last-move");
       if (legalTargets.has(sq)) div.classList.add("legal-dot");
@@ -3033,85 +3105,45 @@ function renderChessTacticsBoard() {
       }
       if (fIdx === 0) div.insertAdjacentHTML("beforeend", `<span class="chess-coord chess-coord-rank">${rk}</span>`);
       if (rIdx === 7) div.insertAdjacentHTML("beforeend", `<span class="chess-coord chess-coord-file">${fl}</span>`);
-      div.onclick = () => onChessTacticsSquareClick(sq, div);
+      div.onclick = () => onPlayableChessClick(sq, div);
       boardEl.appendChild(div);
     });
   });
 }
 
-async function onChessTacticsSquareClick(sq, divEl) {
-  const s = _ctState;
-  if (!s || s.solved) return;
+function onPlayableChessClick(sq, divEl) {
+  const s = _cpState;
+  if (!s || s.over || s.aiThinking || s.game.turn() !== s.playerColor) return;
   const piece = s.game.get(sq);
   if (!s.selectedSq) {
-    if (piece && piece.color === s.game.turn()) {
-      s.selectedSq = sq;
-      renderChessTacticsBoard();
-    }
+    if (piece && piece.color === s.playerColor) { s.selectedSq = sq; renderPlayableChessBoard(); }
     return;
   }
-  if (s.selectedSq === sq) { s.selectedSq = null; renderChessTacticsBoard(); return; }
-  if (piece && piece.color === s.game.turn()) {
-    s.selectedSq = sq;
-    renderChessTacticsBoard();
-    return;
-  }
+  if (s.selectedSq === sq) { s.selectedSq = null; renderPlayableChessBoard(); return; }
+  if (piece && piece.color === s.playerColor) { s.selectedSq = sq; renderPlayableChessBoard(); return; }
 
-  const expectedUci = s.sol[s.solIdx];
-  const candidate = s.game.move({ from: s.selectedSq, to: sq, promotion: "q" });
-  if (!candidate) {
+  const mv = s.game.move({ from: s.selectedSq, to: sq, promotion: "q" });
+  if (!mv) {
     divEl.classList.add("err");
     playProTone("again");
-    setTimeout(() => divEl.classList.remove("err"), 350);
+    setTimeout(() => divEl.classList.remove("err"), 300);
     s.selectedSq = null;
-    renderChessTacticsBoard();
+    renderPlayableChessBoard();
     return;
   }
-  const playedUci = candidate.from + candidate.to + (candidate.promotion || "");
-  const isMate = s.game.in_checkmate();
-  if (playedUci === expectedUci || isMate) {
-    s.lastMove = { from: candidate.from, to: candidate.to };
-    s.selectedSq = null;
-    s.solIdx++;
-    playProTone("good");
-    renderChessTacticsBoard();
+  s.lastMove = { from: mv.from, to: mv.to };
+  s.selectedSq = null;
+  playProTone("good");
+  renderPlayableChessBoard();
 
-    if (s.solIdx >= s.sol.length || isMate) {
-      s.solved = true;
-      document.getElementById("ctStatusPill").innerText = "Vyřešeno! +15 XP";
-      document.getElementById("trProgressBar").style.width = "100%";
-      await awardTrainingCompletion(15, "Šachová úloha vyřešena! +15 XP");
-      return;
-    }
-    // Opponent reply
-    setTimeout(() => {
-      if (!_ctState || _ctState !== s) return;
-      const oppUci = s.sol[s.solIdx];
-      if (oppUci) {
-        const om = s.game.move({ from: oppUci.slice(0, 2), to: oppUci.slice(2, 4), promotion: oppUci[4] || "q" });
-        if (om) s.lastMove = { from: om.from, to: om.to };
-        s.solIdx++;
-        renderChessTacticsBoard();
-      }
-    }, 380);
-  } else {
-    s.game.undo();
-    s.errors++;
-    s.selectedSq = null;
-    playProTone("again");
-    divEl.classList.add("err");
-    document.getElementById("ctStatusPill").innerText = `Špatný tah (chyby: ${s.errors})`;
-    setTimeout(() => { renderChessTacticsBoard(); }, 350);
-  }
+  if (s.game.in_checkmate()) finishChessMatch(s.playerColor, "mat");
+  else if (s.game.in_draw() || s.game.in_stalemate()) finishChessMatch(null, "pat / remíza");
+  else triggerAiMove();
 }
 
-document.getElementById("btnOpenChessTactics").onclick = () => {
-  document.getElementById("trStepLabel").innerText = "Taktika";
-  document.getElementById("trProgressBar").style.width = "20%";
-  loadChessTacticPuzzle(false);
-};
-document.getElementById("btnCtDaily").onclick = () => loadChessTacticPuzzle(true);
-document.getElementById("btnCtNext").onclick = () => loadChessTacticPuzzle(false);
+document.getElementById("btnOpenChessPlay").onclick = startPlayableChessGame;
+document.getElementById("btnChessNewGame").onclick = startPlayableChessGame;
+document.getElementById("selChessDiff").onchange = startPlayableChessGame;
 
 // 1B. CHESS BLINDFOLD (10 rounds, no labels)
 let _cbState = null;
