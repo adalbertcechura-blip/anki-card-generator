@@ -500,7 +500,7 @@ header {
 }
 .boss-hp-fill { height: 100%; background: #c96464; transition: width 0.25s ease; }
 .gravity-arena {
-  position: relative; width: 100%; height: 210px;
+  position: relative; width: 100%; height: 260px;
   background: var(--bg-main); border: 1px solid var(--border-color);
   border-radius: 10px; overflow: hidden; margin-bottom: 10px;
 }
@@ -525,16 +525,16 @@ header {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 8px;
 }
 .match-btn.has-img, .quiz-option.has-img {
-  padding: 5px; display: flex; align-items: center; justify-content: center; min-height: 66px;
+  padding: 6px; display: flex; align-items: center; justify-content: center; min-height: 110px;
 }
 .game-card-img {
-  max-width: 100%; max-height: 62px; border-radius: 6px; object-fit: cover; pointer-events: none; display: block;
+  width: 100%; max-height: 120px; border-radius: 8px; object-fit: cover; pointer-events: none; display: block;
 }
 .game-card-img-lg {
-  max-width: 100%; max-height: 150px; border-radius: 8px; object-fit: contain; pointer-events: none; display: block; margin: 0 auto;
+  max-width: 100%; max-height: 240px; border-radius: 10px; object-fit: contain; pointer-events: none; display: block; margin: 0 auto;
 }
 .game-card-img-meteor {
-  max-width: 110px; max-height: 64px; border-radius: 6px; object-fit: cover; pointer-events: none; display: block;
+  max-width: 180px; max-height: 110px; border-radius: 8px; object-fit: cover; pointer-events: none; display: block;
 }
 @media (max-width: 520px) {
   .games-menu-grid { grid-template-columns: 1fr; }
@@ -796,7 +796,7 @@ PRO_MODALS_HTML = r"""
 
 <!-- MINI-GAMES HUB MODAL -->
 <div class="modal-overlay" id="gamesModal">
-  <div class="modal-content" style="max-width:580px; max-height:90dvh; overflow-y:auto;">
+  <div class="modal-content" style="max-width:660px; max-height:90dvh; overflow-y:auto;">
     <div class="modal-header">
       <div class="modal-title" id="gamesModalTitle">Minihry s kartičkami</div>
       <button class="modal-close" id="gamesModalClose">&times;</button>
@@ -948,7 +948,8 @@ function getDefaultProProfile() {
     freezes: 1,
     frozenDates: [],
     dailyGoal: 20,
-    lessonLength: 12,
+    lessonLength: 0,
+    lessonLengthEnabled: false,
     boostUntil: 0,
     unlockedThemes: ["default"],
     activeTheme: "default",
@@ -1321,7 +1322,7 @@ startStudy = async function(deckId, quickMode = false, subdeckFilter = null, kee
       currentIndex = 0;
       loadCard(0);
     }
-  } else if (!quickMode && prof.lessonLength > 0 && studyQueue.length > prof.lessonLength) {
+  } else if (!quickMode && prof.lessonLengthEnabled && prof.lessonLength > 0 && studyQueue.length > prof.lessonLength) {
     studyQueue = studyQueue.slice(0, prof.lessonLength);
     sessionStats.newCount = studyQueue.filter(c => !getCardSrsObj(c).due || getCardSrsObj(c).due === 0).length;
     sessionStats.dueCount = studyQueue.length - sessionStats.newCount;
@@ -1669,7 +1670,7 @@ async function renderShopModal() {
   const { prof, streak } = await computeProStreakAndFreeze();
   document.getElementById("shopBalanceVal").innerText = `${prof.points} b.`;
   document.getElementById("selProDailyGoal").value = String(prof.dailyGoal || 20);
-  document.getElementById("selProLessonLen").value = String(prof.lessonLength ?? 12);
+  document.getElementById("selProLessonLen").value = String(prof.lessonLengthEnabled ? (prof.lessonLength ?? 0) : 0);
 
   const themesBox = document.getElementById("shopThemesList");
   themesBox.innerHTML = "";
@@ -1771,7 +1772,7 @@ document.getElementById("shopModal").addEventListener("click", (e) => {
   if (e.target.id === "shopModal") { applyProTheme(loadProProfile().activeTheme); document.getElementById("shopModal").classList.remove("active"); }
 });
 document.getElementById("selProDailyGoal").onchange = async (e) => { const p = loadProProfile(); p.dailyGoal = parseInt(e.target.value, 10) || 20; saveProProfile(p); await updateProHud(); };
-document.getElementById("selProLessonLen").onchange = async (e) => { const p = loadProProfile(); p.lessonLength = parseInt(e.target.value, 10); saveProProfile(p); };
+document.getElementById("selProLessonLen").onchange = async (e) => { const p = loadProProfile(); const v = parseInt(e.target.value, 10) || 0; p.lessonLength = v; p.lessonLengthEnabled = v > 0; saveProProfile(p); };
 document.getElementById("btnBuyFreeze").onclick = async () => {
   const p = loadProProfile(); if (p.freezes >= 3) { alert("Máte již plnou zásobu (3/3)."); return; }
   if (p.points < 1200) { alert("Potřebujete alespoň 1200 bodů."); return; }
@@ -2319,7 +2320,7 @@ document.getElementById("btnStartGravity").onclick = async () => {
     }
     const meteor = document.getElementById("gravMeteor");
     if (meteor) meteor.style.top = yPos + "px";
-    if (yPos + ((meteor && meteor.offsetHeight) || 36) >= 205) {
+    if (yPos + ((meteor && meteor.offsetHeight) || 36) >= 254) {
       stopAllMiniGames();
       alert(`Konec hry! Celkové skóre: ${score} bodů.`);
       showGamePane("gamesMenuPane");
@@ -2445,8 +2446,36 @@ async function runCloudSync(silentIfUnconfigured = false) {
     const localReviews = await dbGetAllReviews();
     const localProf = loadProProfile();
 
-    // Merge proProfile
+    // Merge proProfile (including opened chests in dailyQuests and milestones)
     const remProf = (remote && remote.proProfile) || {};
+    const lDq = localProf.dailyQuests || {};
+    const rDq = remProf.dailyQuests || {};
+    let mergedDq = lDq;
+    if (rDq.date && (!lDq.date || rDq.date > lDq.date)) {
+      mergedDq = { ...rDq };
+    } else if (rDq.date && lDq.date && rDq.date === lDq.date) {
+      mergedDq = {
+        date: lDq.date,
+        maxCombo: Math.max(lDq.maxCombo || 0, rDq.maxCombo || 0),
+        cleanCount: Math.max(lDq.cleanCount || 0, rDq.cleanCount || 0),
+        easyCount: Math.max(lDq.easyCount || 0, rDq.easyCount || 0),
+        goodCount: Math.max(lDq.goodCount || 0, rDq.goodCount || 0),
+        hardCount: Math.max(lDq.hardCount || 0, rDq.hardCount || 0),
+        typeCount: Math.max(lDq.typeCount || 0, rDq.typeCount || 0),
+        xpToday: Math.max(lDq.xpToday || 0, rDq.xpToday || 0),
+        minigameCount: Math.max(lDq.minigameCount || 0, rDq.minigameCount || 0),
+        readyIds: Array.from(new Set([...(lDq.readyIds || []), ...(rDq.readyIds || [])])),
+        claimedIds: Array.from(new Set([...(lDq.claimedIds || []), ...(rDq.claimedIds || [])]))
+      };
+    }
+    const msMap = new Map();
+    for (const m of (localProf.milestones || [])) { if (m && m.id) msMap.set(m.id, { ...m }); }
+    for (const rm of (remProf.milestones || [])) {
+      if (!rm || !rm.id) continue;
+      const cur = msMap.get(rm.id);
+      if (cur) msMap.set(rm.id, { ...cur, claimed: Boolean(cur.claimed || rm.claimed) });
+      else msMap.set(rm.id, { ...rm });
+    }
     const mergedProf = {
       ...getDefaultProProfile(),
       ...localProf,
@@ -2457,6 +2486,8 @@ async function runCloudSync(silentIfUnconfigured = false) {
       unlockedThemes: Array.from(new Set([...(localProf.unlockedThemes || []), ...(remProf.unlockedThemes || [])])),
       frozenDates: Array.from(new Set([...(localProf.frozenDates || []), ...(remProf.frozenDates || [])])),
       dailyBonusDates: Array.from(new Set([...(localProf.dailyBonusDates || []), ...(remProf.dailyBonusDates || [])])),
+      dailyQuests: mergedDq,
+      milestones: Array.from(msMap.values()),
       powerups: {
         timeFreeze: Math.max(localProf.powerups?.timeFreeze || 0, remProf.powerups?.timeFreeze || 0),
         fiftyFifty: Math.max(localProf.powerups?.fiftyFifty || 0, remProf.powerups?.fiftyFifty || 0),
@@ -2465,7 +2496,7 @@ async function runCloudSync(silentIfUnconfigured = false) {
     };
     saveProProfile(mergedProf);
 
-    // Merge decks & cards
+    // Merge decks, opened/seen cards, settings & history
     const normName = (s) => (s || "").toLowerCase().replace(/[_\s]+/g, " ").trim();
     const remDecks = (remote && Array.isArray(remote.decks)) ? remote.decks : [];
     let mergedCardUpdates = 0;
@@ -2484,16 +2515,30 @@ async function runCloudSync(silentIfUnconfigured = false) {
         if (!rc) return lc;
         const lLast = lc.lastReview || 0, rLast = rc.lastReview || 0;
         const lReps = lc.reps || 0, rReps = rc.reps || 0;
-        if (rLast > lLast || (rLast === lLast && (rReps > lReps || (rReps === lReps && (rc.due || 0) > (lc.due || 0))))) {
+        const rBetter = rLast > lLast || (rLast === lLast && (rReps > lReps || (rReps === lReps && ((rc.due || 0) > (lc.due || 0) || (rc.state || 0) > (lc.state || 0)))));
+        if (rBetter) {
           changed = true; mergedCardUpdates++;
           lc = { ...lc, interval: rc.interval || 0, reps: rc.reps || 0, ease: rc.ease || 2.5, due: rc.due || 0, state: rc.state || 0, lastReview: rc.lastReview || 0 };
         }
-        if (rc.rev && (!lc.rev || (rc.rev.lastReview || 0) > (lc.rev.lastReview || 0) || (rc.rev.reps || 0) > (lc.rev.reps || 0))) {
+        if (rc.rev && (!lc.rev || (rc.rev.lastReview || 0) > (lc.rev.lastReview || 0) || (rc.rev.reps || 0) > (lc.rev.reps || 0) || (rc.rev.due || 0) > (lc.rev.due || 0))) {
           changed = true;
           lc = { ...lc, rev: { ...rc.rev } };
         }
         return lc;
       });
+      if (Array.isArray(rd.history) && rd.history.length > 0) {
+        const hKey = (h) => `${h.dateStr || ""}|${h.cardId || ""}|${h.timestamp || h.interval || 0}`;
+        const localHist = Array.isArray(d.history) ? [...d.history] : [];
+        const hSet = new Set(localHist.map(hKey));
+        for (const rh of rd.history) {
+          const k = hKey(rh);
+          if (!hSet.has(k)) { hSet.add(k); localHist.push(rh); changed = true; }
+        }
+        d.history = localHist;
+      }
+      if (rd.settings && typeof rd.settings === "object") {
+        d.settings = { ...rd.settings, ...(d.settings || {}) };
+      }
       if (changed) await dbSaveDeck(d);
     }
 
@@ -2514,6 +2559,8 @@ async function runCloudSync(silentIfUnconfigured = false) {
     // Build payload to upload (preserve remote decks not present locally too)
     const exportDecks = localDecks.map(d => ({
       id: d.id, name: d.name,
+      settings: d.settings || {},
+      history: Array.isArray(d.history) ? d.history.slice(-2000) : [],
       cards: (d.cards || []).map(c => ({
         id: c.id, title: c.title, interval: c.interval || 0, reps: c.reps || 0,
         ease: c.ease || 2.5, due: c.due || 0, state: c.state || 0, lastReview: c.lastReview || 0,
@@ -2543,7 +2590,7 @@ async function runCloudSync(silentIfUnconfigured = false) {
       if (gi) gi.value = savedGist.id;
     }
 
-    if (typeof renderDecks === "function") await renderDecks();
+    if (typeof loadDeckList === "function") await loadDeckList();
     if (typeof renderHeatmap === "function") await renderHeatmap();
     await updateProHud();
     showProToast(`Synchronizováno! (${mergedCardUpdates} aktualizací karet)`);
