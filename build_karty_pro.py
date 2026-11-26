@@ -5,7 +5,6 @@ from Karty.html without modifying the public Karty.html / index.html.
 """
 import os
 import shutil
-from lang_courses import get_lang_courses_json, get_lang_glossary_json
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PRO_DIR = os.path.join(BASE_DIR, "pro")
@@ -614,95 +613,76 @@ header {
   .pro-week-dot.frozen { background: var(--accent-soft); color: var(--accent); border-color: var(--border-highlight); }
 }
 
-/* --- DUOLINGO-STYLE LANGUAGE COURSE LAYER --- */
-body.course-en { --accent: #38bdf8; --accent-hover: #0ea5e9; --accent-soft: rgba(56,189,248,0.16); --border-highlight: rgba(56,189,248,0.45); }
-body.course-de { --accent: #f59e0b; --accent-hover: #d97706; --accent-soft: rgba(245,158,11,0.16); --border-highlight: rgba(245,158,11,0.45); }
-body.course-fr { --accent: #818cf8; --accent-hover: #6366f1; --accent-soft: rgba(129,140,248,0.16); --border-highlight: rgba(129,140,248,0.45); }
-.pro-course-bar {
-  display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 10px;
-}
-.pro-course-tab {
-  background: var(--bg-surface); color: var(--text-muted); border: 1px solid var(--border-color);
-  border-bottom: 3px solid rgba(0,0,0,0.35); border-radius: 999px;
-  padding: 5px 12px; font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: all 0.15s;
-}
-.pro-course-tab.active {
-  background: var(--accent); color: #0f172a; border-color: var(--accent);
-}
-.lang-course-section {
-  display: none; flex-direction: column; gap: 12px;
+/* --- INTERACTIVE TRAINING (CHESS & MATH/LOGIC) --- */
+.pro-training-section {
   background: var(--bg-card); border: 1px solid var(--border-color);
-  border-radius: var(--radius); padding: 14px;
+  border-radius: var(--radius); padding: 14px; margin-top: 4px;
 }
-.lang-course-section.active { display: flex; }
-.lang-skill-path {
-  display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 10px 4px;
+.pro-training-grid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px;
 }
-.lang-skill-node-wrap {
-  display: flex; flex-direction: column; align-items: center; gap: 6px; position: relative;
+@media (max-width: 600px) {
+  .pro-training-grid { grid-template-columns: 1fr; }
 }
-.lang-skill-node-wrap:nth-child(odd) { transform: translateX(-22px); }
-.lang-skill-node-wrap:nth-child(even) { transform: translateX(22px); }
-.lang-skill-circle {
-  width: 74px; height: 74px; border-radius: 50%;
-  background: var(--bg-surface); border: 4px solid var(--accent);
-  box-shadow: 0 5px 0 rgba(0,0,0,0.45); color: var(--text-main);
-  font-weight: 800; font-size: 0.9rem; cursor: pointer;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-  transition: transform 0.1s;
+.pro-training-card {
+  background: var(--bg-surface); border: 1px solid var(--border-color);
+  border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px;
 }
-.lang-skill-circle:active { transform: translateY(3px); box-shadow: 0 2px 0 rgba(0,0,0,0.45); }
-.lang-skill-circle.gold {
-  background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #1c1917; border-color: #fde68a;
+.pro-training-actions {
+  display: flex; gap: 6px; flex-wrap: wrap;
 }
-.lang-skill-meta {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center;
-}
-.lang-lesson-modal .modal-content {
+.training-modal .modal-content {
   width: 100vw !important; max-width: 100vw !important;
   height: 100dvh !important; max-height: 100dvh !important;
   border-radius: 0 !important; border: none !important;
-  padding: 16px max(16px, calc((100vw - 760px) / 2)) !important;
-  display: flex; flex-direction: column; box-sizing: border-box;
+  padding: 14px max(12px, calc((100vw - 720px) / 2)) !important;
+  display: flex; flex-direction: column; box-sizing: border-box; overflow-y: auto; overflow-x: hidden;
 }
-.lang-audio-row {
-  display: flex; align-items: center; justify-content: center; gap: 10px; margin: 8px 0;
+.chess-board-wrap {
+  width: min(100%, 400px); margin: 6px auto; position: relative;
 }
-.lang-audio-btn {
-  background: var(--bg-surface); border: 1px solid var(--border-highlight);
-  border-bottom: 3px solid rgba(0,0,0,0.35); border-radius: 12px;
-  padding: 8px 14px; font-size: 1rem; font-weight: 700; cursor: pointer; color: var(--text-main);
+.chess-board {
+  display: grid; grid-template-columns: repeat(8, 1fr);
+  width: 100%; aspect-ratio: 1 / 1; border: 2px solid var(--border-highlight);
+  border-radius: 8px; overflow: hidden; user-select: none; touch-action: manipulation;
 }
-.lang-audio-btn:active { transform: translateY(2px); }
-.de-der { color: #60a5fa; font-weight: 700; background: rgba(96,165,250,0.12); padding: 1px 4px; border-radius: 4px; }
-.de-die { color: #f87171; font-weight: 700; background: rgba(248,113,113,0.12); padding: 1px 4px; border-radius: 4px; }
-.de-das { color: #4ade80; font-weight: 700; background: rgba(74,222,128,0.12); padding: 1px 4px; border-radius: 4px; }
-.peek-word {
-  cursor: pointer; border-bottom: 1px dotted rgba(255,255,255,0.35);
-  padding: 0 1px; border-radius: 3px; transition: background 0.12s; position: relative;
+.chess-sq {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  font-size: clamp(22px, 6.2vw, 36px); line-height: 1; cursor: pointer;
+  transition: background 0.12s;
 }
-.peek-word:hover, .peek-word.active { background: var(--accent-soft); }
-.peek-popover {
-  position: fixed; z-index: 950; background: var(--bg-card); border: 1px solid var(--accent);
-  border-radius: 10px; padding: 6px 10px; font-size: 0.8rem; color: var(--text-main);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.55); pointer-events: none; max-width: 240px;
+.chess-sq.light { background: #d6cbb5; color: #1c1917; }
+.chess-sq.dark { background: #6b7b5e; color: #1c1917; }
+.chess-sq.selected { background: #facc15 !important; }
+.chess-sq.last-move { box-shadow: inset 0 0 0 3px rgba(250, 204, 21, 0.75); }
+.chess-sq.err { background: #ef4444 !important; }
+.chess-sq.ok { background: #22c55e !important; }
+.chess-sq.legal-dot::after {
+  content: ""; width: 28%; height: 28%; border-radius: 50%;
+  background: rgba(15, 23, 42, 0.35); position: absolute; pointer-events: none;
 }
-.lang-wb-answer, .lang-wb-bank {
-  display: flex; flex-wrap: wrap; gap: 8px; min-height: 52px; padding: 10px;
-  border-radius: 12px; background: var(--bg-main); border: 1px solid var(--border-color);
+.chess-piece-w { color: #ffffff; text-shadow: 0 1px 2px #000, 0 0 2px #000; }
+.chess-piece-b { color: #111827; text-shadow: 0 0 2px rgba(255,255,255,0.65); }
+.chess-coord {
+  position: absolute; font-size: 9px; font-weight: 700; opacity: 0.7; pointer-events: none;
 }
-.lang-wb-chip {
-  background: var(--bg-surface); color: var(--text-main);
-  border: 1px solid var(--border-highlight); border-bottom: 3px solid rgba(0,0,0,0.35);
-  border-radius: 10px; padding: 7px 13px; font-weight: 600; font-size: 0.95rem; cursor: pointer;
+.chess-coord-rank { top: 2px; left: 3px; }
+.chess-coord-file { bottom: 1px; right: 3px; }
+.logic-svg-box {
+  background: var(--bg-main); border: 1px solid var(--border-color);
+  border-radius: 12px; padding: 10px; display: flex; justify-content: center; align-items: center;
+  margin: 6px 0; overflow: hidden;
 }
-.lang-wb-chip:active { transform: translateY(2px); }
-.lang-feedback-banner {
-  padding: 10px 14px; border-radius: 12px; font-size: 0.88rem; line-height: 1.45; margin-top: 8px; display: none;
+.logic-svg-box svg { max-width: 100%; height: auto; }
+.math-cat-pills {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px;
 }
-.lang-feedback-banner.ok { display: block; background: rgba(74,222,128,0.14); border: 1px solid #4ade80; color: #bbf7d0; }
-.lang-feedback-banner.warn { display: block; background: rgba(251,191,36,0.14); border: 1px solid #fbbf24; color: #fef08a; }
-.lang-feedback-banner.err { display: block; background: rgba(248,113,113,0.14); border: 1px solid #f87171; color: #fecaca; }
+.math-cat-pill {
+  background: var(--bg-surface); color: var(--text-muted); border: 1px solid var(--border-color);
+  border-bottom: 3px solid rgba(0,0,0,0.3); border-radius: 999px;
+  padding: 5px 10px; font-size: 0.76rem; font-weight: 700; cursor: pointer;
+}
+.math-cat-pill.active { background: var(--accent); color: #12100d; border-color: var(--accent); }
 """
 
 PRO_HEADER_HUD = r"""  <div class="pro-hud" id="proHud">
@@ -715,22 +695,6 @@ PRO_HEADER_HUD = r"""  <div class="pro-hud" id="proHud">
   </div>"""
 
 PRO_DASHBOARD_HTML = r"""
-    <div class="pro-course-bar" id="proCourseBar">
-      <button class="pro-course-tab active" data-course="general">🍄 Obecné balíčky</button>
-      <button class="pro-course-tab" data-course="en">🇬🇧 EN · C1</button>
-      <button class="pro-course-tab" data-course="de">🇩🇪 DE · B1</button>
-      <button class="pro-course-tab" data-course="fr">🇫🇷 FR · A2–B1</button>
-    </div>
-    <div class="lang-course-section" id="langCourseSection">
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-        <div>
-          <h3 id="langCourseTitle" style="font-size:1.05rem; margin:0;">Jazykový kurz</h3>
-          <div id="langCourseSub" style="font-size:0.8rem; color:var(--text-muted);">Tematické uzly · 10–15 karet</div>
-        </div>
-        <button class="btn btn-sm" id="btnOpenLangMdImport">+ Import .md lekce</button>
-      </div>
-      <div class="lang-skill-path" id="langSkillPath"></div>
-    </div>
     <div class="pro-dashboard" id="proDashboard">
       <div class="pro-mascot-wrap">
         <svg class="pro-mascot-svg" id="proMascotSvg" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -763,6 +727,34 @@ PRO_DASHBOARD_HTML = r"""
 PRO_EXTRA_BAR_HTML = r"""
     <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
       <button class="btn btn-sm btn-primary" id="btnProNewCard">+ Nová karta / Rychlý import</button>
+    </div>
+"""
+
+PRO_TRAINING_HTML = r"""
+    <div class="pro-training-section" id="proTrainingSection">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+        <div>
+          <h3 style="font-size:1.02rem; margin:0;">Interaktivní trénink (Minihry)</h3>
+          <div style="font-size:0.78rem; color:var(--text-muted);">Po dokončení připíše XP, body, splní denní úkoly a započítá se do série.</div>
+        </div>
+      </div>
+      <div class="pro-training-grid">
+        <div class="pro-training-card">
+          <div style="font-weight:800; font-size:0.96rem;">♟️ Šachy (Taktika &amp; Vizualizace)</div>
+          <div style="font-size:0.78rem; color:var(--text-muted); line-height:1.4;">Lichess taktické úlohy (tap-to-move) i slepá šachovnice pro trénink souřadnic a diagonál.</div>
+          <div class="pro-training-actions">
+            <button class="btn btn-sm btn-primary" id="btnOpenChessTactics">Taktické úlohy</button>
+            <button class="btn btn-sm" id="btnOpenChessBlind">Slepá šachovnice</button>
+          </div>
+        </div>
+        <div class="pro-training-card">
+          <div style="font-weight:800; font-size:0.96rem;">🧮 Matematické a logické hádanky</div>
+          <div style="font-size:0.78rem; color:var(--text-muted); line-height:1.4;">10kolové lekce: soustavy a bity, modulo a řady, SVG logická hradla i kombinatorika.</div>
+          <div class="pro-training-actions">
+            <button class="btn btn-sm btn-primary" id="btnOpenMathLogic">Spustit trénink</button>
+          </div>
+        </div>
+      </div>
     </div>
 """
 
@@ -1024,57 +1016,69 @@ PRO_MODALS_HTML = r"""
   </div>
 </div>
 
-<!-- LANGUAGE RULE TIP MODAL -->
-<div class="modal-overlay" id="langRuleModal">
-  <div class="modal-content" style="max-width:480px;">
-    <div class="modal-header">
-      <div class="modal-title" id="langRuleTitle">📖 Gramatické pravidlo</div>
-      <button class="modal-close" id="langRuleClose">&times;</button>
-    </div>
-    <div id="langRuleBody" style="font-size:0.9rem; line-height:1.55; margin-bottom:14px;"></div>
-    <button class="btn btn-primary" id="btnStartFromRule" style="width:100%;">Spustit lekci</button>
-  </div>
-</div>
-
-<!-- LANGUAGE MD IMPORT MODAL -->
-<div class="modal-overlay" id="langMdImportModal">
-  <div class="modal-content" style="max-width:520px;">
-    <div class="modal-header">
-      <div class="modal-title">Importovat jazykovou lekci (.md)</div>
-      <button class="modal-close" id="langMdImportClose">&times;</button>
-    </div>
-    <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px;">
-      Vložte text nebo vyberte soubor <code>.md</code> ve formátu <code>lang: de</code>, <code>topic: ...</code>, <code>Q:</code>, <code>A:</code>, <code>NOTE:</code>, <code>CLOZE: [slovo]</code>.
-    </p>
-    <input type="file" id="inpLangMdFile" accept=".md,.txt" style="margin-bottom:8px; font-size:0.82rem;">
-    <textarea id="txtLangMdInput" rows="9" placeholder="---&#10;lang: de&#10;level: B1&#10;topic: Cestování&#10;---&#10;Q: Zmeškal jsem přípoj, protože vlak měl zpoždění.&#10;A: Ich habe den Anschluss verpasst, weil der Zug Verspätung hatte.&#10;NOTE: Spojka weil posouvá sloveso na konec.&#10;CLOZE: Ich habe den Anschluss verpasst, [weil] der Zug Verspätung [hatte]." style="width:100%; background:var(--bg-main); border:1px solid var(--border-color); color:var(--text-main); padding:8px; border-radius:8px; font-size:0.82rem; box-sizing:border-box;"></textarea>
-    <button class="btn btn-primary" id="btnRunLangMdImport" style="margin-top:10px; width:100%;">Přidat do kurzu</button>
-  </div>
-</div>
-
-<!-- LANGUAGE DUOLINGO LESSON MODAL (FULLSCREEN) -->
-<div class="modal-overlay lang-lesson-modal" id="langLessonModal">
+<!-- INTERACTIVE TRAINING MODAL (CHESS & MATH/LOGIC) -->
+<div class="modal-overlay training-modal" id="trainingModal">
   <div class="modal-content">
-    <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-      <button class="btn btn-sm" id="langLessonClose">&times; Ukončit</button>
-      <div class="pro-bar-track" style="flex:1; height:10px;"><div class="pro-bar-fill pro-bar-goal" id="langLessonBar" style="width:0%;"></div></div>
-      <span id="langLessonStepLbl" style="font-size:0.82rem; font-weight:700; color:var(--accent);">1 / 10</span>
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+      <button class="btn btn-sm" id="trainingModalClose">&times; Zavřít</button>
+      <div class="pro-bar-track" style="flex:1; height:10px;"><div class="pro-bar-fill pro-bar-goal" id="trProgressBar" style="width:0%;"></div></div>
+      <span id="trStepLabel" style="font-size:0.82rem; font-weight:700; color:var(--accent);">1 / 10</span>
     </div>
-    <div id="langLessonTypeBadge" style="font-size:0.78rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:4px;">Úloha</div>
-    <div id="langLessonPrompt" style="font-size:1.15rem; font-weight:700; line-height:1.5; margin-bottom:6px;"></div>
-    <div class="lang-audio-row" id="langAudioRow">
-      <button class="lang-audio-btn" id="btnLangSpeakNorm" title="Přehrát normální rychlostí">🔊 Přehrát</button>
-      <button class="lang-audio-btn" id="btnLangSpeakSlow" title="Pomalá výslovnost 0.7×">🐢 Pomalu</button>
+
+    <!-- CHESS TACTICS PANE -->
+    <div id="trChessTacticsPane" style="display:none; flex-direction:column; gap:8px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+        <strong id="ctTitle" style="font-size:0.98rem;">Taktická úloha</strong>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <span id="ctStatusPill" style="font-size:0.8rem; font-weight:700; color:var(--accent);">Načítám...</span>
+          <button class="btn btn-sm" id="btnCtDaily">Denní Lichess</button>
+          <button class="btn btn-sm btn-primary" id="btnCtNext">Další úloha</button>
+        </div>
+      </div>
+      <div class="chess-board-wrap">
+        <div class="chess-board" id="ctBoard"></div>
+      </div>
+      <div id="ctFeedback" class="pro-toast" style="position:static; transform:none; opacity:1; display:none; text-align:center;"></div>
     </div>
-    <div id="langInteractiveArea" style="flex:1; display:flex; flex-direction:column; gap:10px; margin-top:8px; overflow-y:auto;"></div>
-    <div class="lang-feedback-banner" id="langFeedbackBanner"></div>
-    <div style="display:flex; gap:8px; margin-top:10px; padding-top:8px; border-top:1px solid var(--border-color);">
-      <button class="btn btn-primary" id="btnLangCheck" style="flex:1; padding:12px;">Zkontrolovat</button>
-      <button class="btn btn-primary" id="btnLangNext" style="flex:1; padding:12px; display:none;">Pokračovat →</button>
+
+    <!-- CHESS BLINDFOLD PANE -->
+    <div id="trChessBlindPane" style="display:none; flex-direction:column; gap:8px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+        <strong style="font-size:0.98rem;">Slepá šachovnice (10 kol)</strong>
+        <span id="cbScoreLabel" style="font-size:0.84rem; font-weight:700; color:var(--accent);">Skóre: 0</span>
+      </div>
+      <div id="cbPrompt" style="font-size:1.08rem; font-weight:800; text-align:center; padding:8px; background:var(--bg-surface); border-radius:10px; border:1px solid var(--border-color);"></div>
+      <div class="chess-board-wrap">
+        <div class="chess-board" id="cbBoard"></div>
+      </div>
+      <div id="cbChoiceRow" style="display:none; grid-template-columns:1fr 1fr; gap:8px; width:min(100%, 400px); margin:4px auto;">
+        <button class="btn btn-primary" id="btnCbOptA" style="padding:12px;">Světlé</button>
+        <button class="btn btn-primary" id="btnCbOptB" style="padding:12px;">Tmavé</button>
+      </div>
+      <div id="cbFeedback" style="text-align:center; font-size:0.86rem; min-height:20px;"></div>
+    </div>
+
+    <!-- MATH & LOGIC PANE -->
+    <div id="trMathPane" style="display:none; flex-direction:column; gap:8px;">
+      <div class="math-cat-pills" id="mathCatPills">
+        <button class="math-cat-pill active" data-cat="mix">Mix všech</button>
+        <button class="math-cat-pill" data-cat="bits">Soustavy &amp; bity</button>
+        <button class="math-cat-pill" data-cat="mod">Modulo &amp; řady</button>
+        <button class="math-cat-pill" data-cat="gates">Logická hradla</button>
+        <button class="math-cat-pill" data-cat="comb">Kombinatorika</button>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span id="mlCatBadge" style="font-size:0.78rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Hádanka</span>
+        <span id="mlScoreLabel" style="font-size:0.84rem; font-weight:700; color:var(--accent);">Správně: 0</span>
+      </div>
+      <div id="mlPrompt" style="font-size:1.05rem; font-weight:700; line-height:1.5; padding:12px; background:var(--bg-surface); border-radius:12px; border:1px solid var(--border-color);"></div>
+      <div id="mlSvgBox" class="logic-svg-box" style="display:none;"></div>
+      <div id="mlOptionsGrid" class="quiz-grid" style="margin-top:4px;"></div>
+      <div id="mlExplainBox" style="display:none; padding:10px 12px; border-radius:10px; font-size:0.86rem; line-height:1.45; background:var(--bg-surface); border:1px solid var(--border-highlight);"></div>
+      <button class="btn btn-primary" id="btnMlNext" style="display:none; padding:12px; margin-top:4px;">Další úloha →</button>
     </div>
   </div>
 </div>
-<div class="peek-popover" id="peekPopover" style="display:none;"></div>
 
 <!-- CLOUD SYNC MODAL -->
 <div class="modal-overlay" id="syncModal">
@@ -2852,428 +2856,549 @@ document.getElementById("btnSyncDisconnect").onclick = () => {
   document.getElementById("syncStatusMsg").innerText = "Synchronizace odpojena.";
 };
 
-// --- DUOLINGO-STYLE LANGUAGE COURSE ENGINE ---
-const LANG_COURSES = __LANG_COURSES_JSON__;
-const LANG_GLOSSARY = __LANG_GLOSSARY_JSON__;
-const LANG_PROGRESS_KEY = "karty_lang_progress_v1";
-const LANG_CUSTOM_KEY = "karty_lang_custom_topics_v1";
-const ACTIVE_COURSE_KEY = "karty_active_course_v1";
-
-function loadLangProgress() { try { return JSON.parse(localStorage.getItem(LANG_PROGRESS_KEY) || "{}"); } catch { return {}; } }
-function saveLangProgress(p) { localStorage.setItem(LANG_PROGRESS_KEY, JSON.stringify(p)); }
-function loadCustomLangTopics() { try { return JSON.parse(localStorage.getItem(LANG_CUSTOM_KEY) || "{}"); } catch { return {}; } }
-function saveCustomLangTopics(d) { localStorage.setItem(LANG_CUSTOM_KEY, JSON.stringify(d)); }
-
-function getCourseTopics(langKey) {
-  const course = LANG_COURSES[langKey];
-  if (!course) return [];
-  const custom = loadCustomLangTopics()[langKey] || [];
-  return [...course.topics, ...custom];
-}
-
-function switchCourseMode(courseKey) {
-  localStorage.setItem(ACTIVE_COURSE_KEY, courseKey);
-  document.body.classList.remove("course-en", "course-de", "course-fr");
-  if (courseKey === "en" || courseKey === "de" || courseKey === "fr") {
-    document.body.classList.add("course-" + courseKey);
+// --- INTERACTIVE TRAINING ENGINE (CHESS & MATH/LOGIC) ---
+async function awardTrainingCompletion(xpPts, toastMsg, countReview = true) {
+  const p = loadProProfile();
+  const todayStr = getLocalDateString();
+  p.points = (p.points || 0) + xpPts;
+  p.xp = (p.xp || 0) + xpPts;
+  if (!p.dailyQuests || p.dailyQuests.date !== todayStr) {
+    p.dailyQuests = { date: todayStr, maxCombo: 0, cleanCount: 0, easyCount: 0, goodCount: 0, hardCount: 0, typeCount: 0, xpToday: 0, minigameCount: 0, readyIds: [], claimedIds: [] };
   }
-  document.querySelectorAll("#proCourseBar .pro-course-tab").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.course === courseKey);
-  });
-  const langSec = document.getElementById("langCourseSection");
-  const deckListEl = document.getElementById("deckList");
-  const dropZoneEl = document.getElementById("dropZone");
-  const extraBar = document.getElementById("btnProNewCard")?.parentElement;
-  if (courseKey === "general") {
-    if (langSec) langSec.classList.remove("active");
-    if (deckListEl) deckListEl.style.display = "";
-    if (dropZoneEl) dropZoneEl.style.display = "";
-    if (extraBar) extraBar.style.display = "flex";
-  } else {
-    if (langSec) langSec.classList.add("active");
-    if (deckListEl) deckListEl.style.display = "none";
-    if (dropZoneEl) dropZoneEl.style.display = "none";
-    if (extraBar) extraBar.style.display = "none";
-    renderLangCourseView(courseKey);
+  p.dailyQuests.xpToday = (p.dailyQuests.xpToday || 0) + xpPts;
+  p.dailyQuests.minigameCount = (p.dailyQuests.minigameCount || 0) + 1;
+  saveProProfile(p);
+  if (countReview) {
+    try {
+      await dbAddReview({
+        deckId: "__training__",
+        subdeck: "",
+        cardId: "tr_" + Date.now(),
+        timestamp: Date.now(),
+        dateStr: todayStr,
+        rating: "good",
+        interval: 1,
+        isNew: false
+      });
+    } catch {}
   }
+  launchConfetti();
+  playProTone("level");
+  showProToast(toastMsg);
+  await updateProHud();
+  if (typeof renderHeatmap === "function") await renderHeatmap();
 }
 
-function renderLangCourseView(langKey) {
-  const course = LANG_COURSES[langKey];
-  if (!course) return;
-  document.getElementById("langCourseTitle").innerText = course.title;
-  const topics = getCourseTopics(langKey);
-  const prog = loadLangProgress();
-  const totalDone = topics.filter(t => (prog[t.id] || 0) >= t.cards.length).length;
-  document.getElementById("langCourseSub").innerText = `${topics.length} tematických uzlů · Dokončeno ${totalDone}/${topics.length}`;
-  const pathEl = document.getElementById("langSkillPath");
-  pathEl.innerHTML = "";
-  topics.forEach((topic, idx) => {
-    const doneCnt = Math.min(topic.cards.length, prog[topic.id] || 0);
-    const isGold = doneCnt >= topic.cards.length && topic.cards.length > 0;
-    const wrap = document.createElement("div");
-    wrap.className = "lang-skill-node-wrap";
-    wrap.innerHTML = `
-      <button class="lang-skill-circle ${isGold ? "gold" : ""}" title="Spustit lekci">
-        <span>${idx + 1}</span>
-        <span style="font-size:0.7rem; font-weight:700;">${doneCnt}/${topic.cards.length}</span>
-      </button>
-      <div class="lang-skill-meta">
-        <strong style="font-size:0.88rem;">${escapeHtml(topic.name)}</strong>
-        ${topic.ruleHtml ? `<button class="btn btn-sm btn-rule-open" style="padding:2px 8px; font-size:0.74rem;">📖 Pravidlo</button>` : ""}
-      </div>
-    `;
-    wrap.querySelector(".lang-skill-circle").onclick = () => startLangLesson(langKey, topic);
-    const rb = wrap.querySelector(".btn-rule-open");
-    if (rb) rb.onclick = () => openLangRule(langKey, topic);
-    pathEl.appendChild(wrap);
+function showTrainingPane(paneId) {
+  ["trChessTacticsPane", "trChessBlindPane", "trMathPane"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = id === paneId ? "flex" : "none";
   });
+  document.getElementById("trainingModal").classList.add("active");
 }
+document.getElementById("trainingModalClose").onclick = () => document.getElementById("trainingModal").classList.remove("active");
 
-function openLangRule(langKey, topic) {
-  document.getElementById("langRuleTitle").innerText = "📖 " + (topic.ruleTitle || topic.name);
-  document.getElementById("langRuleBody").innerHTML = topic.ruleHtml || "<p>Procvičte si tento tematický blok v lekci.</p>";
-  document.getElementById("btnStartFromRule").onclick = () => {
-    document.getElementById("langRuleModal").classList.remove("active");
-    startLangLesson(langKey, topic);
-  };
-  document.getElementById("langRuleModal").classList.add("active");
-}
-document.getElementById("langRuleClose").onclick = () => document.getElementById("langRuleModal").classList.remove("active");
+// 1A. CHESS TACTICS (Lichess API + 30 verified fallback puzzles)
+const CHESS_PIECE_CHARS = {
+  wp: "♙", wn: "♘", wb: "♗", wr: "♖", wq: "♕", wk: "♔",
+  bp: "♟", bn: "♞", bb: "♝", br: "♜", bq: "♛", bk: "♚"
+};
+const CHESS_FALLBACK_PUZZLES = [
+  { fen: "6k1/5ppp/8/8/8/8/5PPP/4R1K1 w - - 0 1", sol: ["e1e8"], theme: "Mat na poslední řadě" },
+  { fen: "r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4", sol: ["h5f7"], theme: "Ovčácký mat" },
+  { fen: "5rk1/5ppp/8/8/8/8/1Q3PPP/6K1 w - - 0 1", sol: ["b2g7"], theme: "Mat dámou" },
+  { fen: "r4rk1/ppp2ppp/8/8/8/5N2/PPP2PPP/R3R1K1 w - - 0 1", sol: ["e1e8"], theme: "Věž na 8. řadě" },
+  { fen: "6k1/3R1ppp/8/8/8/8/5PPP/6K1 w - - 0 1", sol: ["d7d8"], theme: "Mat věží" },
+  { fen: "3r2k1/5ppp/8/8/8/8/5PPP/3RR1K1 w - - 0 1", sol: ["d1d8"], theme: "Odtažný mat" },
+  { fen: "r1b1k2r/pppp1ppp/2n2q2/2b5/4P3/2N2N2/PPPP1PPP/R1BQKB1R b KQkq - 0 1", sol: ["f6f2"], theme: "Útok na f2" },
+  { fen: "6k1/4Rppp/8/8/8/1B6/5PPP/6K1 w - - 0 1", sol: ["e7e8"], theme: "Mat s podporou" },
+  { fen: "2kr4/ppp5/8/8/8/8/PPP2Q2/2K5 w - - 0 1", sol: ["f2a7"], theme: "Útok na pěšce" },
+  { fen: "r2qk2r/ppp2ppp/2n1bn2/2b1p3/4P3/2NP1N2/PPP2PPP/R1BQKB1R w KQkq - 0 1", sol: ["f3e5"], theme: "Zisk pěšce" },
+  { fen: "4r1k1/5ppp/8/8/8/8/5PPP/3QR1K1 w - - 0 1", sol: ["e1e8"], theme: "Mat na 8. řadě" },
+  { fen: "6k1/5ppp/8/4N3/8/8/5PPP/4R1K1 w - - 0 1", sol: ["e1e8"], theme: "Krytý mat věží" },
+  { fen: "r3k2r/ppp2ppp/8/8/8/8/PPP2PPP/R3K2R w KQkq - 0 1", sol: ["e1g1"], theme: "Krátká rošáda" },
+  { fen: "5rk1/4Qppp/8/8/8/8/5PPP/6K1 w - - 0 1", sol: ["e7f8"], theme: "Výměna do matu" },
+  { fen: "6k1/5ppp/5n2/8/8/1Q6/5PPP/6K1 w - - 0 1", sol: ["b3b8"], theme: "Mat na 8. řadě" },
+  { fen: "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/3P1N2/PPP2PPP/RNBQK2R w KQkq - 0 1", sol: ["c4f7"], theme: "Oběť na f7" },
+  { fen: "6k1/p4ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1", sol: ["d1d8"], theme: "Mat věží" },
+  { fen: "2r3k1/5ppp/8/8/8/8/4QPPP/4R1K1 w - - 0 1", sol: ["e2e8"], theme: "Mat dámou" },
+  { fen: "r5k1/5ppp/8/8/8/5Q2/5PPP/6K1 w - - 0 1", sol: ["f3a8"], theme: "Mat na a8" },
+  { fen: "6k1/4bppp/8/8/8/8/1Q3PPP/4R1K1 w - - 0 1", sol: ["e1e7"], theme: "Zisk střelce" },
+  { fen: "4k3/4P3/4K3/8/8/8/8/8 w - - 0 1", sol: ["e7e8q"], theme: "Proměna pěšce v dámu" },
+  { fen: "6k1/5p1p/6p1/8/8/8/5PPP/4R1K1 w - - 0 1", sol: ["e1e8"], theme: "Slabá poslední řada" },
+  { fen: "r2q1rk1/ppp2ppp/2n5/3np3/8/2NP1N2/PPP2PPP/R1BQ1RK1 w - - 0 1", sol: ["c3d5"], theme: "Výměna v centru" },
+  { fen: "1r4k1/5ppp/8/8/8/8/5PPP/1R3QK1 w - - 0 1", sol: ["b1b8"], theme: "Mat přes věž" },
+  { fen: "6k1/5ppp/8/8/3N4/8/5PPP/6K1 b - - 0 1", sol: ["g8f8"], theme: "Aktivace krále" },
+  { fen: "3qk3/8/8/8/8/8/4R3/4K3 w - - 0 1", sol: ["e2d2"], theme: "Vazba na dámu" },
+  { fen: "6k1/5ppp/4p3/8/8/1B6/5PPP/4R1K1 w - - 0 1", sol: ["b3e6"], theme: "Průlom na e6" },
+  { fen: "r4rk1/5ppp/8/8/8/8/5PPP/R3Q1K1 w - - 0 1", sol: ["e1e8"], theme: "Dvojí útok na e8" },
+  { fen: "6k1/5p2/6p1/8/8/7Q/5PPP/6K1 w - - 0 1", sol: ["h3c8"], theme: "Mat dámou po diagonále" },
+  { fen: "4r1k1/6pp/8/8/8/8/4RPPP/4R1K1 w - - 0 1", sol: ["e2e8"], theme: "Zdvojené věže" }
+];
 
-function playLangAudio(text, ttsLang, rate = 1.0) {
-  if (!("speechSynthesis" in window) || !text) return;
+let _ctState = null;
+async function loadChessTacticPuzzle(useDaily = false) {
+  showTrainingPane("trChessTacticsPane");
+  const statusEl = document.getElementById("ctStatusPill");
+  const titleEl = document.getElementById("ctTitle");
+  const fbEl = document.getElementById("ctFeedback");
+  fbEl.style.display = "none";
+  statusEl.innerText = "Načítám úlohu...";
+
+  if (typeof Chess === "undefined") {
+    statusEl.innerText = "Chybí knihovna chess.js (zkontrolujte připojení).";
+    return;
+  }
+
+  let fen = null, sol = [], theme = "Taktická úloha", preMoveUci = null;
   try {
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = ttsLang || "en-GB";
-    u.rate = rate;
-    window.speechSynthesis.speak(u);
+    const ctrl = new AbortController();
+    const tId = setTimeout(() => ctrl.abort(), 3800);
+    const url = useDaily ? "https://lichess.org/api/puzzle/daily" : "https://lichess.org/api/puzzle/next";
+    const res = await fetch(url, { signal: ctrl.signal, headers: { Accept: "application/json" } });
+    clearTimeout(tId);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.game && data.puzzle && Array.isArray(data.puzzle.solution)) {
+        const tmp = new Chess();
+        if (tmp.load_pgn(data.game.pgn || "")) {
+          const hist = tmp.history({ verbose: true });
+          const ply = Math.min(hist.length, (data.puzzle.initialPly || 0) + 1);
+          const replay = new Chess();
+          for (let i = 0; i < ply - 1; i++) replay.move(hist[i]);
+          const lastM = hist[ply - 1];
+          fen = replay.fen();
+          if (lastM) preMoveUci = lastM.from + lastM.to + (lastM.promotion || "");
+          sol = data.puzzle.solution;
+          theme = (data.puzzle.themes || []).slice(0, 2).join(", ") || "Lichess úloha";
+        }
+      }
+    }
   } catch {}
+
+  if (!fen) {
+    const fb = CHESS_FALLBACK_PUZZLES[Math.floor(Math.random() * CHESS_FALLBACK_PUZZLES.length)];
+    fen = fb.fen; sol = [...fb.sol]; theme = fb.theme + " (offline)";
+  }
+
+  const game = new Chess(fen);
+  _ctState = { game, sol, solIdx: 0, selectedSq: null, lastMove: null, flip: false, solved: false, errors: 0 };
+  titleEl.innerText = useDaily ? `Denní Lichess · ${theme}` : theme;
+
+  if (preMoveUci) {
+    _ctState.flip = game.turn() === "w";
+    renderChessTacticsBoard();
+    statusEl.innerText = "Soupeř táhne...";
+    setTimeout(() => {
+      if (!_ctState || _ctState.game !== game) return;
+      const m = game.move({ from: preMoveUci.slice(0, 2), to: preMoveUci.slice(2, 4), promotion: preMoveUci[4] || "q" });
+      if (m) _ctState.lastMove = { from: m.from, to: m.to };
+      _ctState.flip = game.turn() === "b";
+      statusEl.innerText = game.turn() === "w" ? "Na tahu: Bílý" : "Na tahu: Černý";
+      renderChessTacticsBoard();
+    }, 450);
+  } else {
+    _ctState.flip = game.turn() === "b";
+    statusEl.innerText = game.turn() === "w" ? "Na tahu: Bílý" : "Na tahu: Černý";
+    renderChessTacticsBoard();
+  }
 }
 
-function highlightGermanGenders(htmlStr) {
-  return htmlStr
-    .replace(/\b(der|den|dem)\b/gi, '<span class="de-der">$1</span>')
-    .replace(/\b(die)\b/gi, '<span class="de-die">$1</span>')
-    .replace(/\b(das)\b/gi, '<span class="de-das">$1</span>');
-}
+function renderChessTacticsBoard() {
+  const s = _ctState;
+  if (!s) return;
+  const boardEl = document.getElementById("ctBoard");
+  boardEl.innerHTML = "";
+  const files = s.flip ? ["h","g","f","e","d","c","b","a"] : ["a","b","c","d","e","f","g","h"];
+  const ranks = s.flip ? [1,2,3,4,5,6,7,8] : [8,7,6,5,4,3,2,1];
+  const legalTargets = s.selectedSq ? new Set(s.game.moves({ square: s.selectedSq, verbose: true }).map(m => m.to)) : new Set();
 
-function renderPeekSentence(container, sentence, langKey) {
-  const words = sentence.split(/(\s+)/);
-  let html = words.map(tok => {
-    if (!tok.trim()) return tok;
-    const clean = tok.replace(/[.,!?;:"'()\[\]«»„“]/g, "").toLowerCase();
-    const hasGloss = clean && LANG_GLOSSARY[clean];
-    const safeTok = escapeHtml(tok);
-    const inner = langKey === "de" ? highlightGermanGenders(safeTok) : safeTok;
-    return hasGloss ? `<span class="peek-word" data-gloss="${escapeHtml(LANG_GLOSSARY[clean])}">${inner}</span>` : inner;
-  }).join("");
-  container.innerHTML = html;
-  const pop = document.getElementById("peekPopover");
-  container.querySelectorAll(".peek-word").forEach(el => {
-    const showPop = (e) => {
-      e.stopPropagation();
-      if (!pop) return;
-      pop.innerText = el.dataset.gloss;
-      pop.style.display = "block";
-      const r = el.getBoundingClientRect();
-      pop.style.left = Math.max(8, Math.min(window.innerWidth - 220, r.left)) + "px";
-      pop.style.top = Math.max(8, r.top - 36) + "px";
-      clearTimeout(window._peekTimer);
-      window._peekTimer = setTimeout(() => { pop.style.display = "none"; }, 2200);
-    };
-    el.addEventListener("click", showPop);
-    el.addEventListener("mouseenter", showPop);
+  ranks.forEach((rk, rIdx) => {
+    files.forEach((fl, fIdx) => {
+      const sq = fl + rk;
+      const isLight = (fl.charCodeAt(0) - 97 + rk) % 2 === 1;
+      const div = document.createElement("div");
+      div.className = `chess-sq ${isLight ? "light" : "dark"}`;
+      div.dataset.sq = sq;
+      if (s.selectedSq === sq) div.classList.add("selected");
+      if (s.lastMove && (s.lastMove.from === sq || s.lastMove.to === sq)) div.classList.add("last-move");
+      if (legalTargets.has(sq)) div.classList.add("legal-dot");
+
+      const p = s.game.get(sq);
+      if (p) {
+        const sp = document.createElement("span");
+        sp.className = p.color === "w" ? "chess-piece-w" : "chess-piece-b";
+        sp.innerText = CHESS_PIECE_CHARS[p.color + p.type] || "";
+        div.appendChild(sp);
+      }
+      if (fIdx === 0) div.insertAdjacentHTML("beforeend", `<span class="chess-coord chess-coord-rank">${rk}</span>`);
+      if (rIdx === 7) div.insertAdjacentHTML("beforeend", `<span class="chess-coord chess-coord-file">${fl}</span>`);
+      div.onclick = () => onChessTacticsSquareClick(sq, div);
+      boardEl.appendChild(div);
+    });
   });
 }
 
-function stripDiacriticsStr(s) {
-  return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-}
-function normLangStr(s) {
-  return String(s || "").toLowerCase().replace(/[.,!?;:"'()\[\]«»„“]/g, "").replace(/\s+/g, " ").trim();
-}
-function langLev(a, b) {
-  const m = a.length, n = b.length;
-  const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
-  for (let i = 0; i <= m; i++) dp[i][0] = i;
-  for (let j = 0; j <= n; j++) dp[0][j] = j;
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+async function onChessTacticsSquareClick(sq, divEl) {
+  const s = _ctState;
+  if (!s || s.solved) return;
+  const piece = s.game.get(sq);
+  if (!s.selectedSq) {
+    if (piece && piece.color === s.game.turn()) {
+      s.selectedSq = sq;
+      renderChessTacticsBoard();
     }
+    return;
   }
-  return dp[m][n];
-}
-
-function smartGradeLangAnswer(attemptRaw, expectedRaw, langKey) {
-  const att = normLangStr(attemptRaw);
-  const exp = normLangStr(expectedRaw);
-  if (!att) return { status: "err", msg: `Správná odpověď: <strong>${escapeHtml(expectedRaw)}</strong>` };
-  if (att === exp) return { status: "ok", msg: "Skvěle! Přesná odpověď." };
-  // Check missing diacritics
-  if (stripDiacriticsStr(att) === stripDiacriticsStr(exp)) {
-    return { status: "warn_ok", msg: `Správně! Pozor na diakritiku: <strong>${escapeHtml(expectedRaw)}</strong>` };
-  }
-  // German wrong article check (der/die/das/den/dem/ein/eine/einen)
-  if (langKey === "de") {
-    const artRe = /\b(der|die|das|den|dem|ein|eine|einen|einem)\b/g;
-    if (att.replace(artRe, "_") === exp.replace(artRe, "_")) {
-      return { status: "retry", msg: `Téměř! Zkontroluj si <span style="color:#f87171; font-weight:700;">německý člen</span> (der / die / das) a zkus to znovu.` };
-    }
-  }
-  // 1-letter typo
-  if (langLev(att, exp) <= 1) {
-    return { status: "warn_ok", msg: `Skoro správně! Dej si pozor na překlep: <strong>${escapeHtml(expectedRaw)}</strong>` };
-  }
-  return { status: "err", msg: `Správně má být: <strong>${escapeHtml(expectedRaw)}</strong>` };
-}
-
-let _langSession = null;
-function startLangLesson(langKey, topic) {
-  const course = LANG_COURSES[langKey];
-  if (!course || !topic || !topic.cards || topic.cards.length === 0) return;
-  const exercises = topic.cards.map((card, i) => {
-    let mode = "wordbank";
-    if (langKey === "fr") mode = (i % 4 === 2) ? "listening" : (i % 4 === 3 && card.cloze ? "cloze" : "wordbank");
-    else if (langKey === "de") mode = (i % 3 === 1 && card.cloze) ? "cloze" : (i % 3 === 2 ? "listening" : "wordbank");
-    else if (langKey === "en") mode = (i % 3 === 0 && card.cloze) ? "cloze" : (i % 3 === 1 ? "paraphrase" : "wordbank");
-    return { card, mode };
-  });
-  _langSession = { langKey, ttsLang: course.ttsLang, topic, exercises, idx: 0, mistakes: 0, builtWords: [], currentAnswer: "" };
-  document.getElementById("langLessonModal").classList.add("active");
-  renderLangExercise();
-}
-
-function renderLangExercise() {
-  const s = _langSession;
-  if (!s) return;
-  const ex = s.exercises[s.idx];
-  const card = ex.card;
-  const total = s.exercises.length;
-  document.getElementById("langLessonStepLbl").innerText = `${s.idx + 1} / ${total}`;
-  document.getElementById("langLessonBar").style.width = `${Math.round((s.idx / total) * 100)}%`;
-
-  const badge = document.getElementById("langLessonTypeBadge");
-  const promptEl = document.getElementById("langLessonPrompt");
-  const area = document.getElementById("langInteractiveArea");
-  const fb = document.getElementById("langFeedbackBanner");
-  const btnCheck = document.getElementById("btnLangCheck");
-  const btnNext = document.getElementById("btnLangNext");
-  fb.className = "lang-feedback-banner"; fb.style.display = "none"; fb.innerHTML = "";
-  btnCheck.style.display = "block"; btnNext.style.display = "none";
-  area.innerHTML = "";
-  s.builtWords = [];
-  s.selectedChoice = null;
-
-  document.getElementById("btnLangSpeakNorm").onclick = () => playLangAudio(card.a, s.ttsLang, 1.0);
-  document.getElementById("btnLangSpeakSlow").onclick = () => playLangAudio(card.a, s.ttsLang, 0.7);
-  // Auto-play audio
-  setTimeout(() => playLangAudio(card.a, s.ttsLang, 1.0), 160);
-
-  if (ex.mode === "listening") {
-    badge.innerText = "Poslechové cvičení · Slož větu, kterou slyšíš";
-    promptEl.innerText = "Poslechni si nahrávku a poskládej větu:";
-    buildWordBankUi(area, card, s);
-  } else if (ex.mode === "cloze" && card.cloze) {
-    badge.innerText = "Doplňovačka v kontextu";
-    promptEl.innerText = card.q;
-    const blanks = [];
-    const masked = card.cloze.replace(/\[([^\]]+)\]/g, (_, w) => {
-      blanks.push(w);
-      return `<input type="text" class="lang-cloze-inp" data-idx="${blanks.length - 1}" placeholder="..." autocomplete="off" style="width:${Math.max(70, w.length * 11)}px; background:var(--bg-main); border:2px solid var(--accent); color:var(--text-main); padding:3px 8px; border-radius:8px; font-size:0.95rem; font-weight:700; text-align:center;">`;
-    });
-    const box = document.createElement("div");
-    box.style.cssText = "padding:14px; background:var(--bg-surface); border-radius:12px; line-height:2; font-size:1.05rem;";
-    box.innerHTML = s.langKey === "de" ? highlightGermanGenders(masked) : masked;
-    area.appendChild(box);
-    s.clozeBlanks = blanks;
-    const firstInp = box.querySelector(".lang-cloze-inp");
-    if (firstInp) setTimeout(() => firstInp.focus(), 80);
-  } else if (ex.mode === "paraphrase") {
-    badge.innerText = "C1 Kontext & Nuance · Vyber nejlepší variantu";
-    promptEl.innerText = card.q;
-    const otherCards = s.topic.cards.filter(c => c.id !== card.id).sort(() => Math.random() - 0.5).slice(0, 3);
-    const opts = [card.a, ...otherCards.map(c => c.a)].sort(() => Math.random() - 0.5);
-    const grid = document.createElement("div");
-    grid.className = "quiz-grid";
-    grid.style.gridTemplateColumns = "1fr";
-    opts.forEach(opt => {
-      const b = document.createElement("button");
-      b.className = "quiz-option";
-      b.innerText = opt;
-      b.onclick = () => {
-        grid.querySelectorAll(".quiz-option").forEach(x => x.style.borderColor = "");
-        b.style.borderColor = "var(--accent)";
-        s.selectedChoice = opt;
-      };
-      grid.appendChild(b);
-    });
-    area.appendChild(grid);
-  } else {
-    badge.innerText = "Překlad · Skládání z bublin (Word Bank)";
-    promptEl.innerText = card.q;
-    buildWordBankUi(area, card, s);
-  }
-}
-
-function buildWordBankUi(area, card, s) {
-  const words = card.a.split(/\s+/).filter(Boolean);
-  const distractorsPool = s.langKey === "fr"
-    ? ["très", "toujours", "mais", "avec", "pour", "demain"]
-    : (s.langKey === "de" ? ["immer", "aber", "nicht", "sehr", "heute", "oder"] : ["however", "indeed", "rather", "actually", "almost"]);
-  const distractors = distractorsPool.filter(d => !words.some(w => normLangStr(w) === d)).sort(() => Math.random() - 0.5).slice(0, 2);
-  const tokens = [...words, ...distractors].map((val, idx) => ({ val, idx })).sort(() => Math.random() - 0.5);
-
-  const ansBox = document.createElement("div");
-  ansBox.className = "lang-wb-answer";
-  const bankBox = document.createElement("div");
-  bankBox.className = "lang-wb-bank";
-
-  const renderWb = () => {
-    ansBox.innerHTML = "";
-    s.builtWords.forEach(item => {
-      const c = document.createElement("button");
-      c.className = "lang-wb-chip";
-      c.innerHTML = s.langKey === "de" ? highlightGermanGenders(escapeHtml(item.val)) : escapeHtml(item.val);
-      c.onclick = () => { s.builtWords = s.builtWords.filter(x => x.idx !== item.idx); renderWb(); };
-      ansBox.appendChild(c);
-    });
-    bankBox.innerHTML = "";
-    tokens.forEach(item => {
-      if (s.builtWords.some(x => x.idx === item.idx)) return;
-      const c = document.createElement("button");
-      c.className = "lang-wb-chip";
-      c.innerHTML = s.langKey === "de" ? highlightGermanGenders(escapeHtml(item.val)) : escapeHtml(item.val);
-      c.onclick = () => { s.builtWords.push(item); renderWb(); };
-      bankBox.appendChild(c);
-    });
-  };
-  area.appendChild(ansBox);
-  area.appendChild(bankBox);
-  renderWb();
-}
-
-document.getElementById("btnLangCheck").onclick = async () => {
-  const s = _langSession;
-  if (!s) return;
-  const ex = s.exercises[s.idx];
-  const card = ex.card;
-  const fb = document.getElementById("langFeedbackBanner");
-  let grade = null;
-
-  if (ex.mode === "cloze" && s.clozeBlanks) {
-    const inputs = Array.from(document.querySelectorAll("#langInteractiveArea .lang-cloze-inp"));
-    const userWords = inputs.map(i => i.value.trim()).join(" ");
-    const expWords = s.clozeBlanks.join(" ");
-    grade = smartGradeLangAnswer(userWords, expWords, s.langKey);
-  } else if (ex.mode === "paraphrase") {
-    if (!s.selectedChoice) { alert("Vyberte prosím jednu možnost."); return; }
-    grade = s.selectedChoice === card.a
-      ? { status: "ok", msg: "Skvěle! Přesná C1 nuance." }
-      : { status: "err", msg: `Správně: <strong>${escapeHtml(card.a)}</strong>` };
-  } else {
-    const attempt = s.builtWords.map(x => x.val).join(" ");
-    grade = smartGradeLangAnswer(attempt, card.a, s.langKey);
-  }
-
-  if (grade.status === "retry") {
-    fb.className = "lang-feedback-banner warn";
-    fb.style.display = "block";
-    fb.innerHTML = grade.msg;
-    playProTone("again");
+  if (s.selectedSq === sq) { s.selectedSq = null; renderChessTacticsBoard(); return; }
+  if (piece && piece.color === s.game.turn()) {
+    s.selectedSq = sq;
+    renderChessTacticsBoard();
     return;
   }
 
-  const isCorrect = grade.status === "ok" || grade.status === "warn_ok";
-  fb.className = "lang-feedback-banner " + (grade.status === "ok" ? "ok" : (grade.status === "warn_ok" ? "warn" : "err"));
-  fb.style.display = "block";
-  fb.innerHTML = `<div>${grade.msg}</div>`
-    + `<div style="margin-top:6px;" id="langPeekLine"></div>`
-    + (card.note ? `<div style="margin-top:4px; font-size:0.8rem; opacity:0.9;">💡 ${escapeHtml(card.note)}</div>` : "");
-  const peekLine = document.getElementById("langPeekLine");
-  if (peekLine) renderPeekSentence(peekLine, card.a, s.langKey);
-
-  if (isCorrect) {
+  const expectedUci = s.sol[s.solIdx];
+  const candidate = s.game.move({ from: s.selectedSq, to: sq, promotion: "q" });
+  if (!candidate) {
+    divEl.classList.add("err");
+    playProTone("again");
+    setTimeout(() => divEl.classList.remove("err"), 350);
+    s.selectedSq = null;
+    renderChessTacticsBoard();
+    return;
+  }
+  const playedUci = candidate.from + candidate.to + (candidate.promotion || "");
+  const isMate = s.game.in_checkmate();
+  if (playedUci === expectedUci || isMate) {
+    s.lastMove = { from: candidate.from, to: candidate.to };
+    s.selectedSq = null;
+    s.solIdx++;
     playProTone("good");
-    const p = loadProProfile(); p.points += 8; p.xp = (p.xp || 0) + 8; saveProProfile(p);
-    await updateProHud();
-  } else {
-    s.mistakes++;
-    s.exercises.push(ex); // Return at end of lesson
-    playProTone("again");
-  }
-  document.getElementById("btnLangCheck").style.display = "none";
-  document.getElementById("btnLangNext").style.display = "block";
-};
+    renderChessTacticsBoard();
 
-document.getElementById("btnLangNext").onclick = async () => {
-  const s = _langSession;
+    if (s.solIdx >= s.sol.length || isMate) {
+      s.solved = true;
+      document.getElementById("ctStatusPill").innerText = "Vyřešeno! +15 XP";
+      document.getElementById("trProgressBar").style.width = "100%";
+      await awardTrainingCompletion(15, "Šachová úloha vyřešena! +15 XP");
+      return;
+    }
+    // Opponent reply
+    setTimeout(() => {
+      if (!_ctState || _ctState !== s) return;
+      const oppUci = s.sol[s.solIdx];
+      if (oppUci) {
+        const om = s.game.move({ from: oppUci.slice(0, 2), to: oppUci.slice(2, 4), promotion: oppUci[4] || "q" });
+        if (om) s.lastMove = { from: om.from, to: om.to };
+        s.solIdx++;
+        renderChessTacticsBoard();
+      }
+    }, 380);
+  } else {
+    s.game.undo();
+    s.errors++;
+    s.selectedSq = null;
+    playProTone("again");
+    divEl.classList.add("err");
+    document.getElementById("ctStatusPill").innerText = `Špatný tah (chyby: ${s.errors})`;
+    setTimeout(() => { renderChessTacticsBoard(); }, 350);
+  }
+}
+
+document.getElementById("btnOpenChessTactics").onclick = () => {
+  document.getElementById("trStepLabel").innerText = "Taktika";
+  document.getElementById("trProgressBar").style.width = "20%";
+  loadChessTacticPuzzle(false);
+};
+document.getElementById("btnCtDaily").onclick = () => loadChessTacticPuzzle(true);
+document.getElementById("btnCtNext").onclick = () => loadChessTacticPuzzle(false);
+
+// 1B. CHESS BLINDFOLD (10 rounds, no labels)
+let _cbState = null;
+function startChessBlindfold() {
+  showTrainingPane("trChessBlindPane");
+  _cbState = { round: 0, total: 10, score: 0, current: null, locked: false };
+  nextBlindRound();
+}
+function nextBlindRound() {
+  const s = _cbState;
   if (!s) return;
-  s.idx++;
-  if (s.idx >= s.exercises.length) {
-    document.getElementById("langLessonModal").classList.remove("active");
-    const prog = loadLangProgress();
-    prog[s.topic.id] = s.topic.cards.length;
-    saveLangProgress(prog);
-    const p = loadProProfile(); p.points += 25; p.xp = (p.xp || 0) + 25; saveProProfile(p);
-    launchConfetti(); playProTone("level");
-    showProToast(`Lekce „${s.topic.name}“ dokončena! +25 b.`);
-    renderLangCourseView(s.langKey);
-    await updateProHud();
-    _langSession = null;
+  if (s.round >= s.total) {
+    document.getElementById("trainingModal").classList.remove("active");
+    awardTrainingCompletion(25, `Slepá šachovnice dokončena (${s.score}/10)! +25 XP`);
     return;
   }
-  renderLangExercise();
-};
-document.getElementById("langLessonClose").onclick = () => {
-  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
-  document.getElementById("langLessonModal").classList.remove("active");
-  _langSession = null;
-};
+  s.locked = false;
+  document.getElementById("trStepLabel").innerText = `${s.round + 1} / ${s.total}`;
+  document.getElementById("trProgressBar").style.width = `${Math.round((s.round / s.total) * 100)}%`;
+  document.getElementById("cbScoreLabel").innerText = `Skóre: ${s.score}`;
+  document.getElementById("cbFeedback").innerText = "";
 
-// .md Language Format Importer (lang / level / topic / Q / A / NOTE / CLOZE)
-document.getElementById("btnOpenLangMdImport").onclick = () => document.getElementById("langMdImportModal").classList.add("active");
-document.getElementById("langMdImportClose").onclick = () => document.getElementById("langMdImportModal").classList.remove("active");
-document.getElementById("inpLangMdFile").onchange = async (e) => {
-  const f = e.target.files?.[0];
-  if (f) document.getElementById("txtLangMdInput").value = await f.text();
-};
-document.getElementById("btnRunLangMdImport").onclick = () => {
-  const raw = document.getElementById("txtLangMdInput").value.trim();
-  if (!raw) { alert("Vložte prosím obsah lekce."); return; }
-  let lang = localStorage.getItem(ACTIVE_COURSE_KEY);
-  if (!["en", "de", "fr"].includes(lang)) lang = "de";
-  let topicName = "Vlastní lekce";
-  const fmMatch = raw.match(/^---\s*\n([\s\S]*?)\n---/);
-  let body = raw;
-  if (fmMatch) {
-    body = raw.slice(fmMatch[0].length);
-    const lM = fmMatch[1].match(/^lang:\s*(\w+)/im);
-    const tM = fmMatch[1].match(/^topic:\s*(.+)$/im);
-    if (lM && ["en", "de", "fr"].includes(lM[1].toLowerCase())) lang = lM[1].toLowerCase();
-    if (tM) topicName = tM[1].trim();
+  const files = ["a","b","c","d","e","f","g","h"];
+  const rf = () => files[Math.floor(Math.random() * 8)];
+  const rr = () => Math.floor(Math.random() * 8) + 1;
+  const sq1 = rf() + rr();
+  const qType = Math.floor(Math.random() * 3); // 0=find, 1=color, 2=diag/knight
+  const choiceRow = document.getElementById("cbChoiceRow");
+  const promptEl = document.getElementById("cbPrompt");
+
+  if (qType === 0) {
+    s.current = { type: "find", targetSq: sq1 };
+    promptEl.innerText = `Klikni na pole: ${sq1}`;
+    choiceRow.style.display = "none";
+  } else if (qType === 1) {
+    const isLight = (sq1.charCodeAt(0) - 97 + parseInt(sq1[1], 10)) % 2 === 1;
+    s.current = { type: "choice", answer: isLight ? "A" : "B", revealSq: sq1 };
+    promptEl.innerText = `Jakou barvu má pole ${sq1}?`;
+    document.getElementById("btnCbOptA").innerText = "Světlé";
+    document.getElementById("btnCbOptB").innerText = "Tmavé";
+    choiceRow.style.display = "grid";
+  } else {
+    const sq2 = rf() + rr();
+    const dx = Math.abs(sq1.charCodeAt(0) - sq2.charCodeAt(0));
+    const dy = Math.abs(parseInt(sq1[1], 10) - parseInt(sq2[1], 10));
+    const askKnight = Math.random() < 0.5;
+    const ok = askKnight ? ((dx === 1 && dy === 2) || (dx === 2 && dy === 1)) : (dx === dy && dx > 0);
+    s.current = { type: "choice", answer: ok ? "A" : "B", revealSq: sq1, revealSq2: sq2 };
+    promptEl.innerText = askKnight
+      ? `Doskočí jezdec z ${sq1} na ${sq2} jedním tahem?`
+      : `Leží pole ${sq1} a ${sq2} na stejné diagonále?`;
+    document.getElementById("btnCbOptA").innerText = "Ano";
+    document.getElementById("btnCbOptB").innerText = "Ne";
+    choiceRow.style.display = "grid";
   }
-  const blocks = body.split(/\n\s*\n/).map(b => b.trim()).filter(Boolean);
-  const cards = [];
-  blocks.forEach((blk, idx) => {
-    const q = (blk.match(/^Q:\s*(.+)$/im) || [])[1]?.trim();
-    const a = (blk.match(/^A:\s*(.+)$/im) || [])[1]?.trim();
-    const note = (blk.match(/^NOTE:\s*(.+)$/im) || [])[1]?.trim() || "";
-    const cloze = (blk.match(/^CLOZE:\s*(.+)$/im) || [])[1]?.trim() || "";
-    if (q && a) cards.push({ id: `cust_${Date.now()}_${idx}`, q, a, note, cloze });
+  renderBlindBoard();
+}
+function renderBlindBoard(highlightSq = null, cls = "") {
+  const boardEl = document.getElementById("cbBoard");
+  boardEl.innerHTML = "";
+  const files = ["a","b","c","d","e","f","g","h"];
+  const ranks = [8,7,6,5,4,3,2,1];
+  ranks.forEach(rk => {
+    files.forEach(fl => {
+      const sq = fl + rk;
+      const isLight = (fl.charCodeAt(0) - 97 + rk) % 2 === 1;
+      const div = document.createElement("div");
+      div.className = `chess-sq ${isLight ? "light" : "dark"}`;
+      if (highlightSq === sq && cls) div.classList.add(cls);
+      div.onclick = () => {
+        const s = _cbState;
+        if (!s || s.locked || !s.current || s.current.type !== "find") return;
+        s.locked = true;
+        const ok = sq === s.current.targetSq;
+        if (ok) { s.score++; playProTone("good"); document.getElementById("cbFeedback").innerText = "Správně!"; }
+        else { playProTone("again"); document.getElementById("cbFeedback").innerText = `Špatně (${sq}), hledané pole bylo ${s.current.targetSq}.`; }
+        renderBlindBoard(s.current.targetSq, ok ? "ok" : "err");
+        s.round++;
+        setTimeout(nextBlindRound, 800);
+      };
+      boardEl.appendChild(div);
+    });
   });
-  if (cards.length === 0) { alert("Nenašel jsem žádné karty ve formátu Q: / A:."); return; }
-  const custom = loadCustomLangTopics();
-  custom[lang] = custom[lang] || [];
-  custom[lang].push({ id: "ct_" + Date.now(), name: topicName, cards });
-  saveCustomLangTopics(custom);
-  document.getElementById("langMdImportModal").classList.remove("active");
-  document.getElementById("txtLangMdInput").value = "";
-  switchCourseMode(lang);
-  showProToast(`Přidáno ${cards.length} karet do kurzu ${lang.toUpperCase()}!`);
-};
+}
+function handleBlindChoice(opt) {
+  const s = _cbState;
+  if (!s || s.locked || !s.current || s.current.type !== "choice") return;
+  s.locked = true;
+  const ok = opt === s.current.answer;
+  if (ok) { s.score++; playProTone("good"); document.getElementById("cbFeedback").innerText = "Správně!"; }
+  else { playProTone("again"); document.getElementById("cbFeedback").innerText = "Bohužel špatně."; }
+  renderBlindBoard(s.current.revealSq, ok ? "ok" : "err");
+  s.round++;
+  setTimeout(nextBlindRound, 800);
+}
+document.getElementById("btnCbOptA").onclick = () => handleBlindChoice("A");
+document.getElementById("btnCbOptB").onclick = () => handleBlindChoice("B");
+document.getElementById("btnOpenChessBlind").onclick = startChessBlindfold;
+
+// 2. MATH & LOGIC PUZZLES (10-round procedural generator)
+let _mlState = { cat: "mix", round: 0, total: 10, score: 0, current: null, answered: false };
+
+function genBitsQuestion() {
+  const r = Math.floor(Math.random() * 4);
+  if (r === 0) {
+    const n = 10 + Math.floor(Math.random() * 54);
+    const ans = "0b" + n.toString(2);
+    const opts = new Set([ans]);
+    while (opts.size < 4) opts.add("0b" + Math.max(2, n + Math.floor(Math.random() * 11) - 5).toString(2));
+    return { cat: "Soustavy & bity", q: `Převeďte desítkové číslo ${n} do dvojkové soustavy:`, ans, opts: Array.from(opts), exp: `${n} = ${n.toString(2)}₂ (mocniny dvojky).` };
+  } else if (r === 1) {
+    const n = 20 + Math.floor(Math.random() * 200);
+    const ans = "0x" + n.toString(16).toUpperCase();
+    const opts = new Set([ans]);
+    while (opts.size < 4) opts.add("0x" + Math.max(10, n + Math.floor(Math.random() * 15) - 7).toString(16).toUpperCase());
+    return { cat: "Soustavy & bity", q: `Převeďte desítkové číslo ${n} do šestnáctkové (hex) soustavy:`, ans, opts: Array.from(opts), exp: `${n} ÷ 16 = ${Math.floor(n/16)} zbytek ${n%16} → ${ans}.` };
+  } else if (r === 2) {
+    const a = 3 + Math.floor(Math.random() * 12);
+    const sh = 1 + Math.floor(Math.random() * 3);
+    const isLeft = Math.random() < 0.6;
+    const val = isLeft ? (a << sh) : ((a * 4) >> sh);
+    const expr = isLeft ? `${a} << ${sh}` : `${a * 4} >> ${sh}`;
+    const opts = new Set([String(val)]);
+    while (opts.size < 4) opts.add(String(Math.max(0, val + Math.floor(Math.random() * 11) - 5)));
+    return { cat: "Soustavy & bity", q: `Jaký je výsledek bitového posunu: ${expr} ?`, ans: String(val), opts: Array.from(opts), exp: isLeft ? `Posun vlevo o ${sh} násobí 2^${sh} = ${1<<sh}.` : `Posun vpravo o ${sh} celočíselně dělí 2^${sh} = ${1<<sh}.` };
+  } else {
+    const a = 5 + Math.floor(Math.random() * 10);
+    const b = 3 + Math.floor(Math.random() * 12);
+    const val = a ^ b;
+    const opts = new Set([String(val)]);
+    while (opts.size < 4) opts.add(String(Math.max(0, val + Math.floor(Math.random() * 9) - 4)));
+    return { cat: "Soustavy & bity", q: `Vypočítejte bitový XOR: 0b${a.toString(2).padStart(4,"0")} XOR 0b${b.toString(2).padStart(4,"0")} (desítkově):`, ans: String(val), opts: Array.from(opts), exp: `${a} (${a.toString(2)}) ^ ${b} (${b.toString(2)}) = ${val} (${val.toString(2)}).` };
+  }
+}
+
+function genModQuestion() {
+  const r = Math.floor(Math.random() * 3);
+  if (r === 0) {
+    const mod = 5 + Math.floor(Math.random() * 8);
+    const a = 40 + Math.floor(Math.random() * 120);
+    const val = a % mod;
+    const opts = new Set([String(val)]);
+    while (opts.size < 4) opts.add(String(Math.floor(Math.random() * mod)));
+    return { cat: "Modulo & řady", q: `Jaký je zbytek po dělení: ${a} mod ${mod} ?`, ans: String(val), opts: Array.from(opts), exp: `${a} = ${Math.floor(a/mod)} × ${mod} + ${val}.` };
+  } else if (r === 1) {
+    const days = ["pondělí","úterý","středa","čtvrtek","pátek","sobota","neděle"];
+    const start = Math.floor(Math.random() * 7);
+    const add = 10 + Math.floor(Math.random() * 45);
+    const ans = days[(start + add) % 7];
+    const opts = new Set([ans]);
+    while (opts.size < 4) opts.add(days[Math.floor(Math.random() * 7)]);
+    return { cat: "Modulo & řady", q: `Dnes je ${days[start]}. Jaký den v týdnu bude za ${add} dní?`, ans, opts: Array.from(opts), exp: `${add} mod 7 = ${add % 7}. Posun o ${add % 7} dny od ${days[start]} → ${ans}.` };
+  } else {
+    const a = 2 + Math.floor(Math.random() * 5);
+    const d = 2 + Math.floor(Math.random() * 4);
+    const seq = [0,1,2,3,4].map(i => a + i * d + i * i);
+    const ans = seq[4];
+    const opts = new Set([String(ans)]);
+    while (opts.size < 4) opts.add(String(ans + Math.floor(Math.random() * 11) - 5));
+    return { cat: "Modulo & řady", q: `Doplňte chybějící číslo v řadě: ${seq[0]}, ${seq[1]}, ${seq[2]}, ${seq[3]}, ?`, ans: String(ans), opts: Array.from(opts), exp: `Rozdíly mezi členy rostou vždy o +2 (${seq[1]-seq[0]}, ${seq[2]-seq[1]}, ${seq[3]-seq[2]}, ${seq[4]-seq[3]}).` };
+  }
+}
+
+function genGatesQuestion() {
+  const gates = ["AND", "OR", "XOR", "NAND"];
+  const evalG = (g, x, y) => g === "AND" ? (x & y) : g === "OR" ? (x | y) : g === "XOR" ? (x ^ y) : ((x & y) ? 0 : 1);
+  const g1 = gates[Math.floor(Math.random() * gates.length)];
+  const g2 = gates[Math.floor(Math.random() * gates.length)];
+  const a = Math.round(Math.random()), b = Math.round(Math.random()), c = Math.round(Math.random());
+  const mid = evalG(g1, a, b);
+  const out = evalG(g2, mid, c);
+  const svg = `<svg width="320" height="120" viewBox="0 0 320 120" xmlns="http://www.w3.org/2000/svg">
+    <text x="12" y="30" fill="#e5e7eb" font-size="14" font-weight="700">A = ${a}</text>
+    <text x="12" y="64" fill="#e5e7eb" font-size="14" font-weight="700">B = ${b}</text>
+    <text x="12" y="102" fill="#e5e7eb" font-size="14" font-weight="700">C = ${c}</text>
+    <line x1="56" y1="26" x2="96" y2="38" stroke="#9ca3af" stroke-width="2"/>
+    <line x1="56" y1="60" x2="96" y2="48" stroke="#9ca3af" stroke-width="2"/>
+    <rect x="96" y="22" width="66" height="40" rx="8" fill="#1f2937" stroke="#60a5fa" stroke-width="2"/>
+    <text x="129" y="47" text-anchor="middle" fill="#60a5fa" font-size="13" font-weight="800">${g1}</text>
+    <line x1="162" y1="42" x2="202" y2="62" stroke="#9ca3af" stroke-width="2"/>
+    <line x1="56" y1="98" x2="202" y2="76" stroke="#9ca3af" stroke-width="2"/>
+    <rect x="202" y="48" width="66" height="40" rx="8" fill="#1f2937" stroke="#4ade80" stroke-width="2"/>
+    <text x="235" y="73" text-anchor="middle" fill="#4ade80" font-size="13" font-weight="800">${g2}</text>
+    <line x1="268" y1="68" x2="294" y2="68" stroke="#9ca3af" stroke-width="2"/>
+    <text x="304" y="73" fill="#fbbf24" font-size="16" font-weight="800">?</text>
+  </svg>`;
+  return {
+    cat: "Logická hradla",
+    q: "Jaký bude logický výstup (0 nebo 1) na konci obvodu?",
+    svg,
+    ans: String(out),
+    opts: ["0", "1"],
+    exp: `První hradlo: ${a} ${g1} ${b} = ${mid}. Druhé hradlo: ${mid} ${g2} ${c} = ${out}.`
+  };
+}
+
+function genCombQuestion() {
+  const r = Math.floor(Math.random() * 3);
+  if (r === 0) {
+    const n = 4 + Math.floor(Math.random() * 4);
+    const val = (n * (n - 1)) / 2;
+    const opts = new Set([String(val)]);
+    while (opts.size < 4) opts.add(String(Math.max(1, val + Math.floor(Math.random() * 11) - 5)));
+    return { cat: "Kombinatorika", q: `Na setkání je ${n} lidí a každý si podá ruku s každým právě jednou. Kolik podání rukou proběhne?`, ans: String(val), opts: Array.from(opts), exp: `Kombinace C(${n}, 2) = ${n} × ${n - 1} / 2 = ${val}.` };
+  } else if (r === 1) {
+    const n = 4 + Math.floor(Math.random() * 4);
+    const val = n * (n - 1) * (n - 2);
+    const opts = new Set([String(val)]);
+    while (opts.size < 4) opts.add(String(Math.max(6, val + (Math.floor(Math.random() * 5) - 2) * 12)));
+    return { cat: "Kombinatorika", q: `Kolik různých 3místných PIN kódů lze vytvořit z ${n} různých číslic bez opakování?`, ans: String(val), opts: Array.from(opts), exp: `Variace bez opakování: ${n} × ${n - 1} × ${n - 2} = ${val}.` };
+  } else {
+    const red = 2 + Math.floor(Math.random() * 4);
+    const blue = 3 + Math.floor(Math.random() * 5);
+    const tot = red + blue;
+    const ans = `${red}/${tot}`;
+    const opts = new Set([ans, `${blue}/${tot}`, `1/${tot}`, `${red}/${blue}`]);
+    while (opts.size < 4) opts.add(`${Math.max(1, red + 1)}/${tot + 1}`);
+    return { cat: "Pravděpodobnost", q: `V sáčku je ${red} červených a ${blue} modrých kuliček. Jaká je pravděpodobnost vytažení červené kuličky?`, ans, opts: Array.from(opts), exp: `Příznivých výsledků je ${red} z celkových ${tot} kuliček → ${ans}.` };
+  }
+}
+
+function startMathLogicSession() {
+  showTrainingPane("trMathPane");
+  _mlState.round = 0;
+  _mlState.score = 0;
+  nextMathRound();
+}
+function nextMathRound() {
+  const s = _mlState;
+  if (s.round >= s.total) {
+    document.getElementById("trainingModal").classList.remove("active");
+    awardTrainingCompletion(30, `Matematický trénink hotov (${s.score}/10)! +30 XP`);
+    return;
+  }
+  s.answered = false;
+  document.getElementById("trStepLabel").innerText = `${s.round + 1} / ${s.total}`;
+  document.getElementById("trProgressBar").style.width = `${Math.round((s.round / s.total) * 100)}%`;
+  document.getElementById("mlScoreLabel").innerText = `Správně: ${s.score}`;
+  document.getElementById("mlExplainBox").style.display = "none";
+  document.getElementById("btnMlNext").style.display = "none";
+
+  const cat = s.cat === "mix" ? ["bits","mod","gates","comb"][Math.floor(Math.random() * 4)] : s.cat;
+  const q = cat === "bits" ? genBitsQuestion() : cat === "mod" ? genModQuestion() : cat === "gates" ? genGatesQuestion() : genCombQuestion();
+  s.current = q;
+
+  document.getElementById("mlCatBadge").innerText = q.cat;
+  document.getElementById("mlPrompt").innerText = q.q;
+  const svgBox = document.getElementById("mlSvgBox");
+  if (q.svg) { svgBox.innerHTML = q.svg; svgBox.style.display = "flex"; }
+  else { svgBox.style.display = "none"; svgBox.innerHTML = ""; }
+
+  const grid = document.getElementById("mlOptionsGrid");
+  grid.innerHTML = "";
+  const opts = [...q.opts];
+  if (opts.length > 2) opts.sort(() => Math.random() - 0.5);
+  opts.forEach(o => {
+    const b = document.createElement("button");
+    b.className = "quiz-option";
+    b.innerText = o;
+    b.onclick = () => {
+      if (s.answered) return;
+      s.answered = true;
+      const ok = o === q.ans;
+      if (ok) { s.score++; b.classList.add("correct"); playProTone("good"); }
+      else {
+        b.classList.add("wrong");
+        Array.from(grid.children).forEach(ch => { if (ch.innerText === q.ans) ch.classList.add("correct"); });
+        playProTone("again");
+      }
+      const expEl = document.getElementById("mlExplainBox");
+      expEl.innerHTML = `<strong>${ok ? "Správně!" : "Špatně."}</strong> ${escapeHtml(q.exp)}`;
+      expEl.style.display = "block";
+      document.getElementById("btnMlNext").style.display = "block";
+    };
+    grid.appendChild(b);
+  });
+}
+document.getElementById("btnMlNext").onclick = () => { _mlState.round++; nextMathRound(); };
+document.getElementById("btnOpenMathLogic").onclick = startMathLogicSession;
+document.querySelectorAll("#mathCatPills .math-cat-pill").forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll("#mathCatPills .math-cat-pill").forEach(x => x.classList.remove("active"));
+    btn.classList.add("active");
+    _mlState.cat = btn.dataset.cat;
+    startMathLogicSession();
+  };
+});
 
 window.addEventListener("DOMContentLoaded", () => {
   if (location.hash && location.hash.startsWith("#sync=")) {
@@ -3295,16 +3420,31 @@ window.addEventListener("DOMContentLoaded", () => {
   const bSetup = document.getElementById("btnCloudSyncSetup");
   if (bSync) bSync.onclick = () => runCloudSync(false);
   if (bSetup) bSetup.onclick = () => openSyncModal();
-  document.querySelectorAll("#proCourseBar .pro-course-tab").forEach(btn => {
-    btn.onclick = () => switchCourseMode(btn.dataset.course);
-  });
-  const savedCourse = localStorage.getItem(ACTIVE_COURSE_KEY) || "general";
-  switchCourseMode(savedCourse);
+  document.body.classList.remove("course-en", "course-de", "course-fr");
+  if (!localStorage.getItem("karty_lang_cleanup_v1")) {
+    ["karty_lang_progress_v1", "karty_lang_custom_topics_v1", "karty_active_course_v1", "karty_builtin_langs_seeded_v1", "karty_builtin_langs_seeded_v2"].forEach(k => localStorage.removeItem(k));
+    localStorage.setItem("karty_lang_cleanup_v1", "1");
+    setTimeout(async () => {
+      try {
+        const allD = await dbGetAllDecks();
+        let removed = false;
+        for (const d of allD) {
+          if (["builtin_en_c1", "builtin_fr_a2b1", "builtin_de_a2b1"].includes(d.id)) {
+            await dbDeleteDeck(d.id);
+            removed = true;
+          }
+        }
+        if (removed && typeof loadDeckList === "function") await loadDeckList();
+      } catch {}
+    }, 400);
+  }
   setTimeout(() => { updateProHud(); }, 300);
 });
 """
 
-PRO_JS = PRO_JS.replace("__LANG_COURSES_JSON__", get_lang_courses_json()).replace("__LANG_GLOSSARY_JSON__", get_lang_glossary_json())
+assert "</head>" in html
+html = html.replace("</head>", '<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>\n</head>', 1)
+
 assert "</style>" in html
 html = html.replace("</style>", PRO_CSS + "\n</style>", 1)
 
@@ -3316,6 +3456,8 @@ html = html.replace('<section id="decksView">', '<section id="decksView">\n' + P
 
 assert '<div class="deck-list" id="deckList">' in html
 html = html.replace('<div class="deck-list" id="deckList">', PRO_EXTRA_BAR_HTML + '\n    <div class="deck-list" id="deckList">', 1)
+assert '<!-- Generováno dynamicky -->\n    </div>' in html
+html = html.replace('<!-- Generováno dynamicky -->\n    </div>', '<!-- Generováno dynamicky -->\n    </div>\n' + PRO_TRAINING_HTML, 1)
 
 assert '<div class="progress-pills">' in html
 html = html.replace('<div class="progress-pills">', '<span class="pro-combo-badge" id="proComboBadge">Combo 3x</span>\n        <div class="progress-pills">', 1)
