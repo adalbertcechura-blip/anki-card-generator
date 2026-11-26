@@ -552,16 +552,23 @@ header {
   .pro-hud::-webkit-scrollbar { display: none; }
   .pro-pill { padding: 3px 6px; font-size: 12px; white-space: nowrap; flex-shrink: 0; }
   .pro-hud .btn-sm { padding: 4px 8px; font-size: 12px; white-space: nowrap; flex-shrink: 0; }
-  .flashcard-content, .card-question, .card-answer { font-size: 1.18rem; line-height: 1.6; }
-  .card-answer h2, .card-question h2 { font-size: 1.45rem !important; }
-  .card-answer h3, .card-question h3 { font-size: 1.25rem !important; }
-  .deck-item-name { font-size: 1.1rem; }
-  .deck-stats { font-size: 0.95rem; }
-  .pro-quest-card { font-size: 0.92rem; }
-  .btn-flip { font-size: 1.05rem; padding: 14px 12px; }
-  .btn-rate { font-size: 1.04rem; padding: 11px 6px; }
-  .btn-rate .interval { font-size: 0.86rem; }
-  .quiz-option, .match-btn { font-size: 1.04rem; padding: 12px 12px; }
+  .card-text, .flashcard-content, .card-question, .card-answer { font-size: 15px !important; line-height: 1.48 !important; }
+  .card-answer h2, .card-question h2 { font-size: 19px !important; }
+  .card-answer h3, .card-question h3 { font-size: 16px !important; }
+  .deck-item-name { font-size: 1.05rem; }
+  .deck-stats { font-size: 0.92rem; }
+  .pro-quest-card { font-size: 0.9rem; }
+  .study-controls { margin-top: 6px !important; gap: 4px !important; }
+  .btn-flip { font-size: 14px !important; padding: 9px 10px !important; border-bottom-width: 2px !important; }
+  .btn-side-peek { font-size: 13px !important; padding: 6px 10px !important; }
+  .rating-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 4px !important; }
+  .btn-rate {
+    font-size: 13px !important; padding: 6px 2px !important; min-height: 0 !important;
+    display: flex; flex-direction: column-reverse; align-items: center; justify-content: center; gap: 1px;
+    border-bottom-width: 2px !important;
+  }
+  .btn-rate .interval { font-size: 11px !important; opacity: 0.85; }
+  .quiz-option, .match-btn { font-size: 0.96rem; padding: 10px 10px; }
   .pro-dashboard { grid-template-columns: 1fr; gap: 8px; padding: 10px 12px; }
   .pro-quests-strip { grid-template-columns: 1fr; gap: 6px; }
   .quiz-grid { grid-template-columns: 1fr; }
@@ -3228,6 +3235,10 @@ if (btnSpeakQ) {
         <button class="btn btn-sm" id="btnCloudSyncSetup" title="Nastavení synchronizace a odkaz pro telefon">Nastavit sync</button>
         <button class="btn btn-sm" id="btnExportProgress" title="Stáhnout lehký soubor .json s postupem učení pro přenos na jiné zařízení">Export postupu (.json)</button>
         <button class="btn btn-sm" id="btnImportProgress" title="Načíst a sloučit postup učení ze souboru .json">Import postupu (.json)</button>''',
+    ),
+    (
+        '''<button class="btn-flip" id="btnFlip">Zobrazit odpověď (Mezerník / Klepnutí)</button>''',
+        '''<button class="btn-flip" id="btnFlip">Zobrazit odpověď</button>''',
     ),
 ]
 
