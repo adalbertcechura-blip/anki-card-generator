@@ -206,13 +206,15 @@ body.theme-lighthouse {
   background-repeat: no-repeat; background-position: bottom center; background-size: cover; background-attachment: fixed;
 }
 .theme-preview-bar {
-  position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
-  z-index: 400; display: none; align-items: center; gap: 10px; flex-wrap: wrap;
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  z-index: 400; display: none; flex-direction: column; align-items: center; gap: 8px;
+  width: min(340px, calc(100vw - 24px)); text-align: center;
   background: var(--bg-card); border: 1px solid var(--accent);
-  border-radius: 999px; padding: 8px 14px; box-shadow: 0 10px 28px rgba(0,0,0,0.6);
+  border-radius: 14px; padding: 12px 14px; box-shadow: 0 10px 28px rgba(0,0,0,0.6);
   backdrop-filter: blur(8px);
 }
 .theme-preview-bar.active { display: flex; }
+body.studying-active .pro-hud { display: none !important; }
 header {
   background: var(--bg-main);
   border-bottom: 1px solid var(--border-color);
@@ -1437,7 +1439,7 @@ function renderMatchRound() {
   sample.forEach(c => {
     const btn = document.createElement("button");
     btn.className = "match-btn";
-    btn.innerText = c.title || extractTargetAnswer(c, true) || "Pojem";
+    btn.innerText = getGamePairForCard(c).prompt;
     btn.onclick = () => {
       leftCol.querySelectorAll(".match-btn").forEach(b => b.classList.remove("selected"));
       btn.classList.add("selected");
@@ -1449,7 +1451,7 @@ function renderMatchRound() {
   rightItems.forEach(c => {
     const btn = document.createElement("button");
     btn.className = "match-btn";
-    btn.innerText = extractTargetAnswer(c, false);
+    btn.innerText = getGamePairForCard(c).answer;
     btn.onclick = async () => {
       if (!selLeft) return;
       if (selLeft.id === c.id) {
@@ -1589,26 +1591,7 @@ document.getElementById("btnRunQuickImport").onclick = async () => {
   }
 };
 
-// Mobile Swipe Gestures (left = Again, right = Easy)
-(function bindSwipeGestures() {
-  const box = document.getElementById("flashcardBox");
-  if (!box) return;
-  let startX = 0, startY = 0;
-  box.addEventListener("touchstart", (e) => {
-    if (e.touches.length !== 1) return;
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-  }, { passive: true });
-  box.addEventListener("touchend", (e) => {
-    if (!isCardFlipped || e.changedTouches.length !== 1) return;
-    const dx = e.changedTouches[0].clientX - startX;
-    const dy = e.changedTouches[0].clientY - startY;
-    if (Math.abs(dx) > 90 && Math.abs(dx) > Math.abs(dy) * 1.8) {
-      if (dx < 0) rateCard("again");
-      else rateCard("easy");
-    }
-  }, { passive: true });
-})();
+// Touch swipe rating disabled to prevent accidental card rating while scrolling on mobile.
 
 // Shop & Sound Modal Listeners
 async function renderShopModal() {
@@ -1770,6 +1753,37 @@ document.getElementById("btnBuyComboShield").onclick = async () => {
 };
 
 // --- MINI-GAMES CONTROLLER ---
+function cleanGameLine(raw) {
+  return String(raw || "")
+    .replace(/!\[\[.*?\]\]/g, "")
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/[*_`~]/g, "")
+    .replace(/^[A-Za-zÀ-ž0-9\s/()_-]{2,32}:\s+/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+function getGamePairForCard(card) {
+  let prompt = (card.title || extractTargetAnswer(card, true) || "").trim();
+  let answer = (extractTargetAnswer(card, false) || "").trim();
+  if (!prompt || !answer || prompt.toLowerCase() === answer.toLowerCase()) {
+    const backLines = String(card.back || "")
+      .split(/\r?\n/)
+      .map(cleanGameLine)
+      .filter(l => l && l.length >= 2 && !/^https?:\/\//i.test(l));
+    const frontLines = String(card.front || "")
+      .split(/\r?\n/)
+      .map(cleanGameLine)
+      .filter(l => l && l.length >= 2 && !/^https?:\/\//i.test(l));
+    if (!prompt) prompt = frontLines[0] || backLines[0] || "Pojem";
+    const distinct = backLines.find(l => l.toLowerCase() !== prompt.toLowerCase())
+      || frontLines.find(l => l.toLowerCase() !== prompt.toLowerCase());
+    if (distinct) {
+      answer = distinct.length > 70 ? distinct.slice(0, 67).trim() + "..." : distinct;
+    }
+  }
+  return { prompt: prompt || "Pojem", answer: answer || "Odpověď" };
+}
 const MIN_SEEN_FOR_GAMES = 10;
 function getSeenDeckCards(deck) {
   if (!deck || !Array.isArray(deck.cards)) return [];
@@ -1839,8 +1853,9 @@ document.getElementById("btnStartTimedMatch").onclick = async () => {
   const sample = [...seenCards].sort(() => Math.random() - 0.5).slice(0, 6);
   const tiles = [];
   sample.forEach(c => {
-    tiles.push({ id: c.id, text: c.title || extractTargetAnswer(c, true), side: "L" });
-    tiles.push({ id: c.id, text: extractTargetAnswer(c, false), side: "R" });
+    const pair = getGamePairForCard(c);
+    tiles.push({ id: c.id, text: pair.prompt, side: "L" });
+    tiles.push({ id: c.id, text: pair.answer, side: "R" });
   });
   tiles.sort(() => Math.random() - 0.5);
   const grid = document.getElementById("tmGrid");
@@ -1904,12 +1919,13 @@ document.getElementById("btnStartBossFight").onclick = async () => {
     document.getElementById("playerBossHpText").innerText = `Vaše HP: ${playerHp} / 5`;
     document.getElementById("bossComboText").innerText = `Combo: ${bossCombo}x`;
     const card = seenCards[Math.floor(Math.random() * seenCards.length)];
-    const correct = extractTargetAnswer(card, false);
-    document.getElementById("bossQuestionBox").innerText = card.title || extractTargetAnswer(card, true);
+    const pair = getGamePairForCard(card);
+    const correct = pair.answer;
+    document.getElementById("bossQuestionBox").innerText = pair.prompt;
     const pool = seenCards.filter(c => c.id !== card.id).sort(() => Math.random() - 0.5);
     const opts = [correct];
     for (const c of pool) {
-      const a = extractTargetAnswer(c, false);
+      const a = getGamePairForCard(c).answer;
       if (a && !opts.includes(a)) { opts.push(a); if (opts.length >= 4) break; }
     }
     opts.sort(() => Math.random() - 0.5);
@@ -1961,13 +1977,14 @@ document.getElementById("btnStartGravity").onclick = async () => {
     yPos = 0;
     document.getElementById("gravScoreLabel").innerText = `Skóre: ${score}`;
     const card = seenCards[Math.floor(Math.random() * seenCards.length)];
-    const correct = extractTargetAnswer(card, false);
+    const pair = getGamePairForCard(card);
+    const correct = pair.answer;
     const meteor = document.getElementById("gravMeteor");
-    meteor.innerText = card.title || extractTargetAnswer(card, true);
+    meteor.innerText = pair.prompt;
     const pool = seenCards.filter(c => c.id !== card.id).sort(() => Math.random() - 0.5);
     const opts = [correct];
     for (const c of pool) {
-      const a = extractTargetAnswer(c, false);
+      const a = getGamePairForCard(c).answer;
       if (a && !opts.includes(a)) { opts.push(a); if (opts.length >= 4) break; }
     }
     opts.sort(() => Math.random() - 0.5);
@@ -2026,8 +2043,9 @@ document.getElementById("btnStartScramble").onclick = async () => {
 };
 function nextScramble() {
   const card = _scrPool[Math.floor(Math.random() * _scrPool.length)];
-  _scrTarget = extractTargetAnswer(card, false).split(/\s*[;/]\s*/)[0].trim();
-  document.getElementById("scramblePromptBox").innerText = card.title || extractTargetAnswer(card, true);
+  const pair = getGamePairForCard(card);
+  _scrTarget = pair.answer.split(/\s*[;/]\s*/)[0].trim();
+  document.getElementById("scramblePromptBox").innerText = pair.prompt;
   const words = _scrTarget.split(/\s+/).filter(Boolean);
   const tokens = words.length > 1 ? words : _scrTarget.split("");
   const isWordMode = words.length > 1;
