@@ -5,6 +5,7 @@ from Karty.html without modifying the public Karty.html / index.html.
 """
 import os
 import shutil
+from lang_courses import get_lang_courses_json, get_lang_glossary_json
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PRO_DIR = os.path.join(BASE_DIR, "pro")
@@ -612,6 +613,96 @@ header {
   .pro-week-dot.active { background: var(--accent); color: #12100d; border-color: var(--accent); }
   .pro-week-dot.frozen { background: var(--accent-soft); color: var(--accent); border-color: var(--border-highlight); }
 }
+
+/* --- DUOLINGO-STYLE LANGUAGE COURSE LAYER --- */
+body.course-en { --accent: #38bdf8; --accent-hover: #0ea5e9; --accent-soft: rgba(56,189,248,0.16); --border-highlight: rgba(56,189,248,0.45); }
+body.course-de { --accent: #f59e0b; --accent-hover: #d97706; --accent-soft: rgba(245,158,11,0.16); --border-highlight: rgba(245,158,11,0.45); }
+body.course-fr { --accent: #818cf8; --accent-hover: #6366f1; --accent-soft: rgba(129,140,248,0.16); --border-highlight: rgba(129,140,248,0.45); }
+.pro-course-bar {
+  display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 10px;
+}
+.pro-course-tab {
+  background: var(--bg-surface); color: var(--text-muted); border: 1px solid var(--border-color);
+  border-bottom: 3px solid rgba(0,0,0,0.35); border-radius: 999px;
+  padding: 5px 12px; font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: all 0.15s;
+}
+.pro-course-tab.active {
+  background: var(--accent); color: #0f172a; border-color: var(--accent);
+}
+.lang-course-section {
+  display: none; flex-direction: column; gap: 12px;
+  background: var(--bg-card); border: 1px solid var(--border-color);
+  border-radius: var(--radius); padding: 14px;
+}
+.lang-course-section.active { display: flex; }
+.lang-skill-path {
+  display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 10px 4px;
+}
+.lang-skill-node-wrap {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; position: relative;
+}
+.lang-skill-node-wrap:nth-child(odd) { transform: translateX(-22px); }
+.lang-skill-node-wrap:nth-child(even) { transform: translateX(22px); }
+.lang-skill-circle {
+  width: 74px; height: 74px; border-radius: 50%;
+  background: var(--bg-surface); border: 4px solid var(--accent);
+  box-shadow: 0 5px 0 rgba(0,0,0,0.45); color: var(--text-main);
+  font-weight: 800; font-size: 0.9rem; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  transition: transform 0.1s;
+}
+.lang-skill-circle:active { transform: translateY(3px); box-shadow: 0 2px 0 rgba(0,0,0,0.45); }
+.lang-skill-circle.gold {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #1c1917; border-color: #fde68a;
+}
+.lang-skill-meta {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center;
+}
+.lang-lesson-modal .modal-content {
+  width: 100vw !important; max-width: 100vw !important;
+  height: 100dvh !important; max-height: 100dvh !important;
+  border-radius: 0 !important; border: none !important;
+  padding: 16px max(16px, calc((100vw - 760px) / 2)) !important;
+  display: flex; flex-direction: column; box-sizing: border-box;
+}
+.lang-audio-row {
+  display: flex; align-items: center; justify-content: center; gap: 10px; margin: 8px 0;
+}
+.lang-audio-btn {
+  background: var(--bg-surface); border: 1px solid var(--border-highlight);
+  border-bottom: 3px solid rgba(0,0,0,0.35); border-radius: 12px;
+  padding: 8px 14px; font-size: 1rem; font-weight: 700; cursor: pointer; color: var(--text-main);
+}
+.lang-audio-btn:active { transform: translateY(2px); }
+.de-der { color: #60a5fa; font-weight: 700; background: rgba(96,165,250,0.12); padding: 1px 4px; border-radius: 4px; }
+.de-die { color: #f87171; font-weight: 700; background: rgba(248,113,113,0.12); padding: 1px 4px; border-radius: 4px; }
+.de-das { color: #4ade80; font-weight: 700; background: rgba(74,222,128,0.12); padding: 1px 4px; border-radius: 4px; }
+.peek-word {
+  cursor: pointer; border-bottom: 1px dotted rgba(255,255,255,0.35);
+  padding: 0 1px; border-radius: 3px; transition: background 0.12s; position: relative;
+}
+.peek-word:hover, .peek-word.active { background: var(--accent-soft); }
+.peek-popover {
+  position: fixed; z-index: 950; background: var(--bg-card); border: 1px solid var(--accent);
+  border-radius: 10px; padding: 6px 10px; font-size: 0.8rem; color: var(--text-main);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.55); pointer-events: none; max-width: 240px;
+}
+.lang-wb-answer, .lang-wb-bank {
+  display: flex; flex-wrap: wrap; gap: 8px; min-height: 52px; padding: 10px;
+  border-radius: 12px; background: var(--bg-main); border: 1px solid var(--border-color);
+}
+.lang-wb-chip {
+  background: var(--bg-surface); color: var(--text-main);
+  border: 1px solid var(--border-highlight); border-bottom: 3px solid rgba(0,0,0,0.35);
+  border-radius: 10px; padding: 7px 13px; font-weight: 600; font-size: 0.95rem; cursor: pointer;
+}
+.lang-wb-chip:active { transform: translateY(2px); }
+.lang-feedback-banner {
+  padding: 10px 14px; border-radius: 12px; font-size: 0.88rem; line-height: 1.45; margin-top: 8px; display: none;
+}
+.lang-feedback-banner.ok { display: block; background: rgba(74,222,128,0.14); border: 1px solid #4ade80; color: #bbf7d0; }
+.lang-feedback-banner.warn { display: block; background: rgba(251,191,36,0.14); border: 1px solid #fbbf24; color: #fef08a; }
+.lang-feedback-banner.err { display: block; background: rgba(248,113,113,0.14); border: 1px solid #f87171; color: #fecaca; }
 """
 
 PRO_HEADER_HUD = r"""  <div class="pro-hud" id="proHud">
@@ -624,6 +715,22 @@ PRO_HEADER_HUD = r"""  <div class="pro-hud" id="proHud">
   </div>"""
 
 PRO_DASHBOARD_HTML = r"""
+    <div class="pro-course-bar" id="proCourseBar">
+      <button class="pro-course-tab active" data-course="general">🍄 Obecné balíčky</button>
+      <button class="pro-course-tab" data-course="en">🇬🇧 EN · C1</button>
+      <button class="pro-course-tab" data-course="de">🇩🇪 DE · B1</button>
+      <button class="pro-course-tab" data-course="fr">🇫🇷 FR · A2–B1</button>
+    </div>
+    <div class="lang-course-section" id="langCourseSection">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <div>
+          <h3 id="langCourseTitle" style="font-size:1.05rem; margin:0;">Jazykový kurz</h3>
+          <div id="langCourseSub" style="font-size:0.8rem; color:var(--text-muted);">Tematické uzly · 10–15 karet</div>
+        </div>
+        <button class="btn btn-sm" id="btnOpenLangMdImport">+ Import .md lekce</button>
+      </div>
+      <div class="lang-skill-path" id="langSkillPath"></div>
+    </div>
     <div class="pro-dashboard" id="proDashboard">
       <div class="pro-mascot-wrap">
         <svg class="pro-mascot-svg" id="proMascotSvg" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -916,6 +1023,58 @@ PRO_MODALS_HTML = r"""
     </div>
   </div>
 </div>
+
+<!-- LANGUAGE RULE TIP MODAL -->
+<div class="modal-overlay" id="langRuleModal">
+  <div class="modal-content" style="max-width:480px;">
+    <div class="modal-header">
+      <div class="modal-title" id="langRuleTitle">📖 Gramatické pravidlo</div>
+      <button class="modal-close" id="langRuleClose">&times;</button>
+    </div>
+    <div id="langRuleBody" style="font-size:0.9rem; line-height:1.55; margin-bottom:14px;"></div>
+    <button class="btn btn-primary" id="btnStartFromRule" style="width:100%;">Spustit lekci</button>
+  </div>
+</div>
+
+<!-- LANGUAGE MD IMPORT MODAL -->
+<div class="modal-overlay" id="langMdImportModal">
+  <div class="modal-content" style="max-width:520px;">
+    <div class="modal-header">
+      <div class="modal-title">Importovat jazykovou lekci (.md)</div>
+      <button class="modal-close" id="langMdImportClose">&times;</button>
+    </div>
+    <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px;">
+      Vložte text nebo vyberte soubor <code>.md</code> ve formátu <code>lang: de</code>, <code>topic: ...</code>, <code>Q:</code>, <code>A:</code>, <code>NOTE:</code>, <code>CLOZE: [slovo]</code>.
+    </p>
+    <input type="file" id="inpLangMdFile" accept=".md,.txt" style="margin-bottom:8px; font-size:0.82rem;">
+    <textarea id="txtLangMdInput" rows="9" placeholder="---&#10;lang: de&#10;level: B1&#10;topic: Cestování&#10;---&#10;Q: Zmeškal jsem přípoj, protože vlak měl zpoždění.&#10;A: Ich habe den Anschluss verpasst, weil der Zug Verspätung hatte.&#10;NOTE: Spojka weil posouvá sloveso na konec.&#10;CLOZE: Ich habe den Anschluss verpasst, [weil] der Zug Verspätung [hatte]." style="width:100%; background:var(--bg-main); border:1px solid var(--border-color); color:var(--text-main); padding:8px; border-radius:8px; font-size:0.82rem; box-sizing:border-box;"></textarea>
+    <button class="btn btn-primary" id="btnRunLangMdImport" style="margin-top:10px; width:100%;">Přidat do kurzu</button>
+  </div>
+</div>
+
+<!-- LANGUAGE DUOLINGO LESSON MODAL (FULLSCREEN) -->
+<div class="modal-overlay lang-lesson-modal" id="langLessonModal">
+  <div class="modal-content">
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+      <button class="btn btn-sm" id="langLessonClose">&times; Ukončit</button>
+      <div class="pro-bar-track" style="flex:1; height:10px;"><div class="pro-bar-fill pro-bar-goal" id="langLessonBar" style="width:0%;"></div></div>
+      <span id="langLessonStepLbl" style="font-size:0.82rem; font-weight:700; color:var(--accent);">1 / 10</span>
+    </div>
+    <div id="langLessonTypeBadge" style="font-size:0.78rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:4px;">Úloha</div>
+    <div id="langLessonPrompt" style="font-size:1.15rem; font-weight:700; line-height:1.5; margin-bottom:6px;"></div>
+    <div class="lang-audio-row" id="langAudioRow">
+      <button class="lang-audio-btn" id="btnLangSpeakNorm" title="Přehrát normální rychlostí">🔊 Přehrát</button>
+      <button class="lang-audio-btn" id="btnLangSpeakSlow" title="Pomalá výslovnost 0.7×">🐢 Pomalu</button>
+    </div>
+    <div id="langInteractiveArea" style="flex:1; display:flex; flex-direction:column; gap:10px; margin-top:8px; overflow-y:auto;"></div>
+    <div class="lang-feedback-banner" id="langFeedbackBanner"></div>
+    <div style="display:flex; gap:8px; margin-top:10px; padding-top:8px; border-top:1px solid var(--border-color);">
+      <button class="btn btn-primary" id="btnLangCheck" style="flex:1; padding:12px;">Zkontrolovat</button>
+      <button class="btn btn-primary" id="btnLangNext" style="flex:1; padding:12px; display:none;">Pokračovat →</button>
+    </div>
+  </div>
+</div>
+<div class="peek-popover" id="peekPopover" style="display:none;"></div>
 
 <!-- CLOUD SYNC MODAL -->
 <div class="modal-overlay" id="syncModal">
@@ -2693,6 +2852,429 @@ document.getElementById("btnSyncDisconnect").onclick = () => {
   document.getElementById("syncStatusMsg").innerText = "Synchronizace odpojena.";
 };
 
+// --- DUOLINGO-STYLE LANGUAGE COURSE ENGINE ---
+const LANG_COURSES = __LANG_COURSES_JSON__;
+const LANG_GLOSSARY = __LANG_GLOSSARY_JSON__;
+const LANG_PROGRESS_KEY = "karty_lang_progress_v1";
+const LANG_CUSTOM_KEY = "karty_lang_custom_topics_v1";
+const ACTIVE_COURSE_KEY = "karty_active_course_v1";
+
+function loadLangProgress() { try { return JSON.parse(localStorage.getItem(LANG_PROGRESS_KEY) || "{}"); } catch { return {}; } }
+function saveLangProgress(p) { localStorage.setItem(LANG_PROGRESS_KEY, JSON.stringify(p)); }
+function loadCustomLangTopics() { try { return JSON.parse(localStorage.getItem(LANG_CUSTOM_KEY) || "{}"); } catch { return {}; } }
+function saveCustomLangTopics(d) { localStorage.setItem(LANG_CUSTOM_KEY, JSON.stringify(d)); }
+
+function getCourseTopics(langKey) {
+  const course = LANG_COURSES[langKey];
+  if (!course) return [];
+  const custom = loadCustomLangTopics()[langKey] || [];
+  return [...course.topics, ...custom];
+}
+
+function switchCourseMode(courseKey) {
+  localStorage.setItem(ACTIVE_COURSE_KEY, courseKey);
+  document.body.classList.remove("course-en", "course-de", "course-fr");
+  if (courseKey === "en" || courseKey === "de" || courseKey === "fr") {
+    document.body.classList.add("course-" + courseKey);
+  }
+  document.querySelectorAll("#proCourseBar .pro-course-tab").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.course === courseKey);
+  });
+  const langSec = document.getElementById("langCourseSection");
+  const deckListEl = document.getElementById("deckList");
+  const dropZoneEl = document.getElementById("dropZone");
+  const extraBar = document.getElementById("btnProNewCard")?.parentElement;
+  if (courseKey === "general") {
+    if (langSec) langSec.classList.remove("active");
+    if (deckListEl) deckListEl.style.display = "";
+    if (dropZoneEl) dropZoneEl.style.display = "";
+    if (extraBar) extraBar.style.display = "flex";
+  } else {
+    if (langSec) langSec.classList.add("active");
+    if (deckListEl) deckListEl.style.display = "none";
+    if (dropZoneEl) dropZoneEl.style.display = "none";
+    if (extraBar) extraBar.style.display = "none";
+    renderLangCourseView(courseKey);
+  }
+}
+
+function renderLangCourseView(langKey) {
+  const course = LANG_COURSES[langKey];
+  if (!course) return;
+  document.getElementById("langCourseTitle").innerText = course.title;
+  const topics = getCourseTopics(langKey);
+  const prog = loadLangProgress();
+  const totalDone = topics.filter(t => (prog[t.id] || 0) >= t.cards.length).length;
+  document.getElementById("langCourseSub").innerText = `${topics.length} tematických uzlů · Dokončeno ${totalDone}/${topics.length}`;
+  const pathEl = document.getElementById("langSkillPath");
+  pathEl.innerHTML = "";
+  topics.forEach((topic, idx) => {
+    const doneCnt = Math.min(topic.cards.length, prog[topic.id] || 0);
+    const isGold = doneCnt >= topic.cards.length && topic.cards.length > 0;
+    const wrap = document.createElement("div");
+    wrap.className = "lang-skill-node-wrap";
+    wrap.innerHTML = `
+      <button class="lang-skill-circle ${isGold ? "gold" : ""}" title="Spustit lekci">
+        <span>${idx + 1}</span>
+        <span style="font-size:0.7rem; font-weight:700;">${doneCnt}/${topic.cards.length}</span>
+      </button>
+      <div class="lang-skill-meta">
+        <strong style="font-size:0.88rem;">${escapeHtml(topic.name)}</strong>
+        ${topic.ruleHtml ? `<button class="btn btn-sm btn-rule-open" style="padding:2px 8px; font-size:0.74rem;">📖 Pravidlo</button>` : ""}
+      </div>
+    `;
+    wrap.querySelector(".lang-skill-circle").onclick = () => startLangLesson(langKey, topic);
+    const rb = wrap.querySelector(".btn-rule-open");
+    if (rb) rb.onclick = () => openLangRule(langKey, topic);
+    pathEl.appendChild(wrap);
+  });
+}
+
+function openLangRule(langKey, topic) {
+  document.getElementById("langRuleTitle").innerText = "📖 " + (topic.ruleTitle || topic.name);
+  document.getElementById("langRuleBody").innerHTML = topic.ruleHtml || "<p>Procvičte si tento tematický blok v lekci.</p>";
+  document.getElementById("btnStartFromRule").onclick = () => {
+    document.getElementById("langRuleModal").classList.remove("active");
+    startLangLesson(langKey, topic);
+  };
+  document.getElementById("langRuleModal").classList.add("active");
+}
+document.getElementById("langRuleClose").onclick = () => document.getElementById("langRuleModal").classList.remove("active");
+
+function playLangAudio(text, ttsLang, rate = 1.0) {
+  if (!("speechSynthesis" in window) || !text) return;
+  try {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = ttsLang || "en-GB";
+    u.rate = rate;
+    window.speechSynthesis.speak(u);
+  } catch {}
+}
+
+function highlightGermanGenders(htmlStr) {
+  return htmlStr
+    .replace(/\b(der|den|dem)\b/gi, '<span class="de-der">$1</span>')
+    .replace(/\b(die)\b/gi, '<span class="de-die">$1</span>')
+    .replace(/\b(das)\b/gi, '<span class="de-das">$1</span>');
+}
+
+function renderPeekSentence(container, sentence, langKey) {
+  const words = sentence.split(/(\s+)/);
+  let html = words.map(tok => {
+    if (!tok.trim()) return tok;
+    const clean = tok.replace(/[.,!?;:"'()\[\]«»„“]/g, "").toLowerCase();
+    const hasGloss = clean && LANG_GLOSSARY[clean];
+    const safeTok = escapeHtml(tok);
+    const inner = langKey === "de" ? highlightGermanGenders(safeTok) : safeTok;
+    return hasGloss ? `<span class="peek-word" data-gloss="${escapeHtml(LANG_GLOSSARY[clean])}">${inner}</span>` : inner;
+  }).join("");
+  container.innerHTML = html;
+  const pop = document.getElementById("peekPopover");
+  container.querySelectorAll(".peek-word").forEach(el => {
+    const showPop = (e) => {
+      e.stopPropagation();
+      if (!pop) return;
+      pop.innerText = el.dataset.gloss;
+      pop.style.display = "block";
+      const r = el.getBoundingClientRect();
+      pop.style.left = Math.max(8, Math.min(window.innerWidth - 220, r.left)) + "px";
+      pop.style.top = Math.max(8, r.top - 36) + "px";
+      clearTimeout(window._peekTimer);
+      window._peekTimer = setTimeout(() => { pop.style.display = "none"; }, 2200);
+    };
+    el.addEventListener("click", showPop);
+    el.addEventListener("mouseenter", showPop);
+  });
+}
+
+function stripDiacriticsStr(s) {
+  return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+function normLangStr(s) {
+  return String(s || "").toLowerCase().replace(/[.,!?;:"'()\[\]«»„“]/g, "").replace(/\s+/g, " ").trim();
+}
+function langLev(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
+function smartGradeLangAnswer(attemptRaw, expectedRaw, langKey) {
+  const att = normLangStr(attemptRaw);
+  const exp = normLangStr(expectedRaw);
+  if (!att) return { status: "err", msg: `Správná odpověď: <strong>${escapeHtml(expectedRaw)}</strong>` };
+  if (att === exp) return { status: "ok", msg: "Skvěle! Přesná odpověď." };
+  // Check missing diacritics
+  if (stripDiacriticsStr(att) === stripDiacriticsStr(exp)) {
+    return { status: "warn_ok", msg: `Správně! Pozor na diakritiku: <strong>${escapeHtml(expectedRaw)}</strong>` };
+  }
+  // German wrong article check (der/die/das/den/dem/ein/eine/einen)
+  if (langKey === "de") {
+    const artRe = /\b(der|die|das|den|dem|ein|eine|einen|einem)\b/g;
+    if (att.replace(artRe, "_") === exp.replace(artRe, "_")) {
+      return { status: "retry", msg: `Téměř! Zkontroluj si <span style="color:#f87171; font-weight:700;">německý člen</span> (der / die / das) a zkus to znovu.` };
+    }
+  }
+  // 1-letter typo
+  if (langLev(att, exp) <= 1) {
+    return { status: "warn_ok", msg: `Skoro správně! Dej si pozor na překlep: <strong>${escapeHtml(expectedRaw)}</strong>` };
+  }
+  return { status: "err", msg: `Správně má být: <strong>${escapeHtml(expectedRaw)}</strong>` };
+}
+
+let _langSession = null;
+function startLangLesson(langKey, topic) {
+  const course = LANG_COURSES[langKey];
+  if (!course || !topic || !topic.cards || topic.cards.length === 0) return;
+  const exercises = topic.cards.map((card, i) => {
+    let mode = "wordbank";
+    if (langKey === "fr") mode = (i % 4 === 2) ? "listening" : (i % 4 === 3 && card.cloze ? "cloze" : "wordbank");
+    else if (langKey === "de") mode = (i % 3 === 1 && card.cloze) ? "cloze" : (i % 3 === 2 ? "listening" : "wordbank");
+    else if (langKey === "en") mode = (i % 3 === 0 && card.cloze) ? "cloze" : (i % 3 === 1 ? "paraphrase" : "wordbank");
+    return { card, mode };
+  });
+  _langSession = { langKey, ttsLang: course.ttsLang, topic, exercises, idx: 0, mistakes: 0, builtWords: [], currentAnswer: "" };
+  document.getElementById("langLessonModal").classList.add("active");
+  renderLangExercise();
+}
+
+function renderLangExercise() {
+  const s = _langSession;
+  if (!s) return;
+  const ex = s.exercises[s.idx];
+  const card = ex.card;
+  const total = s.exercises.length;
+  document.getElementById("langLessonStepLbl").innerText = `${s.idx + 1} / ${total}`;
+  document.getElementById("langLessonBar").style.width = `${Math.round((s.idx / total) * 100)}%`;
+
+  const badge = document.getElementById("langLessonTypeBadge");
+  const promptEl = document.getElementById("langLessonPrompt");
+  const area = document.getElementById("langInteractiveArea");
+  const fb = document.getElementById("langFeedbackBanner");
+  const btnCheck = document.getElementById("btnLangCheck");
+  const btnNext = document.getElementById("btnLangNext");
+  fb.className = "lang-feedback-banner"; fb.style.display = "none"; fb.innerHTML = "";
+  btnCheck.style.display = "block"; btnNext.style.display = "none";
+  area.innerHTML = "";
+  s.builtWords = [];
+  s.selectedChoice = null;
+
+  document.getElementById("btnLangSpeakNorm").onclick = () => playLangAudio(card.a, s.ttsLang, 1.0);
+  document.getElementById("btnLangSpeakSlow").onclick = () => playLangAudio(card.a, s.ttsLang, 0.7);
+  // Auto-play audio
+  setTimeout(() => playLangAudio(card.a, s.ttsLang, 1.0), 160);
+
+  if (ex.mode === "listening") {
+    badge.innerText = "Poslechové cvičení · Slož větu, kterou slyšíš";
+    promptEl.innerText = "Poslechni si nahrávku a poskládej větu:";
+    buildWordBankUi(area, card, s);
+  } else if (ex.mode === "cloze" && card.cloze) {
+    badge.innerText = "Doplňovačka v kontextu";
+    promptEl.innerText = card.q;
+    const blanks = [];
+    const masked = card.cloze.replace(/\[([^\]]+)\]/g, (_, w) => {
+      blanks.push(w);
+      return `<input type="text" class="lang-cloze-inp" data-idx="${blanks.length - 1}" placeholder="..." autocomplete="off" style="width:${Math.max(70, w.length * 11)}px; background:var(--bg-main); border:2px solid var(--accent); color:var(--text-main); padding:3px 8px; border-radius:8px; font-size:0.95rem; font-weight:700; text-align:center;">`;
+    });
+    const box = document.createElement("div");
+    box.style.cssText = "padding:14px; background:var(--bg-surface); border-radius:12px; line-height:2; font-size:1.05rem;";
+    box.innerHTML = s.langKey === "de" ? highlightGermanGenders(masked) : masked;
+    area.appendChild(box);
+    s.clozeBlanks = blanks;
+    const firstInp = box.querySelector(".lang-cloze-inp");
+    if (firstInp) setTimeout(() => firstInp.focus(), 80);
+  } else if (ex.mode === "paraphrase") {
+    badge.innerText = "C1 Kontext & Nuance · Vyber nejlepší variantu";
+    promptEl.innerText = card.q;
+    const otherCards = s.topic.cards.filter(c => c.id !== card.id).sort(() => Math.random() - 0.5).slice(0, 3);
+    const opts = [card.a, ...otherCards.map(c => c.a)].sort(() => Math.random() - 0.5);
+    const grid = document.createElement("div");
+    grid.className = "quiz-grid";
+    grid.style.gridTemplateColumns = "1fr";
+    opts.forEach(opt => {
+      const b = document.createElement("button");
+      b.className = "quiz-option";
+      b.innerText = opt;
+      b.onclick = () => {
+        grid.querySelectorAll(".quiz-option").forEach(x => x.style.borderColor = "");
+        b.style.borderColor = "var(--accent)";
+        s.selectedChoice = opt;
+      };
+      grid.appendChild(b);
+    });
+    area.appendChild(grid);
+  } else {
+    badge.innerText = "Překlad · Skládání z bublin (Word Bank)";
+    promptEl.innerText = card.q;
+    buildWordBankUi(area, card, s);
+  }
+}
+
+function buildWordBankUi(area, card, s) {
+  const words = card.a.split(/\s+/).filter(Boolean);
+  const distractorsPool = s.langKey === "fr"
+    ? ["très", "toujours", "mais", "avec", "pour", "demain"]
+    : (s.langKey === "de" ? ["immer", "aber", "nicht", "sehr", "heute", "oder"] : ["however", "indeed", "rather", "actually", "almost"]);
+  const distractors = distractorsPool.filter(d => !words.some(w => normLangStr(w) === d)).sort(() => Math.random() - 0.5).slice(0, 2);
+  const tokens = [...words, ...distractors].map((val, idx) => ({ val, idx })).sort(() => Math.random() - 0.5);
+
+  const ansBox = document.createElement("div");
+  ansBox.className = "lang-wb-answer";
+  const bankBox = document.createElement("div");
+  bankBox.className = "lang-wb-bank";
+
+  const renderWb = () => {
+    ansBox.innerHTML = "";
+    s.builtWords.forEach(item => {
+      const c = document.createElement("button");
+      c.className = "lang-wb-chip";
+      c.innerHTML = s.langKey === "de" ? highlightGermanGenders(escapeHtml(item.val)) : escapeHtml(item.val);
+      c.onclick = () => { s.builtWords = s.builtWords.filter(x => x.idx !== item.idx); renderWb(); };
+      ansBox.appendChild(c);
+    });
+    bankBox.innerHTML = "";
+    tokens.forEach(item => {
+      if (s.builtWords.some(x => x.idx === item.idx)) return;
+      const c = document.createElement("button");
+      c.className = "lang-wb-chip";
+      c.innerHTML = s.langKey === "de" ? highlightGermanGenders(escapeHtml(item.val)) : escapeHtml(item.val);
+      c.onclick = () => { s.builtWords.push(item); renderWb(); };
+      bankBox.appendChild(c);
+    });
+  };
+  area.appendChild(ansBox);
+  area.appendChild(bankBox);
+  renderWb();
+}
+
+document.getElementById("btnLangCheck").onclick = async () => {
+  const s = _langSession;
+  if (!s) return;
+  const ex = s.exercises[s.idx];
+  const card = ex.card;
+  const fb = document.getElementById("langFeedbackBanner");
+  let grade = null;
+
+  if (ex.mode === "cloze" && s.clozeBlanks) {
+    const inputs = Array.from(document.querySelectorAll("#langInteractiveArea .lang-cloze-inp"));
+    const userWords = inputs.map(i => i.value.trim()).join(" ");
+    const expWords = s.clozeBlanks.join(" ");
+    grade = smartGradeLangAnswer(userWords, expWords, s.langKey);
+  } else if (ex.mode === "paraphrase") {
+    if (!s.selectedChoice) { alert("Vyberte prosím jednu možnost."); return; }
+    grade = s.selectedChoice === card.a
+      ? { status: "ok", msg: "Skvěle! Přesná C1 nuance." }
+      : { status: "err", msg: `Správně: <strong>${escapeHtml(card.a)}</strong>` };
+  } else {
+    const attempt = s.builtWords.map(x => x.val).join(" ");
+    grade = smartGradeLangAnswer(attempt, card.a, s.langKey);
+  }
+
+  if (grade.status === "retry") {
+    fb.className = "lang-feedback-banner warn";
+    fb.style.display = "block";
+    fb.innerHTML = grade.msg;
+    playProTone("again");
+    return;
+  }
+
+  const isCorrect = grade.status === "ok" || grade.status === "warn_ok";
+  fb.className = "lang-feedback-banner " + (grade.status === "ok" ? "ok" : (grade.status === "warn_ok" ? "warn" : "err"));
+  fb.style.display = "block";
+  fb.innerHTML = `<div>${grade.msg}</div>`
+    + `<div style="margin-top:6px;" id="langPeekLine"></div>`
+    + (card.note ? `<div style="margin-top:4px; font-size:0.8rem; opacity:0.9;">💡 ${escapeHtml(card.note)}</div>` : "");
+  const peekLine = document.getElementById("langPeekLine");
+  if (peekLine) renderPeekSentence(peekLine, card.a, s.langKey);
+
+  if (isCorrect) {
+    playProTone("good");
+    const p = loadProProfile(); p.points += 8; p.xp = (p.xp || 0) + 8; saveProProfile(p);
+    await updateProHud();
+  } else {
+    s.mistakes++;
+    s.exercises.push(ex); // Return at end of lesson
+    playProTone("again");
+  }
+  document.getElementById("btnLangCheck").style.display = "none";
+  document.getElementById("btnLangNext").style.display = "block";
+};
+
+document.getElementById("btnLangNext").onclick = async () => {
+  const s = _langSession;
+  if (!s) return;
+  s.idx++;
+  if (s.idx >= s.exercises.length) {
+    document.getElementById("langLessonModal").classList.remove("active");
+    const prog = loadLangProgress();
+    prog[s.topic.id] = s.topic.cards.length;
+    saveLangProgress(prog);
+    const p = loadProProfile(); p.points += 25; p.xp = (p.xp || 0) + 25; saveProProfile(p);
+    launchConfetti(); playProTone("level");
+    showProToast(`Lekce „${s.topic.name}“ dokončena! +25 b.`);
+    renderLangCourseView(s.langKey);
+    await updateProHud();
+    _langSession = null;
+    return;
+  }
+  renderLangExercise();
+};
+document.getElementById("langLessonClose").onclick = () => {
+  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  document.getElementById("langLessonModal").classList.remove("active");
+  _langSession = null;
+};
+
+// .md Language Format Importer (lang / level / topic / Q / A / NOTE / CLOZE)
+document.getElementById("btnOpenLangMdImport").onclick = () => document.getElementById("langMdImportModal").classList.add("active");
+document.getElementById("langMdImportClose").onclick = () => document.getElementById("langMdImportModal").classList.remove("active");
+document.getElementById("inpLangMdFile").onchange = async (e) => {
+  const f = e.target.files?.[0];
+  if (f) document.getElementById("txtLangMdInput").value = await f.text();
+};
+document.getElementById("btnRunLangMdImport").onclick = () => {
+  const raw = document.getElementById("txtLangMdInput").value.trim();
+  if (!raw) { alert("Vložte prosím obsah lekce."); return; }
+  let lang = localStorage.getItem(ACTIVE_COURSE_KEY);
+  if (!["en", "de", "fr"].includes(lang)) lang = "de";
+  let topicName = "Vlastní lekce";
+  const fmMatch = raw.match(/^---\s*\n([\s\S]*?)\n---/);
+  let body = raw;
+  if (fmMatch) {
+    body = raw.slice(fmMatch[0].length);
+    const lM = fmMatch[1].match(/^lang:\s*(\w+)/im);
+    const tM = fmMatch[1].match(/^topic:\s*(.+)$/im);
+    if (lM && ["en", "de", "fr"].includes(lM[1].toLowerCase())) lang = lM[1].toLowerCase();
+    if (tM) topicName = tM[1].trim();
+  }
+  const blocks = body.split(/\n\s*\n/).map(b => b.trim()).filter(Boolean);
+  const cards = [];
+  blocks.forEach((blk, idx) => {
+    const q = (blk.match(/^Q:\s*(.+)$/im) || [])[1]?.trim();
+    const a = (blk.match(/^A:\s*(.+)$/im) || [])[1]?.trim();
+    const note = (blk.match(/^NOTE:\s*(.+)$/im) || [])[1]?.trim() || "";
+    const cloze = (blk.match(/^CLOZE:\s*(.+)$/im) || [])[1]?.trim() || "";
+    if (q && a) cards.push({ id: `cust_${Date.now()}_${idx}`, q, a, note, cloze });
+  });
+  if (cards.length === 0) { alert("Nenašel jsem žádné karty ve formátu Q: / A:."); return; }
+  const custom = loadCustomLangTopics();
+  custom[lang] = custom[lang] || [];
+  custom[lang].push({ id: "ct_" + Date.now(), name: topicName, cards });
+  saveCustomLangTopics(custom);
+  document.getElementById("langMdImportModal").classList.remove("active");
+  document.getElementById("txtLangMdInput").value = "";
+  switchCourseMode(lang);
+  showProToast(`Přidáno ${cards.length} karet do kurzu ${lang.toUpperCase()}!`);
+};
+
 window.addEventListener("DOMContentLoaded", () => {
   if (location.hash && location.hash.startsWith("#sync=")) {
     try {
@@ -2713,10 +3295,16 @@ window.addEventListener("DOMContentLoaded", () => {
   const bSetup = document.getElementById("btnCloudSyncSetup");
   if (bSync) bSync.onclick = () => runCloudSync(false);
   if (bSetup) bSetup.onclick = () => openSyncModal();
+  document.querySelectorAll("#proCourseBar .pro-course-tab").forEach(btn => {
+    btn.onclick = () => switchCourseMode(btn.dataset.course);
+  });
+  const savedCourse = localStorage.getItem(ACTIVE_COURSE_KEY) || "general";
+  switchCourseMode(savedCourse);
   setTimeout(() => { updateProHud(); }, 300);
 });
 """
 
+PRO_JS = PRO_JS.replace("__LANG_COURSES_JSON__", get_lang_courses_json()).replace("__LANG_GLOSSARY_JSON__", get_lang_glossary_json())
 assert "</style>" in html
 html = html.replace("</style>", PRO_CSS + "\n</style>", 1)
 
