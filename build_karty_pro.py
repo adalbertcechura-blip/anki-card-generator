@@ -631,24 +631,31 @@ header {
 .pro-training-actions {
   display: flex; gap: 6px; flex-wrap: wrap;
 }
-.training-modal .modal-content {
+#gamesModal.modal-overlay, #trainingModal.modal-overlay {
+  padding: 0 !important; align-items: stretch !important; justify-content: stretch !important;
+  background: var(--bg-main) !important;
+}
+#gamesModal .modal-content, #trainingModal .modal-content {
   width: 100vw !important; max-width: 100vw !important;
   height: 100dvh !important; max-height: 100dvh !important;
-  border-radius: 0 !important; border: none !important;
-  padding: 14px max(12px, calc((100vw - 720px) / 2)) !important;
+  border-radius: 0 !important; border: none !important; margin: 0 !important; box-shadow: none !important;
+  padding: 12px max(10px, calc((100vw - 760px) / 2)) !important;
   display: flex; flex-direction: column; box-sizing: border-box; overflow-y: auto; overflow-x: hidden;
 }
 .chess-board-wrap {
-  width: min(100%, 400px); margin: 6px auto; position: relative;
+  width: min(100%, 440px, calc(100dvh - 210px)); margin: 4px auto; position: relative;
 }
 .chess-board {
-  display: grid; grid-template-columns: repeat(8, 1fr);
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-rows: repeat(8, minmax(0, 1fr));
   width: 100%; aspect-ratio: 1 / 1; border: 2px solid var(--border-highlight);
   border-radius: 8px; overflow: hidden; user-select: none; touch-action: manipulation;
 }
 .chess-sq {
   position: relative; display: flex; align-items: center; justify-content: center;
-  font-size: clamp(22px, 6.2vw, 36px); line-height: 1; cursor: pointer;
+  aspect-ratio: 1 / 1; min-width: 0; min-height: 0; overflow: hidden;
+  font-size: clamp(22px, 7.2vw, 38px); line-height: 1; cursor: pointer;
   transition: background 0.12s;
 }
 .chess-sq.light { background: #d6cbb5; color: #1c1917; }
