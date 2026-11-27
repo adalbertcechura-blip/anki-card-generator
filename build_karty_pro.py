@@ -3929,12 +3929,62 @@ function renderQuizOptions(card, isReverse) {
     cardInDeck.state = (typeof choice.newState === "number") ? choice.newState : (ratingKey === "again" ? 1 : 2);''',
         '''    const srsTarget = getCardSrsObj(cardInDeck);
     const wasNew = !srsTarget.due || srsTarget.due === 0;
+    const wasRed = !wasNew && ((srsTarget.interval || 0) < 1 || srsTarget.state === 1 || srsTarget.state === 3);
+    const wasGreen = !wasNew && !wasRed;
+    let nextDueTs = Date.now() + choice.ms;
+    if (choice.ms >= 86400000) {
+      const mid = new Date();
+      mid.setHours(0, 0, 0, 0);
+      mid.setDate(mid.getDate() + Math.max(1, Math.round(choice.ms / 86400000)));
+      nextDueTs = mid.getTime() + 1000;
+    }
     srsTarget.interval = choice.newInterval;
     srsTarget.ease = choice.newEase;
     srsTarget.reps = choice.newReps;
-    srsTarget.due = Date.now() + choice.ms;
+    srsTarget.due = nextDueTs;
     srsTarget.lastReview = Date.now();
     srsTarget.state = (typeof choice.newState === "number") ? choice.newState : (ratingKey === "again" ? 1 : 2);''',
+    ),
+    (
+        '''    if (wasNew && sessionStats.newCount > 0) sessionStats.newCount--;
+    else if (!wasNew && sessionStats.dueCount > 0) sessionStats.dueCount--;
+
+    if (isSameDayStep) {
+      studyQueue.push(cardInDeck);
+      sessionStats.dueCount++;
+    } else {
+      sessionStats.doneCount++;
+    }''',
+        '''    if (wasNew && sessionStats.newCount > 0) sessionStats.newCount--;
+    else if (wasRed && sessionStats.dueCount > 0) sessionStats.dueCount--;
+    else if (wasGreen && sessionStats.doneCount > 0) sessionStats.doneCount--;
+
+    if (isSameDayStep) {
+      studyQueue.push(cardInDeck);
+      sessionStats.dueCount++;
+    }''',
+    ),
+    (
+        '''  sessionStats = {
+    newCount: studyQueue.filter(c => !c.due || c.due === 0).length,
+    dueCount: studyQueue.filter(c => c.due && c.due > 0 && (c.due <= now || (c.interval > 0 && c.interval < 1 && c.due <= endOfTodayMs))).length,
+    doneCount: 0
+  };''',
+        '''  sessionStats = {
+    newCount: studyQueue.filter(c => !getCardSrsObj(c).due || getCardSrsObj(c).due === 0).length,
+    dueCount: studyQueue.filter(c => {
+      const s = getCardSrsObj(c);
+      return s.due && s.due > 0 && ((s.interval || 0) < 1 || s.state === 1 || s.state === 3);
+    }).length,
+    doneCount: studyQueue.filter(c => {
+      const s = getCardSrsObj(c);
+      return s.due && s.due > 0 && !((s.interval || 0) < 1 || s.state === 1 || s.state === 3);
+    }).length
+  };''',
+    ),
+    (
+        '''<span class="pill pill-done" id="pillDone" title="Hotovo v této relaci">0</span>''',
+        '''<span class="pill pill-done" id="pillDone" title="K opakování (naučené)">0</span>''',
     ),
     (
         '''const btnModeFlip = document.getElementById("btnModeFlip");
