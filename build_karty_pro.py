@@ -1532,7 +1532,9 @@ function renderMobileWeekStrip(activeSet, frozenSet) {
 
 // Wrap startStudy for Lesson slicing (10-15 cards) and Lesson stats
 const _origStartStudyPro = startStudy;
+let _sessionStruggledCards = new Set();
 startStudy = async function(deckId, quickMode = false, subdeckFilter = null, keepExtra = false, sliceRange = null) {
+  _sessionStruggledCards = new Set();
   const prof = loadProProfile();
   _lessonStartMs = Date.now();
   _lessonStats = { reviewed: 0, mistakes: 0, xp: 0 };
@@ -2754,7 +2756,7 @@ async function runCloudSync(silentIfUnconfigured = false) {
         const rBetter = rLast > lLast || (rLast === lLast && (rReps > lReps || (rReps === lReps && ((rc.due || 0) > (lc.due || 0) || (rc.state || 0) > (lc.state || 0)))));
         if (rBetter) {
           changed = true; mergedCardUpdates++;
-          lc = { ...lc, interval: rc.interval || 0, reps: rc.reps || 0, ease: rc.ease || 2.5, due: rc.due || 0, state: rc.state || 0, lastReview: rc.lastReview || 0 };
+          lc = { ...lc, interval: rc.interval || 0, reps: rc.reps || 0, ease: rc.ease || 2.5, due: rc.due || 0, state: rc.state || 0, lastReview: rc.lastReview || 0, strugglePts: rc.strugglePts || 0 };
         }
         if (rc.rev && (!lc.rev || (rc.rev.lastReview || 0) > (lc.rev.lastReview || 0) || (rc.rev.reps || 0) > (lc.rev.reps || 0) || (rc.rev.due || 0) > (lc.rev.due || 0))) {
           changed = true;
@@ -2800,6 +2802,7 @@ async function runCloudSync(silentIfUnconfigured = false) {
       cards: (d.cards || []).map(c => ({
         id: c.id, title: c.title, interval: c.interval || 0, reps: c.reps || 0,
         ease: c.ease || 2.5, due: c.due || 0, state: c.state || 0, lastReview: c.lastReview || 0,
+        strugglePts: c.strugglePts || 0,
         rev: c.rev || null
       }))
     }));
@@ -3748,6 +3751,14 @@ function calcNextIntervals(card, deckArg) {
   const state = (typeof srs.state === "number") ? srs.state : ((!srs.due || srs.due === 0) ? 0 : (interval < 1 ? 1 : 2));''',
     ),
     (
+        '''  const cfg = getDeckSrsSettings(deckArg || currentDeck);
+  const mult = cfg.intervalMultiplier;''',
+        '''  const cfg = getDeckSrsSettings(deckArg || currentDeck);
+  const strugglePts = srs.strugglePts || 0;
+  const struggleFactor = Math.max(0.25, 1 - strugglePts * 0.12);
+  const mult = cfg.intervalMultiplier * struggleFactor;''',
+    ),
+    (
         '''function extractTargetAnswer(card, isReverse) {
   if (!card) return "";''',
         '''function extractTargetAnswer(card, isReverse) {
@@ -3943,7 +3954,14 @@ function renderQuizOptions(card, isReverse) {
     srsTarget.reps = choice.newReps;
     srsTarget.due = nextDueTs;
     srsTarget.lastReview = Date.now();
-    srsTarget.state = (typeof choice.newState === "number") ? choice.newState : (ratingKey === "again" ? 1 : 2);''',
+    srsTarget.state = (typeof choice.newState === "number") ? choice.newState : (ratingKey === "again" ? 1 : 2);
+    const scKey = cardInDeck.id;
+    if (ratingKey === "again" || ratingKey === "hard") {
+      if (typeof _sessionStruggledCards !== "undefined") _sessionStruggledCards.add(scKey);
+      srsTarget.strugglePts = Math.min(8, (srsTarget.strugglePts || 0) + (ratingKey === "again" ? 2 : 1));
+    } else if (choice.ms >= 86400000 && (typeof _sessionStruggledCards === "undefined" || !_sessionStruggledCards.has(scKey))) {
+      srsTarget.strugglePts = 0;
+    }''',
     ),
     (
         '''    if (wasNew && sessionStats.newCount > 0) sessionStats.newCount--;
